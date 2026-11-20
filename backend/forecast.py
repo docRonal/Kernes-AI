@@ -28,6 +28,7 @@ from .models import (
     DecisionRequest,
     DecisionResponse,
     Deficit,
+    EarlierPayment,
     ForecastResponse,
     Projection,
     Proposal,
@@ -190,6 +191,39 @@ def propose(baseline: Projection, transactions: list[Transaction]) -> Proposal |
     )
 
 
+def suggest_earlier_payments(
+    baseline: Projection, transactions: list[Transaction], proposal: Proposal | None
+) -> list[EarlierPayment]:
+    """Incoming payments worth asking for early instead of borrowing, best first.
+
+    Each one is due after the first shortfall. Paid by the day before that shortfall
+    (or on the first day of the forecast), it would leave limit_after_minor of the
+    facility still needed. Ranked by that amount, then by the soonest due date, which
+    is the smallest ask. Payments that wouldn't lower the limit are left out.
+    """
+    if proposal is None:
+        return []
+    days = baseline.days
+    first_gap = proposal.first_shortfall.date
+    pay_by = max(days[0].date, first_gap - timedelta(days=1))
+    ranked = []
+    for transaction in transactions:
+        if transaction.amount_minor <= 0 or not first_gap < transaction.date <= days[-1].date:
+            continue
+        # Paid on pay_by instead of its due date, the money lifts every balance in between.
+        lowest = min(
+            day.balance_minor + (transaction.amount_minor if pay_by <= day.date < transaction.date else 0)
+            for day in days
+        )
+        limit_after = max(0, -lowest)
+        if limit_after < proposal.limit_minor:
+            ranked.append((limit_after, transaction.date, -transaction.amount_minor, transaction.id))
+    return [
+        EarlierPayment(transaction_id=transaction_id, pay_by=pay_by, limit_after_minor=limit_after)
+        for limit_after, _, _, transaction_id in sorted(ranked)
+    ]
+
+
 def move_payment(transactions: list[Transaction], transaction_id: str, to_date: date, start: date) -> list[Transaction]:
     """A copy of the transactions with one incoming payment on another date. The input stays unchanged."""
     window = horizon(start)
@@ -227,10 +261,12 @@ def build_forecast(
         moved = move_payment(transactions, move_transaction_id, move_to_date, start)
         scenario = project(moved, opening_minor, start)
 
+    proposal = propose(baseline, transactions)
     return ForecastResponse(
         transactions=transactions,
         baseline=baseline,
-        proposal=propose(baseline, transactions),
+        proposal=proposal,
+        earlier_payments=suggest_earlier_payments(baseline, transactions, proposal),
         scenario=scenario,
     )
 

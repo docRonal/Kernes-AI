@@ -70,11 +70,21 @@ class Proposal(BaseModel):
     relevant_transaction_ids: list[str]
 
 
+class EarlierPayment(BaseModel):
+    """An incoming payment that would shrink the proposed facility if the client paid it by pay_by."""
+
+    model_config = ConfigDict(extra="forbid")
+    transaction_id: str
+    pay_by: date
+    limit_after_minor: NonNegativeInt
+
+
 class ForecastResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     transactions: list[Transaction]
     baseline: Projection
     proposal: Proposal | None
+    earlier_payments: list[EarlierPayment]
     scenario: Projection | None
 
 

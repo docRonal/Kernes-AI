@@ -76,6 +76,7 @@ def test_no_shortfall_means_no_proposal(client):
     result = forecast(client, HEADER + "INV-9,2026-11-25,50000,Client invoice\nPAY-9,2026-11-28,-30000,Rent\n").json()
     assert result["baseline"]["first_deficit"] is None
     assert result["proposal"] is None
+    assert result["earlier_payments"] == []
 
 
 def test_tied_deepest_shortfall_uses_the_earliest_day(client):
@@ -113,6 +114,51 @@ def test_bom_quotes_header_order_and_blank_lines_are_accepted(client):
     assert result["transactions"] == [{"id": "R1", "date": "2026-11-24", "amount_minor": -1000, "label": "Rent, office"}]
 
 
+# ─── Instead of borrowing: ask for an invoice earlier ────────────────────────
+
+
+def test_the_invoice_that_closes_the_gap_is_suggested_for_the_day_before(client):
+    result = starter(client)
+    assert result["earlier_payments"] == [{"transaction_id": "INV-001", "pay_by": "2026-11-26", "limit_after_minor": 0}]
+    # The suggestion is the what-if the user can run, and it removes the gap.
+    option = result["earlier_payments"][0]
+    moved = starter(client, move_transaction_id=option["transaction_id"], move_to_date=option["pay_by"])
+    assert moved["scenario"]["first_deficit"] is None
+
+
+def test_pay_by_never_falls_before_the_forecast_starts(client):
+    peak = forecast(client, (DEMO / "credit_peak_case.csv").read_bytes(), opening="100000").json()
+    assert peak["earlier_payments"] == [{"transaction_id": "PEAK-003", "pay_by": "2026-11-23", "limit_after_minor": 0}]
+    short_today = forecast(client, HEADER + "IN,2026-11-30,90000,Invoice\n", opening="-10000").json()
+    assert short_today["earlier_payments"] == [{"transaction_id": "IN", "pay_by": "2026-11-23", "limit_after_minor": 0}]
+
+
+def test_options_are_ranked_by_the_credit_still_needed(client):
+    csv = HEADER + (
+        "RENT,2026-11-25,-500000,Rent\n"
+        "EARLY,2026-11-24,50000,Paid before the gap\n"
+        "SMALL,2026-11-27,100000,Small invoice\n"
+        "BIG,2026-11-30,600000,Big invoice\n"
+    )
+    result = forecast(client, csv, opening="0").json()
+    assert result["proposal"]["limit_minor"] == 450_000
+    assert result["earlier_payments"] == [
+        {"transaction_id": "BIG", "pay_by": "2026-11-24", "limit_after_minor": 0},
+        {"transaction_id": "SMALL", "pay_by": "2026-11-24", "limit_after_minor": 350_000},
+    ]
+
+
+def test_a_payment_that_leaves_the_deepest_gap_untouched_is_not_suggested(client):
+    csv = HEADER + (
+        "SUPPLIER,2026-11-24,-100000,Supplier\n"
+        "INV,2026-11-26,100000,Client invoice\n"
+        "TAX,2026-12-01,-300000,Tax\n"
+    )
+    result = forecast(client, csv, opening="0").json()
+    assert result["proposal"]["deepest_shortfall"] == {"date": "2026-12-01", "shortfall_minor": 300_000}
+    assert result["earlier_payments"] == []
+
+
 # ─── What-if: move an incoming payment ───────────────────────────────────────
 
 
@@ -121,6 +167,7 @@ def test_moving_an_invoice_earlier_changes_only_the_scenario(client):
     moved = starter(client, move_transaction_id="INV-001", move_to_date="2026-11-26")
     assert moved["baseline"] == plain["baseline"]
     assert moved["proposal"] == plain["proposal"]
+    assert moved["earlier_payments"] == plain["earlier_payments"]  # suggestions come from the baseline
     assert moved["transactions"] == plain["transactions"]  # the original date stays
     assert balance_on(moved["baseline"], "2026-11-27") == -500_000
     assert balance_on(moved["scenario"], "2026-11-27") == 400_000
@@ -313,6 +360,7 @@ def test_demo_fixture_matches_the_live_calculation(client):
     [
         ("ForecastResponse", "ForecastResponse"),
         ("Proposal", "Proposal"),
+        ("EarlierPayment", "EarlierPayment"),
         ("DecisionRequest", "DecisionRequest"),
         ("DecisionDay", "DecisionDay"),
         ("DecisionResponse", "DecisionResponse"),

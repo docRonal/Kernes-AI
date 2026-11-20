@@ -282,6 +282,31 @@
         ],
         "additionalProperties": false
       },
+      "EarlierPayment": {
+        "type": "object",
+        "description": "An incoming payment that would shrink the proposed facility if the client paid it by pay_by. Calculated, never from the model.",
+        "properties": {
+          "transaction_id": {
+            "type": "string"
+          },
+          "pay_by": {
+            "type": "string",
+            "format": "date",
+            "description": "The day before the first shortfall, or the first day of the forecast."
+          },
+          "limit_after_minor": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Facility still needed if the payment arrives by pay_by."
+          }
+        },
+        "required": [
+          "transaction_id",
+          "pay_by",
+          "limit_after_minor"
+        ],
+        "additionalProperties": false
+      },
       "ForecastResponse": {
         "type": "object",
         "properties": {
@@ -304,6 +329,13 @@
               }
             ]
           },
+          "earlier_payments": {
+            "type": "array",
+            "description": "Incoming payments due after the first shortfall that would lower the facility if paid earlier, best first. Empty without a shortfall.",
+            "items": {
+              "$ref": "#/components/schemas/EarlierPayment"
+            }
+          },
           "scenario": {
             "anyOf": [
               {
@@ -319,6 +351,7 @@
           "transactions",
           "baseline",
           "proposal",
+          "earlier_payments",
           "scenario"
         ],
         "additionalProperties": false
