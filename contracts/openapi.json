@@ -32,7 +32,7 @@
     },
     "/api/forecast": {
       "post": {
-        "description": "Compute 14 end-of-day balances including start_date. Opening balance is before any start_date movement. Sum all dated movements through day 14. Ignore rows outside this window in the projection and return the original CSV rows in transactions. Report the first strictly negative end-of-day balance as a positive shortfall. Both move fields must be supplied together or omitted. If supplied, shift a positive transaction within the window to another date within that window in the scenario only. If omitted, scenario is null.",
+        "description": "Compute 14 end-of-day balances including start_date. Opening balance is before any start_date movement. Sum all dated movements through day 14. Ignore rows outside this window in the projection and return the original CSV rows in transactions. Report the first strictly negative end-of-day balance as a positive shortfall. Both move fields must be supplied together or omitted. If supplied, shift a positive transaction within the window to another date within that window in the scenario only. If omitted, scenario is null. When the baseline goes below zero, proposal is a credit facility with limit_minor = max(0, -min(baseline balances)). deepest_shortfall is the lowest baseline balance; the earliest day wins a tie. relevant_transaction_ids lists the window's rows, by date, up to the day the balance recovers from that deepest gap or the window's end. proposal is null when every baseline balance is zero or above. The scenario never changes the proposal.",
         "requestBody": {
           "required": true,
           "content": {
@@ -55,10 +55,37 @@
             }
           },
           "422": {
-            "description": "Invalid CSV, fields, transaction ID or scenario date"
+            "description": "Invalid CSV, fields, transaction ID or scenario date. detail is a readable message, with the CSV line number where it applies."
+          }
+        }
+      }
+    },
+    "/api/decision": {
+      "post": {
+        "description": "Simulate the user's decision on the proposed facility for the baseline from the forecast response. The server recalculates limit_minor from the baseline, so it always matches the proposal. Approved: each day uses up to limit_minor to cover a negative balance and reports what is still uncovered. Rejected: the facility is unused and the original gap stays uncovered. Balances are returned unchanged. Nothing is applied for, transferred or sent. The result is the same in demo and live modes.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Simulated outcome",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionResponse"
+                }
+              }
+            }
           },
-          "503": {
-            "description": "Forecast unavailable in live mode until its implementation is connected"
+          "422": {
+            "description": "Unknown decision, a baseline that isn't 14 consecutive days, or a baseline without a shortfall"
           }
         }
       }
@@ -193,7 +220,7 @@
           "file": {
             "type": "string",
             "format": "binary",
-            "description": "UTF-8 CSV. Header id,date,amount_minor,label. Unique IDs; ISO dates; signed integer grosz."
+            "description": "UTF-8 CSV, at most 1 MB and 5,000 rows. Header id,date,amount_minor,label in any order. Unique IDs; ISO dates; signed integer grosz up to 100,000,000,000 in absolute value. Blank lines are ignored."
           },
           "starting_balance_minor": {
             "type": "integer"
@@ -217,6 +244,35 @@
         ],
         "additionalProperties": false
       },
+      "Proposal": {
+        "type": "object",
+        "description": "Credit facility proposed for a baseline shortfall. Amounts come from the calculation, never from the model.",
+        "properties": {
+          "limit_minor": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "first_shortfall": {
+            "$ref": "#/components/schemas/Deficit"
+          },
+          "deepest_shortfall": {
+            "$ref": "#/components/schemas/Deficit"
+          },
+          "relevant_transaction_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "limit_minor",
+          "first_shortfall",
+          "deepest_shortfall",
+          "relevant_transaction_ids"
+        ],
+        "additionalProperties": false
+      },
       "ForecastResponse": {
         "type": "object",
         "properties": {
@@ -228,6 +284,16 @@
           },
           "baseline": {
             "$ref": "#/components/schemas/Forecast"
+          },
+          "proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Proposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "scenario": {
             "anyOf": [
@@ -243,7 +309,100 @@
         "required": [
           "transactions",
           "baseline",
+          "proposal",
           "scenario"
+        ],
+        "additionalProperties": false
+      },
+      "DecisionRequest": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ]
+          },
+          "baseline": {
+            "$ref": "#/components/schemas/Forecast"
+          }
+        },
+        "required": [
+          "decision",
+          "baseline"
+        ],
+        "additionalProperties": false
+      },
+      "DecisionDay": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "balance_minor": {
+            "type": "integer"
+          },
+          "facility_used_minor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "uncovered_minor": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "date",
+          "balance_minor",
+          "facility_used_minor",
+          "uncovered_minor"
+        ],
+        "additionalProperties": false
+      },
+      "DecisionResponse": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ]
+          },
+          "simulated": {
+            "const": true
+          },
+          "limit_minor": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DecisionDay"
+            },
+            "minItems": 14,
+            "maxItems": 14
+          },
+          "largest_uncovered": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Deficit"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "decision",
+          "simulated",
+          "limit_minor",
+          "days",
+          "largest_uncovered"
         ],
         "additionalProperties": false
       },
