@@ -7,8 +7,15 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .advice import get_advice
-from .forecast import DEMO_FILE, get_forecast
-from .models import AdviceRequest, AdviceResponse, ForecastRequest, ForecastResponse
+from .forecast import DEMO_FILE, get_decision, get_forecast
+from .models import (
+    AdviceRequest,
+    AdviceResponse,
+    DecisionRequest,
+    DecisionResponse,
+    ForecastRequest,
+    ForecastResponse,
+)
 
 
 FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
@@ -36,7 +43,7 @@ def create_app(mode: str | None = None) -> FastAPI:
         return {"status": "ok"}
 
     @app.post("/api/forecast", response_model=ForecastResponse)
-    async def forecast(request: Annotated[ForecastRequest, File()]) -> dict:
+    async def forecast(request: Annotated[ForecastRequest, File()]) -> ForecastResponse | dict:
         return await get_forecast(
             mode=mode,
             file=request.file,
@@ -45,6 +52,10 @@ def create_app(mode: str | None = None) -> FastAPI:
             move_transaction_id=request.move_transaction_id,
             move_to_date=request.move_to_date,
         )
+
+    @app.post("/api/decision", response_model=DecisionResponse)
+    def decision(request: DecisionRequest) -> DecisionResponse:
+        return get_decision(request)
 
     @app.post("/api/advice", response_model=AdviceResponse)
     def advice(request: AdviceRequest) -> AdviceResponse:
