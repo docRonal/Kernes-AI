@@ -92,7 +92,7 @@
     },
     "/api/advice": {
       "post": {
-        "description": "Explain the baseline shortfall and draft a message using the baseline first_deficit and the original transactions from the forecast response. Return a draft for human review.",
+        "description": "Explain the baseline credit facility proposal with the model served on OpenShift AI and draft an editable payment reminder. Send the baseline and transactions from the forecast response. The server recalculates the proposal, gives the model only formatted facts, and rejects an answer whose PLN amounts don't match them. Demo mode returns demo/advice.example.json for the bundled baseline.",
         "requestBody": {
           "required": true,
           "content": {
@@ -115,10 +115,10 @@
             }
           },
           "422": {
-            "description": "Invalid request"
+            "description": "Invalid request, or a baseline with no shortfall to explain"
           },
           "503": {
-            "description": "OpenShift AI model unavailable"
+            "description": "The model is unavailable, timed out, or its explanation didn't match the calculated figures. The forecast and proposal stay valid."
           }
         }
       }
@@ -408,19 +408,21 @@
       },
       "AdviceRequest": {
         "type": "object",
+        "description": "The baseline and original transactions from the forecast response. The server recalculates the proposal from them and sends only those calculated facts to the model.",
         "properties": {
-          "first_deficit": {
-            "$ref": "#/components/schemas/Deficit"
+          "baseline": {
+            "$ref": "#/components/schemas/Forecast"
           },
           "transactions": {
             "type": "array",
+            "minItems": 1,
             "items": {
               "$ref": "#/components/schemas/Transaction"
             }
           }
         },
         "required": [
-          "first_deficit",
+          "baseline",
           "transactions"
         ],
         "additionalProperties": false
@@ -429,15 +431,43 @@
         "type": "object",
         "properties": {
           "explanation": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "description": "Model explanation of the proposal. Every PLN amount it cites was checked against the calculated figures, and it cites the proposed limit."
           },
           "email_draft": {
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Editable payment reminder for the first incoming payment after the shortfall starts. Null when there is none. The user sends it themselves."
+          },
+          "model": {
+            "type": "string",
+            "description": "Served model name, or 'demo sample' in demo mode."
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Time spent on the model call. Null in demo mode."
           }
         },
         "required": [
           "explanation",
-          "email_draft"
+          "email_draft",
+          "model",
+          "latency_ms"
         ],
         "additionalProperties": false
       }

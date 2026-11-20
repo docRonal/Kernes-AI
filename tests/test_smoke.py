@@ -49,15 +49,12 @@ def test_demo_baseline_scenario_and_draft():
     friday = next(day for day in changed["scenario"]["days"] if day["date"] == "2026-11-27")
     assert friday["balance_minor"] == 400_000
 
-    payload = {
-        "first_deficit": original["baseline"]["first_deficit"],
-        "transactions": original["transactions"],
-    }
+    payload = {"baseline": original["baseline"], "transactions": original["transactions"]}
     advice = client.post("/api/advice", json=payload)
     assert advice.status_code == 200
     assert advice.json() == json.loads((DEMO / "advice.example.json").read_text(encoding="utf-8"))
 
-    payload["first_deficit"] = {"date": "2026-11-27", "shortfall_minor": 123}
+    payload["transactions"] = payload["transactions"][:2]
     assert client.post("/api/advice", json=payload).status_code == 422
 
 
@@ -76,12 +73,13 @@ def test_demo_rejects_unsupported_inputs(data, csv):
     assert forecast(TestClient(create_app("demo")), data, csv).status_code == 422
 
 
-def test_live_mode_exposes_health_without_demo_fallbacks():
+def test_live_mode_exposes_health_without_demo_fallbacks(monkeypatch):
+    monkeypatch.delenv("CFO_MODEL_URL", raising=False)
+    monkeypatch.delenv("CFO_MODEL_NAME", raising=False)
     client = TestClient(create_app("live"))
     assert client.get("/health").status_code == 200
-    assert forecast(client, BASE_INPUT).status_code == 200  # live forecast is implemented
-    response = client.post(
-        "/api/advice",
-        json={"first_deficit": {"date": "2026-11-27", "shortfall_minor": 1}, "transactions": []},
-    )
-    assert response.status_code == 503
+    result = forecast(client, BASE_INPUT)
+    assert result.status_code == 200  # live forecast is implemented
+    body = result.json()
+    response = client.post("/api/advice", json={"baseline": body["baseline"], "transactions": body["transactions"]})
+    assert response.status_code == 503  # no model configured, no saved sample in live mode

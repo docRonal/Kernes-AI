@@ -49,4 +49,48 @@ oc -n kernes-ai get route autonomous-cfo -o jsonpath='{.spec.host}{"\n"}'
 
 Check `/health`, then run the [browser demo](../README.md) with the synthetic CSV. The health check covers the app process. Verify inference separately in the cluster, then through the app once the live flow lands.
 
-For the final deploy, build the integrated Git commit and rerun the app deployment with `CFO_MODE=live`. If the selected endpoint requires authentication, create the `autonomous-cfo-model` Secret in the team namespace with key `CFO_MODEL_TOKEN`. Run the full forecast, live recommendation, and human approval simulation at the deployed URL. [OpenShift templates](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/building_applications/creating-applications) · [Qwen model card](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF) · [llama.cpp server](https://github.com/ggml-org/llama.cpp/tree/master/tools/server)
+### Check the model inside the cluster
+
+The model service is internal, so call it from a short-lived pod. The answer should name `kernes-qwen` and include a short reply.
+
+```sh
+oc -n kernes-ai run model-check --rm -i --restart=Never \
+  --image=registry.access.redhat.com/ubi9/ubi-minimal -- \
+  curl -sS -m 120 "${CFO_MODEL_URL}" -H 'Content-Type: application/json' \
+  -d '{"model":"kernes-qwen","messages":[{"role":"user","content":"Reply with OK."}],"max_tokens":8}'
+```
+
+## Deploy the live app
+
+Build the integrated Git commit, then rerun the app deployment with `CFO_MODE=live`. If the selected endpoint requires authentication, create the `autonomous-cfo-model` Secret in the team namespace with key `CFO_MODEL_TOKEN` before the rollout.
+
+```sh
+oc process --local -f deploy/openshift-template.yaml \
+  -p "APP_IMAGE=${APP_IMAGE}" -p CFO_MODE=live \
+  -p "CFO_MODEL_URL=${CFO_MODEL_URL}" -p "CFO_MODEL_NAME=${CFO_MODEL_NAME}" |
+  oc -n kernes-ai apply -f -
+oc -n kernes-ai rollout status deployment/autonomous-cfo
+```
+
+The Route allows 240 seconds per request and the app waits up to `CFO_MODEL_TIMEOUT` seconds (default 90) for each model answer. The app checks every PLN amount in the explanation against the calculation. It retries once if the explanation misquotes a figure, then returns HTTP 503 and the UI keeps the forecast and proposal on screen.
+
+Run the full forecast, live explanation, and both simulated decisions at the deployed URL. Each model call writes one log line with the model name, attempts, and latency, but never the prompt or the token. Save those lines with the commit SHA as evidence of live inference.
+
+```sh
+oc -n kernes-ai logs deployment/autonomous-cfo | grep 'autonomous_cfo.advice'
+git rev-parse HEAD
+```
+
+The UI also shows the model name and response time under each live explanation.
+
+## Run the live flow locally
+
+The same pinned GGUF runs on a laptop with [llama.cpp](https://github.com/ggml-org/llama.cpp) (`brew install llama.cpp`). Download the file from the model card link in [model.yaml](model.yaml), then start the server and the app in live mode.
+
+```sh
+llama-server -m qwen2.5-1.5b-instruct-q4_k_m.gguf --alias kernes-qwen --port 8081 --ctx-size 4096
+CFO_MODE=live CFO_MODEL_URL=http://127.0.0.1:8081/v1/chat/completions CFO_MODEL_NAME=kernes-qwen \
+  uv run --locked uvicorn backend.main:app --host 127.0.0.1 --port 8080
+```
+
+[OpenShift templates](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/building_applications/creating-applications) · [Qwen model card](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF) · [llama.cpp server](https://github.com/ggml-org/llama.cpp/tree/master/tools/server)

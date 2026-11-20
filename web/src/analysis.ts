@@ -1,4 +1,4 @@
-import type { DailyBalance, Decision, Deficit, ForecastResponse, Projection, Proposal, Transaction } from "./types";
+import type { DailyBalance, Deficit, Projection, Transaction } from "./types";
 
 export const byDate = (a: { date: string }, b: { date: string }) => a.date.localeCompare(b.date);
 
@@ -40,30 +40,6 @@ export function analyse(projection: Projection): Facts {
     daysBelow: firstIndex < 0 ? 0 : endOfRed - firstIndex,
     lastRed: firstIndex < 0 ? null : days[endOfRed - 1],
   };
-}
-
-/**
- * The backend owns the proposal. Until the contract PR adds `proposal` to the
- * forecast response, preview the agreed rule max(0, -min(balances)) so the
- * flow can be demoed. Remove the fallback once the backend sends it.
- */
-export function proposalFor(forecast: ForecastResponse): Proposal | null {
-  if (forecast.proposal !== undefined) return forecast.proposal;
-  const lowest = Math.min(...forecast.baseline.days.map((day) => day.balance_minor));
-  return lowest < 0 ? { limit_minor: -lowest } : null;
-}
-
-export type Simulation = {
-  gaps: { date: string; uncovered_minor: number }[];
-  worst: { date: string; uncovered_minor: number };
-};
-
-/** Same placeholder status as `proposalFor`: replace with the backend's decision response. */
-export function simulate(days: DailyBalance[], limitMinor: number, decision: Exclude<Decision, null>): Simulation {
-  const available = decision === "approved" ? limitMinor : 0;
-  const gaps = days.map((day) => ({ date: day.date, uncovered_minor: Math.max(0, -day.balance_minor - available) }));
-  const worst = gaps.reduce((max, gap) => (gap.uncovered_minor > max.uncovered_minor ? gap : max), gaps[0]);
-  return { gaps, worst };
 }
 
 export function groupByDate(transactions: Transaction[]): Map<string, Transaction[]> {

@@ -1,4 +1,4 @@
-import type { AdviceResponse, ForecastResponse, Move } from "./types";
+import type { AdviceResponse, Decision, DecisionResponse, ForecastResponse, Move } from "./types";
 
 export type ForecastInputs = {
   file: File;
@@ -66,10 +66,19 @@ export async function fetchAdvice(forecast: ForecastResponse): Promise<AdviceRes
   const response = await request("/api/advice", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      first_deficit: forecast.baseline.first_deficit,
-      transactions: forecast.transactions,
-    }),
+    body: JSON.stringify({ baseline: forecast.baseline, transactions: forecast.transactions }),
   });
   return (await response.json()) as AdviceResponse;
+}
+
+export async function fetchDecision(
+  forecast: ForecastResponse,
+  decision: Exclude<Decision, null>,
+): Promise<DecisionResponse> {
+  const response = await request("/api/decision", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ decision, baseline: forecast.baseline }),
+  });
+  return (await response.json()) as DecisionResponse;
 }
