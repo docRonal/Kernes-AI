@@ -173,6 +173,20 @@ def test_no_reminder_without_a_later_incoming_payment(live):
     assert 'set email_draft to ""' in model.requests[0]["messages"][1]["content"]
 
 
+def test_reminder_drops_invented_fees_and_facility_mentions(live):
+    draft = (
+        "Hello,\n\nPlease pay INV-001 for PLN 9,000.00 by Thursday, November 26. This avoids late fees. "
+        "It aligns with the credit facility limit of PLN 5,000.00. Thank you.\n\nKind regards,\nThe finance team"
+    )
+    client, _ = live([{**GOOD, "email_draft": draft}])
+    response = client.post("/api/advice", json=advice_payload(client))
+    assert response.status_code == 200
+    assert response.json()["email_draft"] == (
+        "Hello,\n\nPlease pay INV-001 for PLN 9,000.00 by Thursday, November 26. Thank you.\n\n"
+        "Kind regards,\nThe finance team"
+    )
+
+
 @pytest.mark.parametrize(
     "text, expected",
     [

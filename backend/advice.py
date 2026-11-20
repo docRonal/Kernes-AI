@@ -204,6 +204,25 @@ def check_explanation(text: str, facts: Facts) -> str | None:
     return None
 
 
+# The reminder goes to a client, so it must not invent fees or reveal the credit facility.
+_OFF_LIMITS = re.compile(r"\b(fee|fees|penalt\w*|interest|credit|facility|forecast|balance)\b", re.IGNORECASE)
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+
+
+def clean_reminder(draft: str, facts: Facts) -> str:
+    """Drop sentences that mention off-limits topics or amounts that aren't in the transactions."""
+    lines = []
+    for line in draft.splitlines():
+        kept = [
+            sentence
+            for sentence in _SENTENCE_END.split(line)
+            if not _OFF_LIMITS.search(sentence)
+            and all(amount in facts.allowed_minor for amount in cited_amounts(sentence))
+        ]
+        lines.append(" ".join(kept))
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
 def parse_answer(content: str) -> tuple[str, str]:
     text = content.strip()
     if text.startswith("```"):
@@ -263,7 +282,7 @@ def live_advice(request: AdviceRequest) -> AdviceResponse:
             log.info("advice model=%s attempts=%d latency_ms=%d status=ok", config.name, attempt, latency)
             return AdviceResponse(
                 explanation=explanation,
-                email_draft=(draft or None) if facts.reminder else None,
+                email_draft=(clean_reminder(draft, facts) or None) if facts.reminder else None,
                 model=config.name,
                 latency_ms=latency,
             )
