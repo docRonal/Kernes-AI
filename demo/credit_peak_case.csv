@@ -1,0 +1,4 @@
+id,date,amount_minor,label
+PEAK-001,2026-11-24,-120000,Equipment payment
+PEAK-002,2026-11-26,-50000,Utility bill
+PEAK-003,2026-11-29,100000,Client invoice
