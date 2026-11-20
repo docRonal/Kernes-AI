@@ -234,3 +234,45 @@ def test_returns_503_when_both_primary_and_fallback_fail(live, monkeypatch):
 
     response = client.post("/api/advice", json=advice_payload(client))
     assert response.status_code == 503
+
+
+
+def test_client_delay_prediction_warns_owner_with_calculated_shift(live):
+    client, model = live(
+        [
+            {
+                **GOOD,
+                "delay_warning": (
+                    "Client invoice INV-001 for PLN 9,000.00 was previously delayed by 2 days, "
+                    "shifting expected receipt to Wednesday, December 2; the deepest gap remains PLN 5,000.00."
+                ),
+            }
+        ]
+    )
+    payload = advice_payload(client)
+    payload["client_delays"] = {"INV-001": 2}
+
+    response = client.post("/api/predict-delays", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "delayed by 2 days" in data["delay_warning"]
+    prompt = model.requests[0]["messages"][1]["content"]
+    assert "delayed by 2 day(s)" in prompt
+    assert "Wednesday, December 2" in prompt
+
+
+def test_send_reminder_simulates_when_smtp_unconfigured(live, monkeypatch):
+    monkeypatch.delenv("CFO_SMTP_HOST", raising=False)
+    client, _ = live([GOOD])
+
+    response = client.post(
+        "/api/send-reminder",
+        json={
+            "to_email": "billing@acme.example",
+            "subject": "Payment reminder: INV-001",
+            "body": "Hello, please pay INV-001 by Thursday, November 26.",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "simulated"
+    assert response.json()["recipient"] == "billing@acme.example"

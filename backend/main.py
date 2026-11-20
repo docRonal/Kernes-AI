@@ -7,15 +7,18 @@ from fastapi import FastAPI, File
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from .advice import get_advice
+from .advice import get_advice, predict_delays, send_reminder
 from .forecast import DEMO_FILE, get_decision, get_forecast
 from .models import (
     AdviceRequest,
     AdviceResponse,
     DecisionRequest,
     DecisionResponse,
+    DelayPredictResponse,
     ForecastRequest,
     ForecastResponse,
+    ReminderSendRequest,
+    ReminderSendResponse,
 )
 
 
@@ -72,6 +75,14 @@ def create_app(mode: str | None = None) -> FastAPI:
     @app.post("/api/advice", response_model=AdviceResponse)
     def advice(request: AdviceRequest) -> AdviceResponse:
         return get_advice(mode=mode, request=request)
+
+    @app.post("/api/predict-delays", response_model=DelayPredictResponse)
+    def delay_prediction(request: AdviceRequest) -> DelayPredictResponse:
+        return predict_delays(mode=mode, request=request)
+
+    @app.post("/api/send-reminder", response_model=ReminderSendResponse)
+    def reminder(request: ReminderSendRequest) -> ReminderSendResponse:
+        return send_reminder(request)
 
     return app
 

@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+import smtplib
 import socket
 import ssl
 import time
@@ -17,12 +18,21 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from datetime import date, timedelta
+from email.message import EmailMessage
 from pathlib import Path
 
 from fastapi import HTTPException
 
 from .forecast import horizon, propose
-from .models import AdviceRequest, AdviceResponse, Proposal, Transaction
+from .models import (
+    AdviceRequest,
+    AdviceResponse,
+    DelayPredictResponse,
+    Proposal,
+    ReminderSendRequest,
+    ReminderSendResponse,
+    Transaction,
+)
 
 
 DEMO_DIR = Path(__file__).resolve().parents[1] / "demo"
@@ -47,6 +57,16 @@ OUTPUT_SCHEMA = {
         "email_draft": {"type": "string"},
     },
     "required": ["explanation", "email_draft"],
+}
+
+DELAY_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "explanation": {"type": "string"},
+        "email_draft": {"type": "string"},
+        "delay_warning": {"type": "string"},
+    },
+    "required": ["explanation", "email_draft", "delay_warning"],
 }
 
 SYSTEM_PROMPT = """You are the Liquidity Agent of a small company's finance assistant.
@@ -132,6 +152,61 @@ class Facts:
     lines: list[str]
     reminder: str | None
     allowed_minor: frozenset[int]
+    has_delay_prediction: bool = False
+
+
+def _predict_delay_impact(
+    request: AdviceRequest,
+    window: list[date],
+    baseline_limit_minor: int,
+) -> tuple[list[str], set[int]]:
+    """Calculate deterministic cash-flow impact of historical client payment delays."""
+    if not request.client_delays:
+        return [], set()
+
+    delayed: list[tuple[Transaction, int, date]] = []
+    for t in sorted(request.transactions, key=lambda item: (item.date, item.id)):
+        if t.amount_minor <= 0:
+            continue
+        delay_days = request.client_delays.get(t.id)
+        if delay_days is None:
+            delay_days = request.client_delays.get(t.label)
+        if delay_days and delay_days > 0:
+            delayed.append((t, delay_days, t.date + timedelta(days=delay_days)))
+
+    if not delayed:
+        return [], set()
+
+    balances = [day.balance_minor for day in request.baseline.days]
+    date_to_idx = {d: idx for idx, d in enumerate(window)}
+    for t, _days, new_date in delayed:
+        if t.date in date_to_idx:
+            for idx in range(date_to_idx[t.date], len(balances)):
+                balances[idx] -= t.amount_minor
+        if new_date in date_to_idx:
+            for idx in range(date_to_idx[new_date], len(balances)):
+                balances[idx] += t.amount_minor
+
+    delayed_limit = max(0, -min(balances))
+    delay_lines: list[str] = []
+    for t, delay_days, new_date in delayed:
+        delay_lines.append(
+            f"Historical delay risk: {t.label} ({t.id}) for {pln(t.amount_minor)} was previously "
+            f"delayed by {delay_days} day(s), shifting expected receipt from {day_name(t.date)} "
+            f"to {day_name(new_date)}."
+        )
+    if delayed_limit > baseline_limit_minor:
+        delay_lines.append(
+            f"With the predicted delay, the deepest projected gap increases from "
+            f"{pln(baseline_limit_minor)} to {pln(delayed_limit)}."
+        )
+    else:
+        delay_lines.append(
+            f"With the predicted delay, the deepest projected gap remains {pln(delayed_limit)}."
+        )
+
+    extra_allowed = {delayed_limit} | {abs(b) for b in balances}
+    return delay_lines, extra_allowed
 
 
 def build_facts(request: AdviceRequest) -> Facts:
@@ -170,10 +245,20 @@ def build_facts(request: AdviceRequest) -> Facts:
         lines.append(f"- {day_name(t.date)}: {t.label} ({t.id}), {direction} {pln(abs(t.amount_minor))}.")
 
     reminder = _reminder_target(request.transactions, first.date, window)
+    delay_lines, extra_allowed = _predict_delay_impact(request, window, proposal.limit_minor)
+    lines.extend(delay_lines)
+
     allowed = {proposal.limit_minor, first.shortfall_minor, deepest.shortfall_minor}
     allowed |= {abs(day.balance_minor) for day in baseline.days}
     allowed |= {abs(t.amount_minor) for t in request.transactions}
-    return Facts(proposal=proposal, lines=lines, reminder=reminder, allowed_minor=frozenset(allowed))
+    allowed |= extra_allowed
+    return Facts(
+        proposal=proposal,
+        lines=lines,
+        reminder=reminder,
+        allowed_minor=frozenset(allowed),
+        has_delay_prediction=bool(delay_lines),
+    )
 
 
 def _reminder_target(transactions: list[Transaction], first_gap: date, window: list[date]) -> str | None:
@@ -209,6 +294,12 @@ def build_messages(facts: Facts) -> list[dict[str, str]]:
         )
     else:
         task.append('Task 2: there is no incoming payment to ask for, so set email_draft to "".')
+    if facts.has_delay_prediction:
+        task.append(
+            "Task 3, delay_warning: write 1-2 plain English sentences warning the business owner about "
+            "the client's historical payment delay and its calculated impact on the cash gap, using only "
+            "the delay facts above."
+        )
     return [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": "\n".join(task)}]
 
 
@@ -258,7 +349,7 @@ def clean_reminder(draft: str, facts: Facts) -> str:
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
-def parse_answer(content: str) -> tuple[str, str]:
+def parse_answer(content: str) -> tuple[str, str, str | None]:
     text = content.strip()
     if text.startswith("```"):
         text = text.strip("`").removeprefix("json").strip()
@@ -268,21 +359,28 @@ def parse_answer(content: str) -> tuple[str, str]:
         raise ModelError("The model didn't return JSON.") from exc
     explanation = data.get("explanation") if isinstance(data, dict) else None
     draft = data.get("email_draft", "") if isinstance(data, dict) else None
+    delay_warning = data.get("delay_warning") if isinstance(data, dict) else None
     if not isinstance(explanation, str) or not explanation.strip() or not isinstance(draft, str):
         raise ModelError("The model's answer is missing the explanation.")
-    return explanation.strip(), draft.strip()
+    clean_warning = delay_warning.strip() if isinstance(delay_warning, str) and delay_warning.strip() else None
+    return explanation.strip(), draft.strip(), clean_warning
 
 
 # ─── Model call ──────────────────────────────────────────────────────────────
 
 
-def call_model(config: ModelConfig, messages: list[dict[str, str]]) -> str:
+def call_model(
+    config: ModelConfig,
+    messages: list[dict[str, str]],
+    *,
+    schema: dict = OUTPUT_SCHEMA,
+) -> str:
     body = {
         "model": config.name,
         "messages": messages,
         "temperature": 0.2,
         "max_tokens": MAX_TOKENS,
-        "response_format": {"type": "json_schema", "json_schema": {"name": "advice", "schema": OUTPUT_SCHEMA}},
+        "response_format": {"type": "json_schema", "json_schema": {"name": "advice", "schema": schema}},
     }
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     if config.token:
@@ -308,25 +406,33 @@ def _run_attempts(
     facts: Facts,
     messages: list[dict[str, str]],
     started: float,
-) -> AdviceResponse:
+) -> tuple[AdviceResponse, str | None]:
+    schema = DELAY_OUTPUT_SCHEMA if facts.has_delay_prediction else OUTPUT_SCHEMA
     problem = "no answer"
     for attempt in range(1, ATTEMPTS + 1):
-        explanation, draft = parse_answer(call_model(config, messages))
+        explanation, draft, delay_warning = parse_answer(call_model(config, messages, schema=schema))
         problem = check_explanation(explanation, facts)
+        if problem is None and facts.has_delay_prediction and delay_warning:
+            unknown = [a for a in cited_amounts(delay_warning) if a not in facts.allowed_minor]
+            if unknown:
+                problem = f"delay_warning cites {pln(unknown[0])}, which isn't in the forecast"
         if problem is None:
             latency = round((time.monotonic() - started) * 1000)
             log.info("advice model=%s attempts=%d latency_ms=%d status=ok", config.name, attempt, latency)
-            return AdviceResponse(
-                explanation=explanation,
-                email_draft=(clean_reminder(draft, facts) or None) if facts.reminder else None,
-                model=config.name,
-                latency_ms=latency,
+            return (
+                AdviceResponse(
+                    explanation=explanation,
+                    email_draft=(clean_reminder(draft, facts) or None) if facts.reminder else None,
+                    model=config.name,
+                    latency_ms=latency,
+                ),
+                delay_warning if facts.has_delay_prediction else None,
             )
         log.warning("advice model=%s attempt=%d rejected: %s", config.name, attempt, problem)
     raise ModelError(f"The model's explanation didn't match the calculated figures: {problem}.")
 
 
-def live_advice(request: AdviceRequest) -> AdviceResponse:
+def _live_advice_with_warning(request: AdviceRequest) -> tuple[AdviceResponse, str | None]:
     facts = build_facts(request)
     primary = ModelConfig.from_env()
     messages = build_messages(facts)
@@ -349,6 +455,36 @@ def live_advice(request: AdviceRequest) -> AdviceResponse:
         return _run_attempts(fallback, facts, messages, started)
 
 
+def live_advice(request: AdviceRequest) -> AdviceResponse:
+    response, _ = _live_advice_with_warning(request)
+    return response
+
+
+def predict_delays(*, mode: str, request: AdviceRequest) -> DelayPredictResponse:
+    if mode == "live":
+        try:
+            response, delay_warning = _live_advice_with_warning(request)
+        except ModelError as exc:
+            log.warning("delay prediction unavailable: %s", exc)
+            raise HTTPException(503, f"The AI explanation is unavailable. {exc}") from exc
+        return DelayPredictResponse(
+            explanation=response.explanation,
+            email_draft=response.email_draft,
+            delay_warning=delay_warning,
+            model=response.model,
+            latency_ms=response.latency_ms,
+        )
+
+    demo_response = get_advice(mode=mode, request=AdviceRequest(baseline=request.baseline, transactions=request.transactions))
+    return DelayPredictResponse(
+        explanation=demo_response.explanation,
+        email_draft=demo_response.email_draft,
+        delay_warning=None,
+        model=demo_response.model,
+        latency_ms=demo_response.latency_ms,
+    )
+
+
 # ─── API entry point ─────────────────────────────────────────────────────────
 
 
@@ -362,7 +498,48 @@ def get_advice(*, mode: str, request: AdviceRequest) -> AdviceResponse:
 
     forecast = json.loads((DEMO_DIR / "forecast.example.json").read_text(encoding="utf-8"))
     expected = {"baseline": forecast["baseline"], "transactions": forecast["transactions"]}
-    if request.model_dump(mode="json") != expected:
+    if request.model_dump(mode="json", exclude_none=True) != expected:
         raise HTTPException(422, "Submit the bundled baseline forecast in demo mode.")
 
     return AdviceResponse.model_validate_json((DEMO_DIR / "advice.example.json").read_text(encoding="utf-8"))
+
+
+def send_reminder(request: ReminderSendRequest) -> ReminderSendResponse:
+    """Send a debtor reminder via SMTP when configured, or simulate delivery."""
+    smtp_host = os.environ.get("CFO_SMTP_HOST", "").strip()
+    if not smtp_host:
+        log.info("reminder simulated recipient=%s", request.to_email)
+        return ReminderSendResponse(
+            status="simulated",
+            recipient=request.to_email,
+            subject=request.subject,
+            message="Reminder queued in simulation mode (set CFO_SMTP_HOST for real SMTP delivery).",
+        )
+
+    smtp_port = int(os.environ.get("CFO_SMTP_PORT", "587"))
+    sender = os.environ.get("CFO_SMTP_FROM", "cfo@kernes-ai.local").strip()
+    msg = EmailMessage()
+    msg["From"] = sender
+    msg["To"] = request.to_email
+    msg["Subject"] = request.subject
+    msg.set_content(request.body)
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as client:
+            if os.environ.get("CFO_SMTP_TLS", "1") == "1":
+                client.starttls()
+            user = os.environ.get("CFO_SMTP_USER", "").strip()
+            password = os.environ.get("CFO_SMTP_PASSWORD", "").strip()
+            if user and password:
+                client.login(user, password)
+            client.send_message(msg)
+    except (OSError, smtplib.SMTPException) as exc:
+        raise HTTPException(503, f"Failed to send reminder email: {exc}") from exc
+
+    log.info("reminder sent recipient=%s", request.to_email)
+    return ReminderSendResponse(
+        status="sent",
+        recipient=request.to_email,
+        subject=request.subject,
+        message="Reminder email sent via SMTP.",
+    )

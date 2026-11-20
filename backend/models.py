@@ -68,6 +68,7 @@ class AdviceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     baseline: Projection
     transactions: list[Transaction] = Field(min_length=1)
+    client_delays: dict[str, NonNegativeInt] | None = None
 
 
 class AdviceResponse(BaseModel):
@@ -76,6 +77,30 @@ class AdviceResponse(BaseModel):
     email_draft: str | None
     model: str
     latency_ms: NonNegativeInt | None
+
+
+class DelayPredictResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    explanation: str = Field(min_length=1)
+    email_draft: str | None
+    delay_warning: str | None
+    model: str
+    latency_ms: NonNegativeInt | None
+
+
+class ReminderSendRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    to_email: str = Field(min_length=3, max_length=254)
+    subject: str = Field(min_length=1, max_length=200)
+    body: str = Field(min_length=1, max_length=5000)
+
+
+class ReminderSendResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: Literal["simulated", "sent"]
+    recipient: str
+    subject: str
+    message: str
 
 
 DecisionKind = Literal["approved", "rejected"]
