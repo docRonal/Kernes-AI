@@ -1,4 +1,6 @@
 {
-  "explanation": "The balance is projected to be 5,000 PLN short on Friday. Payroll and rent fall due before the client invoice.",
-  "email_draft": "Hi, would you be able to pay invoice INV-001 by Thursday, November 26? Please let us know if that date works for you. Thank you."
+  "explanation": "Your balance is projected to fall to -PLN 5,000.00 on Friday, November 27, when Payroll (PAY-001) and Office rent (PAY-002) go out before the Client invoice (INV-001) arrives on Monday, November 30. A credit facility of PLN 5,000.00 covers that gap until the invoice is paid. It is a proposal for you to approve or reject.",
+  "email_draft": "Hello,\n\nWe hope all is well. Could you pay invoice INV-001 for PLN 9,000.00, currently due on Monday, November 30, by Thursday, November 26 instead? Please let us know if that date works for you.\n\nThank you,\nThe finance team",
+  "model": "demo sample",
+  "latency_ms": null
 }

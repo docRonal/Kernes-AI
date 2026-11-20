@@ -1,0 +1,4 @@
+id,date,amount_minor,label
+SAFE-001,2026-11-24,-400000,Supplier payment
+SAFE-002,2026-11-26,600000,Retainer invoice
+SAFE-003,2026-11-30,-800000,Payroll

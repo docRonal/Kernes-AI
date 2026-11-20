@@ -156,7 +156,7 @@ function Reminder({ advice }: { advice: AdviceState }) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (advice.status === "ready") setDraft((current) => current || advice.data.email_draft);
+    if (advice.status === "ready") setDraft((current) => current || (advice.data.email_draft ?? ""));
   }, [advice]);
 
   async function copy() {
@@ -171,7 +171,7 @@ function Reminder({ advice }: { advice: AdviceState }) {
     window.setTimeout(() => setCopied(false), 1600);
   }
 
-  const ready = advice.status === "ready";
+  const ready = advice.status === "ready" && advice.data.email_draft !== null;
 
   return (
     <div className="reminder">
@@ -199,7 +199,9 @@ function Reminder({ advice }: { advice: AdviceState }) {
               ? "Preparing the draft…"
               : advice.status === "error"
                 ? "The draft comes with the AI explanation, which is unavailable right now."
-                : null}
+                : advice.status === "ready"
+                  ? "No client payment arrives after the gap, so there is nothing to ask for sooner."
+                  : null}
           </p>
         )}
         <AnimatePresence>

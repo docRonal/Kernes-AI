@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MotionConfig } from "motion/react";
-import { analyse, proposalFor } from "./analysis";
-import { errorMessage, fetchAdvice, fetchForecast, loadSampleFile, type ForecastInputs } from "./api";
+import { analyse } from "./analysis";
+import { errorMessage, fetchAdvice, fetchDecision, fetchForecast, loadSampleFile, type ForecastInputs } from "./api";
 import { AgentSteps } from "./components/AgentSteps";
 import { ChartBlock } from "./components/CashChart";
 import { Footer, TopBar } from "./components/Chrome";
@@ -9,7 +9,7 @@ import { Hero, type SetupValues } from "./components/Hero";
 import { Proposal } from "./components/Proposal";
 import { Verdict } from "./components/Verdict";
 import { WhatIf } from "./components/WhatIf";
-import type { AdviceState, Decision, ForecastResponse, Move, Scenario } from "./types";
+import type { AdviceState, Decision, ForecastResponse, Move, OutcomeState, Scenario } from "./types";
 
 type Baseline = { forecast: ForecastResponse; inputs: ForecastInputs; run: number };
 
@@ -17,13 +17,14 @@ export function App() {
   const [baseline, setBaseline] = useState<Baseline | null>(null);
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const [advice, setAdvice] = useState<AdviceState>({ status: "idle" });
-  const [decision, setDecision] = useState<Decision>(null);
+  const [outcome, setOutcome] = useState<OutcomeState>({ status: "idle" });
   const adviceTicket = useRef(0);
+  const decisionTicket = useRef(0);
   const results = useRef<HTMLElement>(null);
 
   const loadAdvice = useCallback(async (forecast: ForecastResponse) => {
     const ticket = ++adviceTicket.current;
-    if (!forecast.baseline.first_deficit) {
+    if (!forecast.proposal) {
       setAdvice({ status: "idle" });
       return;
     }
@@ -46,10 +47,31 @@ export function App() {
       const forecast = await fetchForecast(inputs);
       setBaseline((previous) => ({ forecast, inputs, run: (previous?.run ?? 0) + 1 }));
       setScenario(null);
-      setDecision(null);
+      decisionTicket.current++;
+      setOutcome({ status: "idle" });
       void loadAdvice(forecast);
     },
     [loadAdvice],
+  );
+
+  const decide = useCallback(
+    async (choice: Decision) => {
+      const ticket = ++decisionTicket.current;
+      if (!baseline || choice === null) {
+        setOutcome({ status: "idle" });
+        return;
+      }
+      setOutcome({ status: "loading", decision: choice });
+      try {
+        const data = await fetchDecision(baseline.forecast, choice);
+        if (ticket === decisionTicket.current) setOutcome({ status: "ready", data });
+      } catch (problem) {
+        if (ticket === decisionTicket.current) {
+          setOutcome({ status: "error", decision: choice, message: errorMessage(problem) });
+        }
+      }
+    },
+    [baseline],
   );
 
   const compare = useCallback(
@@ -67,7 +89,9 @@ export function App() {
   }, [baseline?.run]);
 
   const facts = useMemo(() => (baseline ? analyse(baseline.forecast.baseline) : null), [baseline]);
-  const proposal = baseline ? proposalFor(baseline.forecast) : null;
+  const proposal = baseline?.forecast.proposal ?? null;
+  // The chart and steps follow the backend's simulated result, not the click itself.
+  const decision: Decision = outcome.status === "ready" ? outcome.data.decision : null;
 
   return (
     <MotionConfig reducedMotion="user">
@@ -82,7 +106,7 @@ export function App() {
               forecast={baseline.forecast}
               facts={facts}
               scenario={scenario}
-              coveredMinor={decision === "approved" && proposal ? proposal.limit_minor : 0}
+              coveredMinor={outcome.status === "ready" && decision === "approved" ? outcome.data.limit_minor : 0}
             />
             <AgentSteps
               forecast={baseline.forecast}
@@ -97,8 +121,8 @@ export function App() {
                 facts={facts}
                 limitMinor={proposal.limit_minor}
                 advice={advice}
-                decision={decision}
-                onDecide={setDecision}
+                outcome={outcome}
+                onDecide={(choice) => void decide(choice)}
                 onRetryAdvice={() => void loadAdvice(baseline.forecast)}
               />
             )}

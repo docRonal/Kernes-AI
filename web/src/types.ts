@@ -24,22 +24,51 @@ export type Projection = {
 
 export type Proposal = {
   limit_minor: number;
+  first_shortfall: Deficit;
+  deepest_shortfall: Deficit;
+  relevant_transaction_ids: string[];
 };
 
 export type ForecastResponse = {
   transactions: Transaction[];
   baseline: Projection;
   scenario: Projection | null;
-  /** Planned in the contract PR. The UI previews the agreed rule until the backend sends it. */
-  proposal?: Proposal | null;
+  /** Calculated by the backend. Null when the baseline never goes below zero. */
+  proposal: Proposal | null;
 };
 
 export type AdviceResponse = {
   explanation: string;
-  email_draft: string;
+  /** Null when there is no incoming payment after the gap to ask for. */
+  email_draft: string | null;
+  /** Served model name, or "demo sample" in demo mode. */
+  model: string;
+  latency_ms: number | null;
 };
 
 export type Decision = "approved" | "rejected" | null;
+
+export type DecisionDay = {
+  date: string;
+  balance_minor: number;
+  facility_used_minor: number;
+  uncovered_minor: number;
+};
+
+/** The backend's simulation of the user's decision. Nothing is applied for or sent. */
+export type DecisionResponse = {
+  decision: Exclude<Decision, null>;
+  simulated: true;
+  limit_minor: number;
+  days: DecisionDay[];
+  largest_uncovered: Deficit | null;
+};
+
+export type OutcomeState =
+  | { status: "idle" }
+  | { status: "loading"; decision: Exclude<Decision, null> }
+  | { status: "ready"; data: DecisionResponse }
+  | { status: "error"; decision: Exclude<Decision, null>; message: string };
 
 export type Move = {
   id: string;

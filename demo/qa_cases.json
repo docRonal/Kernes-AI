@@ -1,0 +1,245 @@
+{
+  "cases": [
+    {
+      "id": "starter",
+      "description": "Starter case: PLN 12,000 opening balance, Friday Payroll + Office rent create a PLN 5,000 shortfall on 2026-11-27 before Client invoice arrives on 2026-11-30.",
+      "csv": "transactions.csv",
+      "starting_balance_minor": 1200000,
+      "start_date": "2026-11-23",
+      "expected_baseline_balances": [
+        1200000,
+        1200000,
+        1200000,
+        1200000,
+        -500000,
+        -500000,
+        -500000,
+        400000,
+        400000,
+        400000,
+        400000,
+        400000,
+        400000,
+        400000
+      ],
+      "expected_first_deficit": {
+        "date": "2026-11-27",
+        "shortfall_minor": 500000
+      },
+      "expected_proposal": {
+        "limit_minor": 500000,
+        "first_shortfall": {
+          "date": "2026-11-27",
+          "shortfall_minor": 500000
+        },
+        "deepest_shortfall": {
+          "date": "2026-11-27",
+          "shortfall_minor": 500000
+        },
+        "relevant_transaction_ids": [
+          "PAY-001",
+          "PAY-002",
+          "INV-001"
+        ]
+      },
+      "expected_decisions": {
+        "approved": {
+          "limit_minor": 500000,
+          "largest_uncovered": null,
+          "facility_used_minor": [0, 0, 0, 0, 500000, 500000, 500000, 0, 0, 0, 0, 0, 0, 0],
+          "uncovered_minor": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        },
+        "rejected": {
+          "limit_minor": 500000,
+          "largest_uncovered": {
+            "date": "2026-11-27",
+            "shortfall_minor": 500000
+          },
+          "facility_used_minor": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "uncovered_minor": [0, 0, 0, 0, 500000, 500000, 500000, 0, 0, 0, 0, 0, 0, 0]
+        }
+      },
+      "scenario_move": {
+        "move_transaction_id": "INV-001",
+        "move_to_date": "2026-11-26",
+        "expected_first_deficit": null,
+        "expected_key_date": "2026-11-27",
+        "expected_baseline_minor": -500000,
+        "expected_scenario_minor": 400000,
+        "expected_scenario_balances": [
+          1200000,
+          1200000,
+          1200000,
+          2100000,
+          400000,
+          400000,
+          400000,
+          400000,
+          400000,
+          400000,
+          400000,
+          400000,
+          400000,
+          400000
+        ]
+      },
+      "explanation_expectations": {
+        "required_amount_groups": [
+          ["5,000", "5000", "5 000"]
+        ],
+        "required_date_groups": [
+          ["2026-11-27", "nov 27", "27 nov", "november 27", "friday"]
+        ],
+        "any_transaction_tokens": [
+          "payroll",
+          "pay-001",
+          "office rent",
+          "rent",
+          "pay-002",
+          "inv-001",
+          "client invoice"
+        ]
+      },
+      "email_draft_expectations": {
+        "any_tokens": ["inv-001", "client invoice", "9,000", "9000", "november 26", "nov 26", "26 nov"],
+        "forbidden_tokens": ["credit facility", "credit line", "overdraft", "shortfall", "deficit"]
+      }
+    },
+    {
+      "id": "credit_peak",
+      "description": "Peak-shortfall case: PLN 1,000 opening balance, first shortfall PLN 200 on 2026-11-24 deepens to PLN 700 on 2026-11-26 before PLN 1,000 invoice arrives on 2026-11-29.",
+      "csv": "credit_peak_case.csv",
+      "starting_balance_minor": 100000,
+      "start_date": "2026-11-23",
+      "expected_baseline_balances": [
+        100000,
+        -20000,
+        -20000,
+        -70000,
+        -70000,
+        -70000,
+        30000,
+        30000,
+        30000,
+        30000,
+        30000,
+        30000,
+        30000,
+        30000
+      ],
+      "expected_first_deficit": {
+        "date": "2026-11-24",
+        "shortfall_minor": 20000
+      },
+      "expected_proposal": {
+        "limit_minor": 70000,
+        "first_shortfall": {
+          "date": "2026-11-24",
+          "shortfall_minor": 20000
+        },
+        "deepest_shortfall": {
+          "date": "2026-11-26",
+          "shortfall_minor": 70000
+        },
+        "relevant_transaction_ids": [
+          "PEAK-001",
+          "PEAK-002",
+          "PEAK-003"
+        ]
+      },
+      "expected_decisions": {
+        "approved": {
+          "limit_minor": 70000,
+          "largest_uncovered": null,
+          "facility_used_minor": [0, 20000, 20000, 70000, 70000, 70000, 0, 0, 0, 0, 0, 0, 0, 0],
+          "uncovered_minor": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        },
+        "rejected": {
+          "limit_minor": 70000,
+          "largest_uncovered": {
+            "date": "2026-11-26",
+            "shortfall_minor": 70000
+          },
+          "facility_used_minor": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "uncovered_minor": [0, 20000, 20000, 70000, 70000, 70000, 0, 0, 0, 0, 0, 0, 0, 0]
+        }
+      },
+      "scenario_move": {
+        "move_transaction_id": "PEAK-003",
+        "move_to_date": "2026-11-24",
+        "expected_first_deficit": null,
+        "expected_key_date": "2026-11-24",
+        "expected_baseline_minor": -20000,
+        "expected_scenario_minor": 80000,
+        "expected_scenario_balances": [
+          100000,
+          80000,
+          80000,
+          30000,
+          30000,
+          30000,
+          30000,
+          30000,
+          30000,
+          30000,
+          30000,
+          30000,
+          30000,
+          30000
+        ]
+      },
+      "explanation_expectations": {
+        "required_amount_groups": [
+          ["200"],
+          ["700"]
+        ],
+        "required_date_groups": [
+          ["2026-11-24", "nov 24", "24 nov", "november 24"],
+          ["2026-11-26", "nov 26", "26 nov", "november 26"]
+        ],
+        "any_transaction_tokens": [
+          "equipment",
+          "peak-001",
+          "utility",
+          "peak-002",
+          "client invoice",
+          "peak-003"
+        ]
+      },
+      "email_draft_expectations": {
+        "any_tokens": ["peak-003", "client invoice", "1,000", "1000", "november 23", "nov 23", "23 nov"],
+        "forbidden_tokens": ["credit facility", "credit line", "overdraft", "shortfall", "deficit"]
+      }
+    },
+    {
+      "id": "no_shortfall",
+      "description": "Healthy baseline case: PLN 15,000 opening balance stays at or above PLN 9,000 across all 14 days, requiring no credit facility proposal.",
+      "csv": "no_shortfall_case.csv",
+      "starting_balance_minor": 1500000,
+      "start_date": "2026-11-23",
+      "expected_baseline_balances": [
+        1500000,
+        1100000,
+        1100000,
+        1700000,
+        1700000,
+        1700000,
+        1700000,
+        900000,
+        900000,
+        900000,
+        900000,
+        900000,
+        900000,
+        900000
+      ],
+      "expected_first_deficit": null,
+      "expected_proposal": null,
+      "expected_decisions": null,
+      "expected_decision_status": 422,
+      "scenario_move": null,
+      "explanation_expectations": null,
+      "email_draft_expectations": null
+    }
+  ]
+}

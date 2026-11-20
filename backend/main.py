@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 from typing import Annotated
@@ -21,12 +22,23 @@ from .models import (
 FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
 
 
+def _log_to_stderr() -> None:
+    """Send the app's own log lines, such as each model call's latency, to the pod log."""
+    logger = logging.getLogger("autonomous_cfo")
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+
+
 def create_app(mode: str | None = None) -> FastAPI:
     if mode is None:
         mode = os.environ.get("CFO_MODE", "demo")
     if mode not in {"demo", "live"}:
         raise ValueError("CFO_MODE must be demo or live.")
 
+    _log_to_stderr()
     app = FastAPI(title="Autonomous CFO", version="0.1.0")
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIR / "assets"), name="assets")
 

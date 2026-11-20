@@ -59,15 +59,23 @@ class ForecastResponse(BaseModel):
 
 
 class AdviceRequest(BaseModel):
+    """The baseline and transactions from the forecast response.
+
+    The server recalculates the proposal from them, so the model always explains
+    the deterministic figures.
+    """
+
     model_config = ConfigDict(extra="forbid")
-    first_deficit: Deficit
-    transactions: list[Transaction]
+    baseline: Projection
+    transactions: list[Transaction] = Field(min_length=1)
 
 
 class AdviceResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    explanation: str
-    email_draft: str
+    explanation: str = Field(min_length=1)
+    email_draft: str | None
+    model: str
+    latency_ms: NonNegativeInt | None
 
 
 DecisionKind = Literal["approved", "rejected"]
