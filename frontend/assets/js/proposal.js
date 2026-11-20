@@ -24,11 +24,11 @@ export function computeProposal(forecastData) {
 
   const backendProposal = forecastData.credit_proposal || forecastData.proposal || null;
   const peakShortfallMinor =
-    backendProposal?.deepest_deficit?.shortfall_minor ??
+    backendProposal?.deepest_shortfall?.shortfall_minor ??
     backendProposal?.peak_shortfall_minor ??
     Math.max(0, -minBalance);
   const peakShortfallDate =
-    backendProposal?.deepest_deficit?.date ??
+    backendProposal?.deepest_shortfall?.date ??
     backendProposal?.peak_shortfall_date ??
     peakDate;
   const recommendedLimitMinor =
