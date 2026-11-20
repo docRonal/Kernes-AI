@@ -256,3 +256,53 @@ class AskResponse(BaseModel):
     what_if: WhatIf | None
     model: str
     latency_ms: NonNegativeInt
+
+
+class AnomalyFinding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["duplicate_payment", "outlier_expense", "same_day_spike"]
+    date: date
+    amount_minor: NonNegativeInt
+    transaction_ids: list[str] = Field(min_length=1)
+    detail: str
+
+
+class AnomalyDetectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    baseline: Projection
+    transactions: list[Transaction] = Field(min_length=1)
+
+
+class AnomalyDetectResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    findings: list[AnomalyFinding]
+    risk_flag: Literal["clean", "review_recommended"]
+    summary: str = Field(min_length=1)
+    model: str
+    latency_ms: NonNegativeInt | None
+
+
+class FinancingOption(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    option_kind: Literal["credit_facility", "invoice_factoring", "defer_outflow"]
+    title: str
+    estimated_cost_minor: NonNegativeInt
+    credit_needed_minor: NonNegativeInt
+    detail: str
+
+
+class CompareOptionsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    baseline: Projection
+    transactions: list[Transaction] = Field(min_length=1)
+    annual_rate_bps: NonNegativeInt = Field(default=1200, le=10000)
+    factoring_fee_bps: NonNegativeInt = Field(default=150, le=5000)
+
+
+class CompareOptionsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    options: list[FinancingOption]
+    recommended_option: Literal["credit_facility", "invoice_factoring", "defer_outflow", "none_needed"]
+    explanation: str = Field(min_length=1)
+    model: str
+    latency_ms: NonNegativeInt | None

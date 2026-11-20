@@ -8,14 +8,19 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .advice import get_advice, predict_delays, send_reminder
+from .advisory_extras import compare_financing_options, detect_anomalies
 from .consultant import ask_cfo, credit_check
 from .forecast import DEMO_FILE, get_decision, get_forecast
 from .insights import optimize_payments, stress_test
 from .models import (
     AdviceRequest,
     AdviceResponse,
+    AnomalyDetectRequest,
+    AnomalyDetectResponse,
     AskRequest,
     AskResponse,
+    CompareOptionsRequest,
+    CompareOptionsResponse,
     CreditCheckResponse,
     DecisionRequest,
     DecisionResponse,
@@ -107,6 +112,14 @@ def create_app(mode: str | None = None) -> FastAPI:
     @app.post("/api/ask-cfo", response_model=AskResponse)
     def ask(request: AskRequest) -> AskResponse:
         return ask_cfo(mode=mode, request=request)
+
+    @app.post("/api/detect-anomalies", response_model=AnomalyDetectResponse)
+    def anomalies(request: AnomalyDetectRequest) -> AnomalyDetectResponse:
+        return detect_anomalies(mode=mode, request=request)
+
+    @app.post("/api/compare-options", response_model=CompareOptionsResponse)
+    def compare_options(request: CompareOptionsRequest) -> CompareOptionsResponse:
+        return compare_financing_options(mode=mode, request=request)
 
     return app
 
