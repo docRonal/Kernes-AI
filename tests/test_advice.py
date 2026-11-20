@@ -53,11 +53,12 @@ def test_live_advice_calls_openshift_ai_and_verifies_figures(monkeypatch):
 
     captured = {}
 
-    def fake_urlopen(req, timeout):
+    def fake_urlopen(req, timeout, context=None):
         captured["url"] = req.full_url
         captured["headers"] = {k.lower(): v for k, v in req.header_items()}
         captured["body"] = json.loads(req.data.decode("utf-8"))
         captured["timeout"] = timeout
+        captured["context"] = context
         return _FakeResponse(
             {
                 "choices": [
@@ -93,6 +94,9 @@ def test_live_advice_calls_openshift_ai_and_verifies_figures(monkeypatch):
     assert captured["headers"]["authorization"] == "Bearer secret-token"
     assert captured["timeout"] == 12.0
     assert captured["body"]["model"] == "kernes-qwen"
+    system_prompt = captured["body"]["messages"][0]["content"].lower()
+    assert "credit facility" in system_prompt
+    assert "shortfall" in system_prompt
     user_prompt = captured["body"]["messages"][1]["content"]
     assert "2026-11-27" in user_prompt
     assert "5,000.00 PLN" in user_prompt
@@ -106,7 +110,7 @@ def test_live_advice_accepts_fenced_json_and_omits_auth_when_no_token(monkeypatc
 
     captured_headers = {}
 
-    def fake_urlopen(req, timeout):
+    def fake_urlopen(req, timeout, context=None):
         captured_headers.update({k.lower(): v for k, v in req.header_items()})
         fenced = (
             "```json\n"
@@ -140,7 +144,7 @@ def test_live_advice_handles_timeouts_with_503(monkeypatch, exc):
     monkeypatch.setenv("CFO_MODEL_URL", "http://kernes-qwen.local:8080/v1/chat/completions")
     monkeypatch.setenv("CFO_MODEL_NAME", "kernes-qwen")
 
-    def fake_urlopen(req, timeout):
+    def fake_urlopen(req, timeout, context=None):
         raise exc
 
     monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
@@ -155,7 +159,7 @@ def test_live_advice_handles_http_and_connection_errors_with_503(monkeypatch):
     monkeypatch.setenv("CFO_MODEL_URL", "http://kernes-qwen.local:8080/v1/chat/completions")
     monkeypatch.setenv("CFO_MODEL_NAME", "kernes-qwen")
 
-    def raise_http_error(req, timeout):
+    def raise_http_error(req, timeout, context=None):
         raise urllib.error.HTTPError(
             req.full_url, 502, "Bad Gateway", hdrs=None, fp=io.BytesIO(b"bad gateway")
         )
@@ -166,7 +170,7 @@ def test_live_advice_handles_http_and_connection_errors_with_503(monkeypatch):
     assert response.status_code == 503
     assert "502" in response.json()["detail"]
 
-    def raise_url_error(req, timeout):
+    def raise_url_error(req, timeout, context=None):
         raise urllib.error.URLError("connection refused")
 
     monkeypatch.setattr("urllib.request.urlopen", raise_url_error)
@@ -203,7 +207,7 @@ def test_live_advice_rejects_invalid_or_ungrounded_model_output(monkeypatch, con
     monkeypatch.setenv("CFO_MODEL_URL", "http://kernes-qwen.local:8080/v1/chat/completions")
     monkeypatch.setenv("CFO_MODEL_NAME", "kernes-qwen")
 
-    def fake_urlopen(req, timeout):
+    def fake_urlopen(req, timeout, context=None):
         return _FakeResponse({"choices": [{"message": {"content": content}}]})
 
     monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
@@ -211,3 +215,19 @@ def test_live_advice_rejects_invalid_or_ungrounded_model_output(monkeypatch, con
 
     response = client.post("/api/advice", json=_sample_payload())
     assert response.status_code == 503
+
+
+def test_live_advice_rejects_invalid_timeout_or_ca_bundle(monkeypatch):
+    monkeypatch.setenv("CFO_MODEL_URL", "https://kernes-qwen.local/v1/chat/completions")
+    monkeypatch.setenv("CFO_MODEL_NAME", "kernes-qwen")
+    monkeypatch.setenv("CFO_MODEL_TIMEOUT_SECONDS", "not-a-number")
+    client = TestClient(create_app("live"))
+
+    response = client.post("/api/advice", json=_sample_payload())
+    assert response.status_code == 503
+
+    monkeypatch.setenv("CFO_MODEL_TIMEOUT_SECONDS", "15")
+    monkeypatch.setenv("CFO_CA_BUNDLE", "/nonexistent/ca.crt")
+    response = client.post("/api/advice", json=_sample_payload())
+    assert response.status_code == 503
+    assert "CFO_CA_BUNDLE" in response.json()["detail"]

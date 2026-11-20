@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import socket
+import ssl
 import urllib.error
 import urllib.request
 from datetime import date
@@ -14,8 +16,10 @@ from pathlib import Path
 from fastapi import HTTPException
 from pydantic import ValidationError
 
-from .models import AdviceRequest, AdviceResponse, Transaction
+from .models import AdviceRequest, AdviceResponse
 
+
+logger = logging.getLogger(__name__)
 
 DEMO_DIR = Path(__file__).resolve().parents[1] / "demo"
 DEFAULT_TIMEOUT_SECONDS = 15.0
@@ -65,6 +69,8 @@ def _build_messages(request: AdviceRequest) -> list[dict[str, str]]:
         "Use ONLY the exact figures, dates, and transaction IDs supplied by the user. "
         "Include the exact shortfall date and shortfall amount in PLN in \"explanation\", "
         "and reference the relevant incoming invoice ID (if any) in \"email_draft\". "
+        "In \"email_draft\", write a polite client-facing reminder and NEVER mention internal terms "
+        "such as \"credit facility\", \"credit line\", \"overdraft\", \"shortfall\", or \"deficit\". "
         "Do not invent numbers or perform new calculations."
     )
 
@@ -170,6 +176,17 @@ def _verify_grounded_response(
             )
 
 
+def _read_ssl_context() -> ssl.SSLContext | None:
+    ca_bundle = os.environ.get("CFO_CA_BUNDLE", "").strip()
+    if not ca_bundle:
+        return None
+    try:
+        return ssl.create_default_context(cafile=ca_bundle)
+    except (OSError, ssl.SSLError) as exc:
+        logger.warning("Failed to load CFO_CA_BUNDLE from %s: %s", ca_bundle, exc)
+        raise HTTPException(503, "Invalid CFO_CA_BUNDLE configuration.") from exc
+
+
 def _call_openshift_ai(request: AdviceRequest) -> AdviceResponse:
     """Call an OpenAI-compatible OpenShift AI chat completions endpoint."""
     url = os.environ.get("CFO_MODEL_URL", "").strip()
@@ -180,6 +197,7 @@ def _call_openshift_ai(request: AdviceRequest) -> AdviceResponse:
         raise HTTPException(503, "OpenShift AI is not configured (CFO_MODEL_URL / CFO_MODEL_NAME missing).")
 
     timeout = _read_timeout_seconds()
+    ssl_context = _read_ssl_context()
     payload = {
         "model": model_name,
         "temperature": 0.1,
@@ -198,32 +216,40 @@ def _call_openshift_ai(request: AdviceRequest) -> AdviceResponse:
     )
 
     try:
-        with urllib.request.urlopen(http_request, timeout=timeout) as response:
+        with urllib.request.urlopen(http_request, timeout=timeout, context=ssl_context) as response:
             raw_body = response.read().decode("utf-8")
     except (TimeoutError, socket.timeout) as exc:
+        logger.warning("OpenShift AI request timed out after %.1fs (model=%s)", timeout, model_name)
         raise HTTPException(503, "OpenShift AI request timed out.") from exc
     except urllib.error.HTTPError as exc:
+        logger.warning("OpenShift AI returned HTTP %s (model=%s)", exc.code, model_name)
         raise HTTPException(503, f"OpenShift AI returned HTTP {exc.code}.") from exc
     except urllib.error.URLError as exc:
         if isinstance(exc.reason, (TimeoutError, socket.timeout)):
+            logger.warning("OpenShift AI request timed out after %.1fs (model=%s)", timeout, model_name)
             raise HTTPException(503, "OpenShift AI request timed out.") from exc
+        logger.warning("OpenShift AI connection failed (model=%s): %s", model_name, exc.reason)
         raise HTTPException(503, "OpenShift AI is unavailable.") from exc
     except (OSError, UnicodeDecodeError) as exc:
+        logger.warning("Failed to read OpenShift AI response (model=%s): %s", model_name, exc)
         raise HTTPException(503, "Failed to read OpenShift AI response.") from exc
 
     try:
         upstream = json.loads(raw_body)
         content = upstream["choices"][0]["message"]["content"]
     except (json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
+        logger.warning("OpenShift AI returned unexpected response structure (model=%s)", model_name)
         raise HTTPException(503, "OpenShift AI returned an unexpected response structure.") from exc
 
     if not isinstance(content, str):
+        logger.warning("OpenShift AI returned non-text completion content (model=%s)", model_name)
         raise HTTPException(503, "OpenShift AI returned non-text completion content.")
 
     parsed = _extract_json_object(content)
     try:
         advice = AdviceResponse.model_validate(parsed)
     except ValidationError as exc:
+        logger.warning("OpenShift AI response failed AdviceResponse validation (model=%s)", model_name)
         raise HTTPException(503, "OpenShift AI response did not match the advice contract.") from exc
 
     _verify_grounded_response(advice, request)
