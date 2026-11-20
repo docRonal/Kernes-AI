@@ -97,7 +97,7 @@ class ReminderSendRequest(BaseModel):
 
 class ReminderSendResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    status: Literal["simulated", "sent"]
+    status: Literal["simulated"]
     recipient: str
     subject: str
     message: str
