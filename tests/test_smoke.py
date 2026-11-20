@@ -36,9 +36,18 @@ def forecast(client, data, csv_bytes=None):
 def test_preview_serves_html_assets_and_demo_csv():
     client = TestClient(create_app("demo"))
     assert client.get("/health").json() == {"status": "ok"}
-    assert "Autonomous CFO" in client.get("/").text
-    assert client.get("/assets/app.js").status_code == 200
-    assert client.get("/assets/styles.css").status_code == 200
+    page = client.get("/")
+    assert page.status_code == 200
+    assert 'class="app-shell"' in page.text
+    styles = client.get("/assets/styles.css")
+    assert styles.status_code == 200
+    assert "css/tokens.css" in styles.text
+    for asset in (
+        "app.js", "chart.js", "parser.js", "sample-amalfi.js",
+        "js/api.js", "js/format.js", "js/proposal.js", "js/render.js",
+        "css/tokens.css", "css/dashboard.css", "css/forms.css", "css/panels.css", "css/responsive.css",
+    ):
+        assert client.get(f"/assets/{asset}").status_code == 200, asset
     assert client.get("/demo/transactions.csv").content == (DEMO / "transactions.csv").read_bytes()
     operations = client.get("/openapi.json").json()["paths"]
     assert "multipart/form-data" in operations["/api/forecast"]["post"]["requestBody"]["content"]

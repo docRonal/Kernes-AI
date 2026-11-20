@@ -3,9 +3,8 @@
 !uv.lock
 !backend/
 !backend/**
-!web/
-!web/**
-web/node_modules
+!frontend/
+!frontend/**
 !demo/
 !demo/**
 **/__pycache__/

@@ -22,6 +22,12 @@ function niceStep(range, targetTicks = 5) {
   return step * pow10;
 }
 
+function escapeText(value) {
+  const text = document.createElement("span");
+  text.textContent = value;
+  return text.innerHTML;
+}
+
 function formatCompactMoney(minor, symbol = "€") {
   const value = minor / 100;
   const abs = Math.abs(value);
@@ -344,7 +350,7 @@ export function renderCashflowChart(container, config) {
               ? ` (${tx.original_currency})`
               : "";
           lines.push(
-            `<div class="tip-tx"><span>${tx.label}${fxNote}</span><strong class="${tx.amount_minor < 0 ? "neg" : "pos"}">${sign}${formatMoney(tx.amount_minor)}</strong></div>`,
+            `<div class="tip-tx"><span>${escapeText(tx.label + fxNote)}</span><strong class="${tx.amount_minor < 0 ? "neg" : "pos"}">${sign}${formatMoney(tx.amount_minor)}</strong></div>`,
           );
         }
         if (dayTxs.length > 4) {

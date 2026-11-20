@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Autonomous CFO — Simple Cash Assistant</title>
-  <link rel="stylesheet" href="/assets/styles.css">
-  <script type="module" src="/assets/app.js"></script>
+  <link rel="stylesheet" href="/assets/styles.css?v=timur">
+  <script type="module" src="/assets/app.js?v=timur"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -54,7 +54,7 @@
                   <span class="file-icon" aria-hidden="true">📄</span>
                   <div class="file-copy">
                     <span class="file-name" id="file-name">Pizzeria Amalfi example (ready to use)</span>
-                    <span class="file-hint">Drop your semicolon-delimited bank CSV here, or click to browse</span>
+                    <span class="file-hint">Drop a bank statement or a PLN transaction CSV here, or click to browse</span>
                   </div>
                   <span class="file-action">Browse</span>
                 </div>
@@ -63,7 +63,7 @@
 
             <div class="setup-fields-row">
               <div class="field">
-                <label for="opening-balance">Cash in bank today (EUR)</label>
+                <label for="opening-balance">Opening cash balance</label>
                 <input id="opening-balance" name="opening_balance" inputmode="decimal" value="5000.00" placeholder="5000.00" required>
               </div>
 
@@ -85,6 +85,7 @@
             <div class="setup-actions">
               <button type="submit" class="btn btn-primary btn-lg" id="run-forecast-btn">Check my cash →</button>
               <button type="button" class="btn btn-ghost" id="load-sample-btn">Try Pizzeria Amalfi sample</button>
+              <button type="button" class="btn btn-ghost" id="load-kernes-sample-btn">Try Kernes demo (PLN)</button>
             </div>
           </form>
 
@@ -112,7 +113,7 @@
                 <span class="hero-stat-sub" id="kpi-horizon">14 days</span>
               </div>
               <div class="hero-stat" id="kpi-first-card">
-                <span class="hero-stat-label">First dip below €0</span>
+                <span class="hero-stat-label">First cash shortfall</span>
                 <strong class="hero-stat-value" id="kpi-first-shortfall">—</strong>
                 <span class="hero-stat-sub" id="kpi-first-date">—</span>
               </div>
@@ -158,7 +159,7 @@
                 <h2>You're all set</h2>
                 <span class="pill pill-success">No shortfall</span>
               </div>
-              <p class="card-desc">Your balance stays at or above €0.00 for every day in this period, so you don't need a credit line right now.</p>
+              <p class="card-desc">Your balance stays at or above zero for every day in this period, so you don't need a credit line right now.</p>
             </section>
 
             <section id="assistant-card" class="card assistant-card" aria-labelledby="assistant-heading" hidden>
@@ -182,6 +183,7 @@
               <div id="advice-error" class="inline-alert inline-alert-soft" hidden></div>
 
               <p id="explanation" class="agent-text" hidden></p>
+              <p id="advice-model" class="agent-sub" hidden></p>
 
               <!-- 2-3 Plain-English Bullet Highlights -->
               <div class="why-box">
@@ -225,7 +227,7 @@
                 <div id="proposal-card" hidden>
                   <div class="credit-callout">
                     <span class="credit-callout-label">Suggested safety net</span>
-                    <strong class="credit-callout-amount" id="proposal-limit-value">0.00 EUR</strong>
+                    <strong class="credit-callout-amount" id="proposal-limit-value">—</strong>
                     <span class="credit-callout-sub" id="fact-peak-shortfall">Covers your lowest projected day</span>
                   </div>
 
