@@ -45,16 +45,16 @@ Each folder contains the owner's responsibilities, file scope, checks, and start
 
 ## How we stay in sync
 
-1. Start your role branch from the latest `origin/main`. Open the repository root in your coding tool and use your role's starter prompt. On a shared laptop, use one Git worktree per branch.
+1. Fetch `origin` and check out your assigned role branch. Open the repository root in your coding tool and use your role's starter prompt. On a shared laptop, use one Git worktree per branch.
 2. Treat [the OpenAPI contract](contracts/openapi.json) and the examples in [demo/](demo/) as shared. Propose changes to the contract, dependency files, or shared fixtures in the PR and coordinate them with Mikhail and the affected owners.
 3. Open a PR with what changed, the checks you ran, and anything another role needs to pick up. Mikhail coordinates reviews and merges. When a dependency merges, bring the latest `main` into your branch and rerun your checks.
 4. Deploy the starter early while the frontend uses the saved HTTP responses and the backend and AI owners build their implementations. Switch the deployed app to `live` after the real forecast and model call are integrated. Yuri runs the end-to-end demo check on that same deployment.
 
-To start a branch from a personal clone, use the branch name from the table. For example:
+On your first checkout from a personal clone, track the remote branch listed above. For example:
 
 ```sh
 git fetch origin
-git switch -c feat/backend origin/main
+git switch --track origin/feat/backend
 ```
 
 ## Instructions and subagents
