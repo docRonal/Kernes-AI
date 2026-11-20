@@ -1,6 +1,10 @@
-"""OpenShift AI adapter and demo-mode handler for /api/advice."""
+"""Explanations and reminder drafts from the model served on OpenShift AI.
 
-from __future__ import annotations
+The model never calculates. The server recalculates the proposal from the
+forecast, formats every figure, and sends those facts to the model. It then
+checks that each PLN amount in the explanation is one of those facts and that
+the explanation cites the proposed limit.
+"""
 
 import json
 import logging
@@ -8,266 +12,319 @@ import os
 import re
 import socket
 import ssl
+import time
 import urllib.error
 import urllib.request
-from datetime import date
+from dataclasses import dataclass
+from datetime import date, timedelta
 from pathlib import Path
 
 from fastapi import HTTPException
-from pydantic import ValidationError
 
-from .models import AdviceRequest, AdviceResponse
+from .forecast import horizon, propose
+from .models import AdviceRequest, AdviceResponse, Proposal, Transaction
 
-
-logger = logging.getLogger(__name__)
 
 DEMO_DIR = Path(__file__).resolve().parents[1] / "demo"
-DEFAULT_TIMEOUT_SECONDS = 15.0
+DEFAULT_TIMEOUT_SECONDS = 90
+MAX_TOKENS = 450
+ATTEMPTS = 2
 
-_CODE_FENCE_RE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL | re.IGNORECASE)
+log = logging.getLogger("autonomous_cfo.advice")
 
+# Thousands separators: comma, no-break space and narrow no-break space. A plain
+# space is left out so "November 27, 5,000 PLN" isn't read as 275,000.
+_DIGITS = r"\d[\d,\u00a0\u202f]*(?:\.\d{1,2})?"
+_AMOUNT = re.compile(
+    rf"(?:PLN|zł|zl)\s*[-−]?\s*({_DIGITS})|({_DIGITS})\s*(?:PLN|zł|zl)\b",
+    re.IGNORECASE,
+)
 
-def _format_pln(amount_minor: int) -> str:
-    """Format integer grosz as a PLN string with two decimal places."""
-    sign = "-" if amount_minor < 0 else ""
-    abs_minor = abs(amount_minor)
-    whole, frac = divmod(abs_minor, 100)
-    return f"{sign}{whole:,}.{frac:02d} PLN"
+OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "explanation": {"type": "string"},
+        "email_draft": {"type": "string"},
+    },
+    "required": ["explanation", "email_draft"],
+}
 
-
-def _read_timeout_seconds() -> float:
-    raw = os.environ.get("CFO_MODEL_TIMEOUT_SECONDS", "").strip()
-    if not raw:
-        return DEFAULT_TIMEOUT_SECONDS
-    try:
-        value = float(raw)
-    except ValueError as exc:
-        raise HTTPException(503, "Invalid CFO_MODEL_TIMEOUT_SECONDS configuration.") from exc
-    if value <= 0:
-        raise HTTPException(503, "CFO_MODEL_TIMEOUT_SECONDS must be positive.")
-    return value
-
-
-def _build_messages(request: AdviceRequest) -> list[dict[str, str]]:
-    """Build grounded system and user messages for the OpenShift AI model."""
-    shortfall_minor = request.first_deficit.shortfall_minor
-    shortfall_date = request.first_deficit.date.isoformat()
-    shortfall_pln = _format_pln(shortfall_minor)
-
-    tx_lines = []
-    for tx in sorted(request.transactions, key=lambda item: (item.date, item.id)):
-        direction = "inflow" if tx.amount_minor >= 0 else "outflow"
-        tx_lines.append(
-            f"- {tx.id} | {tx.date.isoformat()} | {direction} | {_format_pln(tx.amount_minor)} | {tx.label}"
-        )
-    tx_block = "\n".join(tx_lines) if tx_lines else "- (none provided)"
-
-    system_prompt = (
-        "You are an Autonomous CFO Liquidity Agent. "
-        "Explain the projected cash shortfall and draft a polite payment reminder email. "
-        "Return ONLY valid JSON with two string keys: \"explanation\" and \"email_draft\". "
-        "Use ONLY the exact figures, dates, and transaction IDs supplied by the user. "
-        "Include the exact shortfall date and shortfall amount in PLN in \"explanation\", "
-        "and reference the relevant incoming invoice ID (if any) in \"email_draft\". "
-        "In \"email_draft\", write a polite client-facing reminder and NEVER mention internal terms "
-        "such as \"credit facility\", \"credit line\", \"overdraft\", \"shortfall\", or \"deficit\". "
-        "Do not invent numbers or perform new calculations."
-    )
-
-    user_prompt = (
-        f"First projected shortfall:\n"
-        f"- Date: {shortfall_date}\n"
-        f"- Shortfall amount: {shortfall_pln} ({shortfall_minor} grosz)\n\n"
-        f"Transactions:\n{tx_block}\n\n"
-        f"Respond with JSON: {{\"explanation\": \"...\", \"email_draft\": \"...\"}}"
-    )
-
-    return [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
+SYSTEM_PROMPT = """You are the Liquidity Agent of a small company's finance assistant.
+The application has already calculated every figure. You only explain them.
+Rules:
+- Use only the facts you are given. Copy amounts and dates exactly as written.
+- Never calculate, round or invent an amount, date, transaction, fee, penalty or interest rate.
+- Write plain English for a busy business owner. No markdown, no bullet points.
+- Reply with JSON: {"explanation": "...", "email_draft": "..."}."""
 
 
-def _extract_json_object(content: str) -> dict:
-    """Parse a JSON object from model output, tolerating markdown code fences."""
-    cleaned = content.strip()
-    fence_match = _CODE_FENCE_RE.match(cleaned)
-    if fence_match:
-        cleaned = fence_match.group(1).strip()
+class ModelError(RuntimeError):
+    """The model is unreachable or its answer can't be used."""
 
-    try:
-        parsed = json.loads(cleaned)
-    except json.JSONDecodeError:
-        start = cleaned.find("{")
-        end = cleaned.rfind("}")
-        if start == -1 or end <= start:
-            raise HTTPException(503, "OpenShift AI returned non-JSON advice content.")
+
+@dataclass(frozen=True)
+class ModelConfig:
+    url: str
+    name: str
+    token: str | None
+    timeout: float
+    ssl_context: ssl.SSLContext | None = None
+
+    @classmethod
+    def from_env(cls) -> "ModelConfig":
+        url = os.environ.get("CFO_MODEL_URL", "").strip()
+        name = os.environ.get("CFO_MODEL_NAME", "").strip()
+        if not url.startswith(("http://", "https://")) or not name:
+            raise ModelError("The model endpoint isn't configured. Set CFO_MODEL_URL and CFO_MODEL_NAME.")
+        raw_timeout = os.environ.get("CFO_MODEL_TIMEOUT") or os.environ.get("CFO_MODEL_TIMEOUT_SECONDS") or ""
         try:
-            parsed = json.loads(cleaned[start : end + 1])
-        except json.JSONDecodeError as exc:
-            raise HTTPException(503, "OpenShift AI returned invalid JSON advice content.") from exc
-
-    if not isinstance(parsed, dict):
-        raise HTTPException(503, "OpenShift AI returned a non-object JSON payload.")
-    return parsed
-
-
-def _amount_patterns(amount_minor: int) -> list[str]:
-    """Return formatted numeric representations (without currency) for grounding checks."""
-    whole, frac = divmod(abs(amount_minor), 100)
-    patterns = [
-        f"{whole}.{frac:02d}",
-        f"{whole:,}.{frac:02d}",
-        f"{whole:,}.{frac:02d}".replace(",", " "),
-    ]
-    if frac == 0:
-        patterns.extend([str(whole), f"{whole:,}", f"{whole:,}".replace(",", " ")])
-    return patterns
-
-
-def _date_patterns(target_date: date) -> list[str]:
-    """Return common date representations for grounding checks."""
-    return [
-        target_date.isoformat(),
-        f"{target_date.strftime('%B')} {target_date.day}",
-        f"{target_date.day} {target_date.strftime('%B')}",
-        f"{target_date.strftime('%b')} {target_date.day}",
-        f"{target_date.day} {target_date.strftime('%b')}",
-        target_date.strftime("%d.%m.%Y"),
-        target_date.strftime("%d.%m"),
-    ]
-
-
-def _contains_any(haystack: str, needles: list[str]) -> bool:
-    lowered = haystack.lower()
-    return any(needle.lower() in lowered for needle in needles)
-
-
-def _verify_grounded_response(
-    advice: AdviceResponse,
-    request: AdviceRequest,
-) -> None:
-    """Verify that the model's response uses the supplied shortfall figures and context."""
-    explanation = advice.explanation.strip()
-    email_draft = advice.email_draft.strip()
-    if not explanation or not email_draft:
-        raise HTTPException(503, "OpenShift AI returned empty explanation or email draft.")
-
-    combined = f"{explanation}\n{email_draft}"
-
-    amount_ok = _contains_any(explanation, _amount_patterns(request.first_deficit.shortfall_minor))
-    date_ok = _contains_any(explanation, _date_patterns(request.first_deficit.date))
-    if not amount_ok or not date_ok:
-        raise HTTPException(
-            503,
-            "OpenShift AI response did not reference the supplied shortfall date and amount.",
+            timeout = float(raw_timeout) if raw_timeout.strip() else DEFAULT_TIMEOUT_SECONDS
+            if timeout <= 0:
+                timeout = DEFAULT_TIMEOUT_SECONDS
+        except ValueError:
+            timeout = DEFAULT_TIMEOUT_SECONDS
+        ca_bundle = os.environ.get("CFO_CA_BUNDLE", "").strip()
+        ssl_context: ssl.SSLContext | None = None
+        if ca_bundle:
+            try:
+                ssl_context = ssl.create_default_context(cafile=ca_bundle)
+            except (OSError, ssl.SSLError) as exc:
+                raise ModelError("Invalid CFO_CA_BUNDLE configuration.") from exc
+        return cls(
+            url=url,
+            name=name,
+            token=os.environ.get("CFO_MODEL_TOKEN") or None,
+            timeout=timeout,
+            ssl_context=ssl_context,
         )
 
-    if request.transactions:
-        tx_tokens: list[str] = []
-        for tx in request.transactions:
-            tx_tokens.append(tx.id)
-            if len(tx.label.strip()) >= 3:
-                tx_tokens.append(tx.label.strip())
-        if tx_tokens and not _contains_any(combined, tx_tokens):
-            raise HTTPException(
-                503,
-                "OpenShift AI response did not reference any supplied transactions.",
-            )
+
+# ─── Facts ───────────────────────────────────────────────────────────────────
 
 
-def _read_ssl_context() -> ssl.SSLContext | None:
-    ca_bundle = os.environ.get("CFO_CA_BUNDLE", "").strip()
-    if not ca_bundle:
+def pln(minor: int) -> str:
+    sign = "-" if minor < 0 else ""
+    whole, grosz = divmod(abs(minor), 100)
+    return f"{sign}PLN {whole:,}.{grosz:02d}"
+
+
+def day_name(day: date) -> str:
+    return f"{day:%A}, {day:%B} {day.day}"
+
+
+@dataclass(frozen=True)
+class Facts:
+    proposal: Proposal
+    lines: list[str]
+    reminder: str | None
+    allowed_minor: frozenset[int]
+
+
+def build_facts(request: AdviceRequest) -> Facts:
+    baseline = request.baseline
+    window = horizon(baseline.days[0].date)
+    if [day.date for day in baseline.days] != window:
+        raise HTTPException(422, "The baseline must list 14 consecutive days.")
+    proposal = propose(baseline, request.transactions)
+    if proposal is None:
+        raise HTTPException(422, "The baseline never goes below zero, so there is nothing to explain.")
+
+    first, deepest = proposal.first_shortfall, proposal.deepest_shortfall
+    deepest_index = next(index for index, day in enumerate(baseline.days) if day.date == deepest.date)
+    recovery = next((day for day in baseline.days[deepest_index + 1 :] if day.balance_minor >= 0), None)
+    relevant = [t for t in sorted(request.transactions, key=lambda t: t.date) if t.id in proposal.relevant_transaction_ids]
+
+    lines = [
+        f"Forecast period: {day_name(window[0])} to {day_name(window[-1])}, {window[0].year}.",
+        f"First day below zero: {day_name(first.date)}, balance {pln(-first.shortfall_minor)}.",
+    ]
+    if deepest.date == first.date:
+        lines.append(f"This is also the deepest point of the forecast: a gap of {pln(deepest.shortfall_minor)}.")
+    else:
+        lines.append(f"Deepest point: {day_name(deepest.date)}, balance {pln(-deepest.shortfall_minor)}.")
+    lines.append(
+        f"Proposed credit facility limit: {pln(proposal.limit_minor)}. "
+        "It equals the deepest projected gap, so it covers every day of the forecast."
+    )
+    if recovery:
+        lines.append(f"The balance is back above zero on {day_name(recovery.date)} at {pln(recovery.balance_minor)}.")
+    else:
+        lines.append("The balance stays below zero until the end of the 14-day forecast.")
+    lines.append("Transactions that cause and close the gap:")
+    for t in relevant:
+        direction = "incoming" if t.amount_minor > 0 else "outgoing"
+        lines.append(f"- {day_name(t.date)}: {t.label} ({t.id}), {direction} {pln(abs(t.amount_minor))}.")
+
+    reminder = _reminder_target(request.transactions, first.date, window)
+    allowed = {proposal.limit_minor, first.shortfall_minor, deepest.shortfall_minor}
+    allowed |= {abs(day.balance_minor) for day in baseline.days}
+    allowed |= {abs(t.amount_minor) for t in request.transactions}
+    return Facts(proposal=proposal, lines=lines, reminder=reminder, allowed_minor=frozenset(allowed))
+
+
+def _reminder_target(transactions: list[Transaction], first_gap: date, window: list[date]) -> str | None:
+    """The first incoming payment after the gap starts: the one worth asking for early."""
+    late = [t for t in transactions if t.amount_minor > 0 and first_gap < t.date <= window[-1]]
+    if not late:
         return None
-    try:
-        return ssl.create_default_context(cafile=ca_bundle)
-    except (OSError, ssl.SSLError) as exc:
-        logger.warning("Failed to load CFO_CA_BUNDLE from %s: %s", ca_bundle, exc)
-        raise HTTPException(503, "Invalid CFO_CA_BUNDLE configuration.") from exc
-
-
-def _call_openshift_ai(request: AdviceRequest) -> AdviceResponse:
-    """Call an OpenAI-compatible OpenShift AI chat completions endpoint."""
-    url = os.environ.get("CFO_MODEL_URL", "").strip()
-    model_name = os.environ.get("CFO_MODEL_NAME", "").strip()
-    token = os.environ.get("CFO_MODEL_TOKEN", "").strip()
-
-    if not url or not model_name:
-        raise HTTPException(503, "OpenShift AI is not configured (CFO_MODEL_URL / CFO_MODEL_NAME missing).")
-
-    timeout = _read_timeout_seconds()
-    ssl_context = _read_ssl_context()
-    payload = {
-        "model": model_name,
-        "temperature": 0.1,
-        "messages": _build_messages(request),
-    }
-
-    headers = {"Content-Type": "application/json"}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-
-    http_request = urllib.request.Request(
-        url=url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers=headers,
-        method="POST",
+    target = min(late, key=lambda t: (t.date, -t.amount_minor))
+    pay_by = max(window[0], first_gap - timedelta(days=1))
+    return (
+        f"Ask the client to pay {target.label} {target.id} for {pln(target.amount_minor)}, "
+        f"currently due {day_name(target.date)}, by {day_name(pay_by)} instead."
     )
 
+
+def build_messages(facts: Facts) -> list[dict[str, str]]:
+    limit = pln(facts.proposal.limit_minor)
+    task = [
+        "Facts:",
+        *facts.lines,
+        "",
+        "Task 1, explanation: write exactly 3 sentences about the forecast, in the future tense "
+        '("is projected to"). Sentence 1: when the balance first goes below zero and by how much, and the '
+        "deepest point if it is a different day. Sentence 2: which transactions cause the gap and when money "
+        f"comes back. Sentence 3: why a credit facility of {limit} covers the gap, and that the owner can "
+        "approve or reject this proposal. Do not mention any email.",
+    ]
+    if facts.reminder:
+        task.append(
+            "Task 2, email_draft: a polite payment reminder to the client, under 70 words. Start with "
+            f'"Hello,". {facts.reminder} Do not mention the credit facility, fees or penalties. '
+            'End with "Kind regards,\nThe finance team".'
+        )
+    else:
+        task.append('Task 2: there is no incoming payment to ask for, so set email_draft to "".')
+    return [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": "\n".join(task)}]
+
+
+# ─── Checking the answer ─────────────────────────────────────────────────────
+
+
+def cited_amounts(text: str) -> list[int]:
+    amounts = []
+    for match in _AMOUNT.finditer(text):
+        raw = (match.group(1) or match.group(2)).replace(",", "").replace("\u00a0", "").replace("\u202f", "").strip(".")
+        whole, _, fraction = raw.partition(".")
+        if whole.isdigit():
+            amounts.append(int(whole) * 100 + int((fraction + "00")[:2] or 0))
+    return amounts
+
+
+def check_explanation(text: str, facts: Facts) -> str | None:
+    """Return a problem with the explanation's figures, or None when they match."""
+    amounts = cited_amounts(text)
+    unknown = [amount for amount in amounts if amount not in facts.allowed_minor]
+    if unknown:
+        return f"it cites {pln(unknown[0])}, which isn't in the forecast"
+    if facts.proposal.limit_minor not in amounts:
+        return f"it doesn't cite the proposed limit of {pln(facts.proposal.limit_minor)}"
+    return None
+
+
+# The reminder goes to a client, so it must not invent fees or reveal internal liquidity terms.
+_OFF_LIMITS = re.compile(
+    r"\b(fee|fees|penalt\w*|interest|credit|facility|forecast|balance|overdraft|shortfall|deficit)\b",
+    re.IGNORECASE,
+)
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+
+
+def clean_reminder(draft: str, facts: Facts) -> str:
+    """Drop sentences that mention off-limits topics or amounts that aren't in the transactions."""
+    lines = []
+    for line in draft.splitlines():
+        kept = [
+            sentence
+            for sentence in _SENTENCE_END.split(line)
+            if not _OFF_LIMITS.search(sentence)
+            and all(amount in facts.allowed_minor for amount in cited_amounts(sentence))
+        ]
+        lines.append(" ".join(kept))
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
+def parse_answer(content: str) -> tuple[str, str]:
+    text = content.strip()
+    if text.startswith("```"):
+        text = text.strip("`").removeprefix("json").strip()
     try:
-        with urllib.request.urlopen(http_request, timeout=timeout, context=ssl_context) as response:
-            raw_body = response.read().decode("utf-8")
-    except (TimeoutError, socket.timeout) as exc:
-        logger.warning("OpenShift AI request timed out after %.1fs (model=%s)", timeout, model_name)
-        raise HTTPException(503, "OpenShift AI request timed out.") from exc
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ModelError("The model didn't return JSON.") from exc
+    explanation = data.get("explanation") if isinstance(data, dict) else None
+    draft = data.get("email_draft", "") if isinstance(data, dict) else None
+    if not isinstance(explanation, str) or not explanation.strip() or not isinstance(draft, str):
+        raise ModelError("The model's answer is missing the explanation.")
+    return explanation.strip(), draft.strip()
+
+
+# ─── Model call ──────────────────────────────────────────────────────────────
+
+
+def call_model(config: ModelConfig, messages: list[dict[str, str]]) -> str:
+    body = {
+        "model": config.name,
+        "messages": messages,
+        "temperature": 0.2,
+        "max_tokens": MAX_TOKENS,
+        "response_format": {"type": "json_schema", "json_schema": {"name": "advice", "schema": OUTPUT_SCHEMA}},
+    }
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    if config.token:
+        headers["Authorization"] = f"Bearer {config.token}"
+    request = urllib.request.Request(config.url, data=json.dumps(body).encode(), headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(request, timeout=config.timeout, context=config.ssl_context) as response:
+            payload = json.loads(response.read(1_000_000))
     except urllib.error.HTTPError as exc:
-        logger.warning("OpenShift AI returned HTTP %s (model=%s)", exc.code, model_name)
-        raise HTTPException(503, f"OpenShift AI returned HTTP {exc.code}.") from exc
-    except urllib.error.URLError as exc:
-        if isinstance(exc.reason, (TimeoutError, socket.timeout)):
-            logger.warning("OpenShift AI request timed out after %.1fs (model=%s)", timeout, model_name)
-            raise HTTPException(503, "OpenShift AI request timed out.") from exc
-        logger.warning("OpenShift AI connection failed (model=%s): %s", model_name, exc.reason)
-        raise HTTPException(503, "OpenShift AI is unavailable.") from exc
-    except (OSError, UnicodeDecodeError) as exc:
-        logger.warning("Failed to read OpenShift AI response (model=%s): %s", model_name, exc)
-        raise HTTPException(503, "Failed to read OpenShift AI response.") from exc
-
+        raise ModelError(f"The model endpoint answered HTTP {exc.code}.") from exc
+    except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError) as exc:
+        raise ModelError("The model endpoint can't be reached or timed out.") from exc
+    except json.JSONDecodeError as exc:
+        raise ModelError("The model endpoint returned something other than JSON.") from exc
     try:
-        upstream = json.loads(raw_body)
-        content = upstream["choices"][0]["message"]["content"]
-    except (json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
-        logger.warning("OpenShift AI returned unexpected response structure (model=%s)", model_name)
-        raise HTTPException(503, "OpenShift AI returned an unexpected response structure.") from exc
+        return payload["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise ModelError("The model endpoint returned an unexpected response.") from exc
 
-    if not isinstance(content, str):
-        logger.warning("OpenShift AI returned non-text completion content (model=%s)", model_name)
-        raise HTTPException(503, "OpenShift AI returned non-text completion content.")
 
-    parsed = _extract_json_object(content)
-    try:
-        advice = AdviceResponse.model_validate(parsed)
-    except ValidationError as exc:
-        logger.warning("OpenShift AI response failed AdviceResponse validation (model=%s)", model_name)
-        raise HTTPException(503, "OpenShift AI response did not match the advice contract.") from exc
+def live_advice(request: AdviceRequest) -> AdviceResponse:
+    facts = build_facts(request)
+    config = ModelConfig.from_env()
+    messages = build_messages(facts)
+    started = time.monotonic()
+    problem = "no answer"
+    for attempt in range(1, ATTEMPTS + 1):
+        explanation, draft = parse_answer(call_model(config, messages))
+        problem = check_explanation(explanation, facts)
+        if problem is None:
+            latency = round((time.monotonic() - started) * 1000)
+            log.info("advice model=%s attempts=%d latency_ms=%d status=ok", config.name, attempt, latency)
+            return AdviceResponse(
+                explanation=explanation,
+                email_draft=(clean_reminder(draft, facts) or None) if facts.reminder else None,
+                model=config.name,
+                latency_ms=latency,
+            )
+        log.warning("advice model=%s attempt=%d rejected: %s", config.name, attempt, problem)
+    raise ModelError(f"The model's explanation didn't match the calculated figures: {problem}.")
 
-    _verify_grounded_response(advice, request)
-    return advice
+
+# ─── API entry point ─────────────────────────────────────────────────────────
 
 
 def get_advice(*, mode: str, request: AdviceRequest) -> AdviceResponse:
     if mode == "live":
-        return _call_openshift_ai(request)
+        try:
+            return live_advice(request)
+        except ModelError as exc:
+            log.warning("advice unavailable: %s", exc)
+            raise HTTPException(503, f"The AI explanation is unavailable. {exc}") from exc
 
     forecast = json.loads((DEMO_DIR / "forecast.example.json").read_text(encoding="utf-8"))
-    expected = {
-        "first_deficit": forecast["baseline"]["first_deficit"],
-        "transactions": forecast["transactions"],
-    }
+    expected = {"baseline": forecast["baseline"], "transactions": forecast["transactions"]}
     if request.model_dump(mode="json") != expected:
         raise HTTPException(422, "Submit the bundled baseline forecast in demo mode.")
 
-    return AdviceResponse.model_validate_json(
-        (DEMO_DIR / "advice.example.json").read_text(encoding="utf-8")
-    )
+    return AdviceResponse.model_validate_json((DEMO_DIR / "advice.example.json").read_text(encoding="utf-8"))

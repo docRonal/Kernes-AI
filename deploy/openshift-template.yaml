@@ -13,9 +13,9 @@ parameters:
     description: Full inference endpoint URL issued for the team.
   - name: CFO_MODEL_NAME
     description: Model identifier expected by that endpoint.
-  - name: CFO_MODEL_TIMEOUT_SECONDS
-    description: Request timeout in seconds when calling the OpenShift AI model.
-    value: "30"
+  - name: CFO_MODEL_TIMEOUT
+    description: Seconds to wait for one model answer. A CPU model can take tens of seconds.
+    value: "90"
 objects:
   - apiVersion: apps/v1
     kind: Deployment
@@ -44,8 +44,8 @@ objects:
                   value: "${CFO_MODEL_URL}"
                 - name: CFO_MODEL_NAME
                   value: "${CFO_MODEL_NAME}"
-                - name: CFO_MODEL_TIMEOUT_SECONDS
-                  value: "${CFO_MODEL_TIMEOUT_SECONDS}"
+                - name: CFO_MODEL_TIMEOUT
+                  value: "${CFO_MODEL_TIMEOUT}"
                 - name: CFO_MODEL_TOKEN
                   valueFrom:
                     secretKeyRef:
@@ -82,6 +82,9 @@ objects:
     kind: Route
     metadata:
       name: autonomous-cfo
+      annotations:
+        # The router's default 30 s timeout is shorter than a CPU model answer plus one retry.
+        haproxy.router.openshift.io/timeout: 240s
     spec:
       to:
         kind: Service

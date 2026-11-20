@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Check, RotateCcw, X } from "lucide-react";
-import { byDate, simulate, type Facts } from "../analysis";
+import { byDate, type Facts } from "../analysis";
 import { money, plural, shortDate } from "../format";
-import type { AdviceState, Decision, ForecastResponse } from "../types";
+import type { AdviceResponse, AdviceState, Decision, ForecastResponse, OutcomeState } from "../types";
 import { Figure } from "./Figure";
 
 type Props = {
@@ -11,7 +11,7 @@ type Props = {
   facts: Facts;
   limitMinor: number;
   advice: AdviceState;
-  decision: Decision;
+  outcome: OutcomeState;
   onDecide: (decision: Decision) => void;
   onRetryAdvice: () => void;
 };
@@ -23,7 +23,7 @@ const rise = {
   transition: { duration: 0.6, ease: [0.2, 0.8, 0.2, 1] },
 } as const;
 
-export function Proposal({ forecast, facts, limitMinor, advice, decision, onDecide, onRetryAdvice }: Props) {
+export function Proposal({ forecast, facts, limitMinor, advice, outcome, onDecide, onRetryAdvice }: Props) {
   const facts4 = [
     facts.first && { term: "First day in the red", value: money(-facts.first.shortfall_minor), note: shortDate(facts.first.date) },
     facts.deepest && { term: "Deepest point", value: money(facts.deepest.balance_minor), note: shortDate(facts.deepest.date) },
@@ -62,7 +62,7 @@ export function Proposal({ forecast, facts, limitMinor, advice, decision, onDeci
 
       <aside className="side">
         <Ledger forecast={forecast} facts={facts} />
-        <DecisionPanel forecast={forecast} facts={facts} limitMinor={limitMinor} decision={decision} onDecide={onDecide} />
+        <DecisionPanel facts={facts} outcome={outcome} onDecide={onDecide} />
       </aside>
     </section>
   );
@@ -84,7 +84,7 @@ function Why({ advice, onRetry }: { advice: AdviceState; onRetry: () => void }) 
         {advice.status === "ready" && (
           <motion.div key="ready" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
             <p className="why-text">{advice.data.explanation}</p>
-            <p className="why-meta">Explained by the AI model · the amounts come from the calculation, not from the model</p>
+            <p className="why-meta">{modelNote(advice.data)}</p>
           </motion.div>
         )}
         {advice.status === "error" && (
@@ -102,6 +102,12 @@ function Why({ advice, onRetry }: { advice: AdviceState; onRetry: () => void }) 
       </AnimatePresence>
     </div>
   );
+}
+
+function modelNote(advice: AdviceResponse): string {
+  if (advice.latency_ms === null) return `Saved sample (${advice.model}) · the amounts come from the calculation, not from the model`;
+  const seconds = (advice.latency_ms / 1000).toFixed(1);
+  return `Explained live by ${advice.model} in ${seconds} s · every amount was checked against the calculation`;
 }
 
 function Ledger({ forecast, facts }: { forecast: ForecastResponse; facts: Facts }) {
@@ -133,20 +139,18 @@ function Ledger({ forecast, facts }: { forecast: ForecastResponse; facts: Facts 
   );
 }
 
-function DecisionPanel({
-  forecast,
-  facts,
-  limitMinor,
-  decision,
-  onDecide,
-}: Pick<Props, "forecast" | "facts" | "limitMinor" | "decision" | "onDecide">) {
-  const outcome = useRef<HTMLDivElement>(null);
+function DecisionPanel({ facts, outcome, onDecide }: Pick<Props, "facts" | "outcome" | "onDecide">) {
+  const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (decision) outcome.current?.focus({ preventScroll: true });
-  }, [decision]);
+    if (outcome.status === "ready") panel.current?.focus({ preventScroll: true });
+  }, [outcome.status]);
 
   const deepestGap = facts.deepest ? -facts.deepest.balance_minor : 0;
-  const result = decision ? simulate(forecast.baseline.days, limitMinor, decision) : null;
+  const result = outcome.status === "ready" ? outcome.data : null;
+  const decision = result?.decision ?? null;
+  const worst = result?.largest_uncovered ?? null;
+  const uncovered = worst?.shortfall_minor ?? 0;
+  const pending = outcome.status === "loading" ? outcome.decision : null;
   const range =
     facts.first && facts.lastRed
       ? facts.first.date === facts.lastRed.date
@@ -156,7 +160,7 @@ function DecisionPanel({
 
   return (
     <AnimatePresence mode="wait" initial={false}>
-      {decision === null || !result ? (
+      {!result ? (
         <motion.div
           key="ask"
           className="panel"
@@ -167,16 +171,31 @@ function DecisionPanel({
         >
           <p className="panel-title">Your call</p>
           <p>Approve to see what the credit line would do. It is a simulation: nothing is applied for and no money moves.</p>
-          <div className="decide">
-            <button type="button" className="btn primary block" onClick={() => onDecide("approved")}>
+          {outcome.status === "error" && (
+            <p className="alert soft" role="alert">
+              The simulation didn't run ({outcome.message}). Try again.
+            </p>
+          )}
+          <div className="decide" aria-busy={pending !== null}>
+            <button
+              type="button"
+              className="btn primary block"
+              onClick={() => onDecide("approved")}
+              disabled={pending !== null}
+            >
               <span>
-                Approve <small>simulation</small>
+                {pending === "approved" ? "Simulating…" : "Approve"} <small>simulation</small>
               </span>
               <Check size={20} aria-hidden="true" />
             </button>
-            <button type="button" className="btn ghost block" onClick={() => onDecide("rejected")}>
+            <button
+              type="button"
+              className="btn ghost block"
+              onClick={() => onDecide("rejected")}
+              disabled={pending !== null}
+            >
               <span>
-                Reject <small>simulation</small>
+                {pending === "rejected" ? "Simulating…" : "Reject"} <small>simulation</small>
               </span>
               <X size={20} aria-hidden="true" />
             </button>
@@ -185,7 +204,7 @@ function DecisionPanel({
       ) : (
         <motion.div
           key={decision}
-          ref={outcome}
+          ref={panel}
           tabIndex={-1}
           className={`panel outcome ${decision}`}
           initial={{ opacity: 0, y: 10 }}
@@ -200,29 +219,27 @@ function DecisionPanel({
           <p className="outcome-label">Still uncovered on the worst day</p>
           <p className="outcome-figure">
             <Figure
-              minor={result.worst.uncovered_minor}
-              tone={result.worst.uncovered_minor > 0 ? "neg" : "ok"}
+              minor={uncovered}
+              tone={uncovered > 0 ? "neg" : "ok"}
               count
               from={deepestGap}
             />
           </p>
           <p>
             {decision === "approved" ? (
-              result.worst.uncovered_minor === 0 ? (
+              !worst ? (
                 <>
                   The credit line covers all {plural(facts.daysBelow, "day")} below zero ({range}). The forecast itself
                   doesn't change.
                 </>
               ) : (
                 <>
-                  The credit line isn't enough: {money(result.worst.uncovered_minor)} is still short on{" "}
-                  {shortDate(result.worst.date)}.
+                  The credit line isn't enough: {money(worst.shortfall_minor)} is still short on {shortDate(worst.date)}.
                 </>
               )
             ) : (
               <>
-                Without the credit line, {money(result.worst.uncovered_minor)} stays uncovered on{" "}
-                {shortDate(result.worst.date)}. Moving a client payment earlier might help. <a href="#whatif">Try it below</a>.
+                Without the credit line, {money(uncovered)} stays uncovered on {worst ? shortDate(worst.date) : ""}. Moving a client payment earlier might help. <a href="#whatif">Try it below</a>.
               </>
             )}
           </p>
