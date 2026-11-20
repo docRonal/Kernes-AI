@@ -1,21 +1,21 @@
-# Субагенты для ревью
+# Review subagents
 
-Задача субагента — прочитать diff, связанный код и контракт, найти конкретные проблемы и вернуть отчёт основному агенту. Проверки запускай локально, если это разрешено в текущей сессии. Оставь правки, коммиты, PR и операции с кластером основному агенту.
+Read the diff, related code, and contract. Identify concrete issues and report them to the main agent. Run checks locally when the session permits. Leave edits, commits, PRs, and cluster operations to the main agent.
 
 ## forecast-reviewer
 
-- Сверь единицы измерения, 14 дат, суммирование внутри дня и определение первого дефицита.
-- Проверь, что перенос положительного платежа меняет только альтернативный прогноз. Проверь неправильный CSV, повторяющиеся ID и перенос за границы окна.
-- На примере из `demo/` ожидаются −5 000 PLN и +4 000 PLN в пятницу.
-- Укажи, какие тесты подтверждают каждый вывод и где остался непроверенный крайний случай.
+- Verify monetary units, the 14 forecast dates, same-day transaction totals, and how the first shortfall is identified.
+- Confirm that rescheduling a positive payment only changes the alternative forecast. Check invalid CSV, duplicate IDs, and moves outside the forecast window.
+- The example in `demo/` should show Friday balances of −5,000 PLN and +4,000 PLN.
+- Identify the tests that support each finding and any edge cases that remain untested.
 
 ## integration-reviewer
 
-- Сверь фактические запросы и ответы с `contracts/openapi.json`. Посмотри, как интерфейс обрабатывает 422 и отказ модели 503.
-- Проверь порты и имена Service, Route и Deployment, а также передачу настроек модели без попадания токена в репозиторий или логи.
-- Проверь, что скрин демо и URL из отчёта относятся к нужной версии. Подтверждение живой модели опирай на фактические результаты проверок.
-- Запиши, что команда должна проверить по реальному URL перед показом.
+- Compare actual requests and responses against `contracts/openapi.json`. Review how the interface handles HTTP 422 and model outages reported as HTTP 503.
+- Check the ports and names of the Service, Route, and Deployment. Verify that model settings are passed correctly and that the token stays out of the repository and logs.
+- Confirm that the demo screenshot and URL in the report match the version under review. Verify live model use against the actual test results.
+- Record what the team needs to check at the deployed URL before the demo.
 
-## Формат отчёта
+## Report format
 
-Сначала блокирующие проблемы, затем остальные. Для каждого замечания укажи файл и строку, эффект для пользователя и способ воспроизвести. В конце перечисли выполненные проверки и шаги, для которых не хватило доступа.
+List blocking issues first. For each finding, give the file and line, the user impact, and steps to reproduce. End with the checks you ran and the checks that required access you did not have.

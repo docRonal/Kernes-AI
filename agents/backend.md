@@ -1,14 +1,14 @@
-# Claude Code — прогноз и API
+# Forecasting and API with Claude Code
 
-Ветка `feat/backend`. Рабочие файлы — `backend/forecast.py`, входная валидация в `backend/main.py` и тесты прогноза. Согласуй изменения общих моделей данных и зависимостей с интегратором. Точка стыка с Codex — публичная функция из `backend/advice.py`.
+Work on `feat/backend`. Your files are `backend/forecast.py`, input validation in `backend/main.py`, and the forecast tests. Coordinate changes to shared data models and dependencies with the integration owner. Integrate with the Codex work through the public function in `backend/advice.py`.
 
-## Задача
+## Task
 
-1. Реализуй расчёт в режиме `live` по [контракту API](../contracts/openapi.json). Разбери UTF-8 CSV, проверь заголовки, даты, суммы и уникальность ID. Неверный ввод возвращает 422.
-2. Рассчитай 14 остатков на конец дня. Начальный остаток задан до операций первого дня. Суммируй операции в целых грошах. Найди первую дату с отрицательным остатком.
-3. Пересчитывай альтернативу для входящего платежа с новой датой, сохраняя исходные операции и базовый прогноз.
-4. Проверь сценарий из `demo/`, ошибочный ввод, несколько операций одного дня и случаи без дефицита. Сохрани локальный запуск на примерах до слияния реализации.
+1. Implement the calculation in `live` mode according to the [API contract](../contracts/openapi.json). Parse UTF-8 CSV and validate the headers, dates, amounts, and unique IDs. Return HTTP 422 for invalid input.
+2. Calculate 14 end-of-day balances. Apply the opening balance before the first day's transactions. Sum transactions in whole grosz. Find the first date with a negative balance.
+3. Recalculate the alternative forecast when an incoming payment moves to a new date. Preserve the original transactions and the baseline forecast.
+4. Test the scenario in `demo/`, invalid input, multiple transactions on the same day, and cases with no shortfall. Keep the fixture-based local demo runnable until the implementation is merged.
 
-## Промпт для старта
+## Starter prompt
 
-> Прочитай AGENTS.md, agents/backend.md и contracts/openapi.json. Работай в feat/backend. Реализуй прогноз и перенос платежа, затем запусти тесты. Для проверки diff вызови forecast-reviewer, если он доступен. В конце перечисли изменения и команды проверки.
+> Read AGENTS.md, agents/backend.md, and contracts/openapi.json. Work on feat/backend. Implement the forecast and payment rescheduling, then run the tests. Ask forecast-reviewer to review the diff if available. List your changes and the commands you ran to verify them.

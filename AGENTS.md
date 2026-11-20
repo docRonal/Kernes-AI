@@ -1,23 +1,23 @@
 # Autonomous CFO
 
-Цель хакатона — помочь владельцу малого бизнеса заранее увидеть нехватку денег, сравнить даты платежей и получить черновик письма. Финальное демо запускается на Red Hat OpenShift и вызывает модель на OpenShift AI.
+Help small-business owners spot cash shortfalls early, compare payment dates, and draft a payment reminder. The final demo runs on Red Hat OpenShift and calls a model on OpenShift AI.
 
-## Общие файлы
+## Shared files
 
-- [README.md](README.md) описывает запуск, распределение задач и проверку перед демо.
-- [contracts/openapi.json](contracts/openapi.json) задаёт API. В [demo/](demo/) лежат синтетический CSV и ответы для разработки интерфейса.
-- [agents/](agents/) содержит задания по ролям и чек-листы субагентов. Прочитай файл своей роли перед правками.
+- [README.md](README.md) covers setup, roles, and demo verification.
+- [contracts/openapi.json](contracts/openapi.json) defines the API. [demo/](demo/) contains synthetic CSV data and sample responses for frontend development.
+- [agents/](agents/) contains role assignments and reviewer checklists. Read your role file before editing.
 
-## Как работать одновременно
+## Working in parallel
 
-- Работай из корня репозитория в ветке своей задачи. Правь файлы, указанные в задании. Согласуй изменения контракта, общих зависимостей и чужих файлов с человеком, который собирает PR.
-- Для старта новой задачи используй свежий `main`. Перед интеграцией обнови ветку из `main`, прогони тесты и проверь diff. После обновления общих инструкций начни новую сессию агента.
-- В PR укажи, что изменилось, какие команды прошли и что нужно проверить в кластере. Объединяй ветки по очереди через PR, чтобы `main` оставался запускаемым.
-- Используй синтетические данные. Храни токены модели в переменных окружения или OpenShift Secret. Исключи их из Git, задач для агентов и логов.
+- Work from the repository root on your assigned branch. Edit the files listed in your assignment. Coordinate changes to the API contract, shared dependencies, and files owned by another role with the person merging PRs.
+- Start new tasks from the latest `main`. Before integration, update your branch from `main`, run the tests, and review the diff. Start a fresh agent session after shared instructions change.
+- In your PR, summarize what changed, list the checks that passed, and identify any checks that still need cluster access. Merge PRs one at a time so `main` stays runnable.
+- Use synthetic data. Store model tokens in environment variables or an OpenShift Secret. Keep tokens out of Git, agent prompts, and logs.
 
-## Контракт и проверка
+## API contract and verification
 
-- Python считает баланс в целых грошах. Модель объясняет уже рассчитанный риск и пишет черновик. Интерфейс показывает цифры с двумя знаками после запятой. Отправку письма выполняет человек.
-- Прогноз и совет — два запроса. Ошибка модели оставляет прогноз доступным. Режим `demo` использует готовые примеры и подходит для локальной работы. Режим `live` требует реальной реализации расчёта и вызова модели.
-- Сценарий из комплекта начинается 23 ноября 2026 с 12 000 PLN. Первый дефицит — 5 000 PLN 27 ноября. Если перенести `INV-001` на 26 ноября, остаток в пятницу составит 4 000 PLN. Базовый сценарий сохранит исходные цифры.
-- Перед демо повтори этот сценарий по URL OpenShift и проверь успешный реальный вызов модели OpenShift AI.
+- Calculate balances in Python using integer grosz amounts. The model explains the calculated risk and drafts a reminder. Display amounts with two decimal places. The user decides whether to send the reminder and sends it themselves.
+- Use separate requests for forecasts and advice. Keep the forecast available if the model call fails. The `demo` mode uses sample responses for local development. The `live` mode requires a working forecast and model client.
+- The sample starts on November 23, 2026, with PLN 12,000. The first shortfall is PLN 5,000 on November 27. Move `INV-001` to November 26 and the projected Friday balance becomes PLN 4,000. The baseline keeps its original values.
+- Before the demo, repeat the sample flow at the OpenShift URL and verify that the live OpenShift AI model responds.

@@ -1,36 +1,36 @@
 # Autonomous CFO
 
-Стартовый проект для челленджа Red Hat на Collabothon. Владелец бизнеса загрузит список платежей, увидит кассовый разрыв и проверит, что изменится, если клиент заплатит раньше.
+A starter project for the Red Hat challenge at Collabothon. A small-business owner uploads upcoming payments, sees when their cash balance could fall below zero, and checks what changes if a customer pays earlier.
 
-## Запуск на ноутбуке
+## Run locally
 
-Установите [uv](https://docs.astral.sh/uv/getting-started/installation/), откройте терминал в корне проекта и выполните:
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and run this command from the repository root.
 
 ```sh
 uv run --locked uvicorn backend.main:app --host 127.0.0.1 --port 8080
 ```
 
-Откройте [приложение](http://127.0.0.1:8080) или [Swagger](http://127.0.0.1:8080/docs). Проверки запускаются отдельной командой:
+Open the [app](http://127.0.0.1:8080) or the [Swagger UI](http://127.0.0.1:8080/docs). Run the tests in a separate terminal.
 
 ```sh
 uv run --locked pytest -q
 ```
 
-В режиме `demo` программа принимает CSV из [demo/transactions.csv](demo/transactions.csv) и показывает сохранённый ответ. В комплекте есть два ожидаемых исхода и пример ответа модели. Режим `live` содержит точки подключения для расчёта произвольного CSV и вызова OpenShift AI. Развёртывание описано в [deploy/README.md](deploy/README.md).
+In `demo` mode, the app accepts [demo/transactions.csv](demo/transactions.csv) and returns a saved response. The starter includes two forecast outcomes and a sample model response. The `live` mode has entry points for forecasting from any valid CSV and calling OpenShift AI. See the [deployment guide](deploy/README.md).
 
-Для локальных настроек скопируйте `.env.example` в `.env` и передайте `--env-file .env` сразу после `uv run --locked`. По умолчанию приложение запускается в режиме `demo`.
+For local configuration, copy `.env.example` to `.env` and add `--env-file .env` immediately after `uv run --locked`. The app starts in `demo` mode by default.
 
-## Первый коммит и ветки
+## Team branches
 
-В новый командный GitHub-репозиторий добавьте содержимое этой папки вместе со скрытыми каталогами. Сначала влейте стартовый коммит в `main`, затем создайте ветку для каждого исполнителя и передайте ему промпт из файла роли.
+Clone the team repository and create a branch from `main` for each contributor. Use the first prompt in the corresponding role file.
 
-| Инструмент | Ветка | Первый промпт |
+| Tool | Branch | First prompt |
 | --- | --- | --- |
-| Claude Code | `feat/backend` | [Расчёт остатков и API](agents/backend.md) |
-| Antigravity | `feat/frontend` | [Интерфейс и проверка в браузере](agents/frontend.md) |
-| Codex | `feat/openshift` | [Модель, контейнер и кластер](agents/openshift.md) |
+| Claude Code | `feat/backend` | [Cash flow forecast and API](agents/backend.md) |
+| Antigravity | `feat/frontend` | [UI and browser checks](agents/frontend.md) |
+| Codex | `feat/openshift` | [Model client, container, and cluster](agents/openshift.md) |
 
-На отдельных ноутбуках каждый работает в своём клоне. Если два агента работают на одном компьютере, откройте их в разных worktree. Например, из основного клона после публикации `main`:
+On separate laptops, each contributor works in their own clone. On a shared computer, open each agent in its own Git worktree. Run these commands from the main clone.
 
 ```sh
 git fetch origin
@@ -39,20 +39,20 @@ git worktree add ../cfo-frontend -b feat/frontend origin/main
 git worktree add ../cfo-openshift -b feat/openshift origin/main
 ```
 
-Назначьте одного интегратора. Он согласует изменения `contracts/openapi.json`, следит за общими зависимостями и проверяет итоговый `main`. Каждый агент открывает PR со своим diff и результатом локальных проверок. Перед финальной проверкой все подтягивают изменения `main`.
+Assign one person to coordinate integration. They review changes to `contracts/openapi.json`, look after shared dependencies, and verify the final `main`. Each contributor opens a PR with their changes and local test results. Update your branch from `main` before the final check.
 
-## Инструкции и субагенты
+## Instructions and subagents
 
-Три основных агента получают правила из [AGENTS.md](AGENTS.md). [CLAUDE.md](CLAUDE.md) подключает его импортом. В каждом инструменте открывайте корень соответствующего клона или worktree.
+All three primary agents use the shared rules in [AGENTS.md](AGENTS.md). [CLAUDE.md](CLAUDE.md) imports the same file. Open the root of the relevant clone or worktree in each tool.
 
-- `forecast-reviewer` проверяет расчёт, валидацию и сценарий переноса.
-- `integration-reviewer` проверяет стыки интерфейса, API и OpenShift.
+- `forecast-reviewer` checks the calculations, input validation, and payment-date scenario.
+- `integration-reviewer` checks how the UI, API, and OpenShift fit together.
 
-Конфигурации лежат в `.codex/agents/`, `.claude/agents/` и `.agents/agents/` соответственно. В Codex и Antigravity App/CLI попросите основной агент делегировать ревью по имени и передать список изменённых файлов. В Claude Code можно упомянуть `@agent-forecast-reviewer` или `@agent-integration-reviewer`. Если установленная версия инструмента не показывает субагента, передайте основному агенту [чек-листы ревью](agents/reviewer.md). [Codex](https://learn.chatgpt.com/docs/agent-configuration/subagents#custom-agents) · [Claude Code](https://code.claude.com/docs/en/sub-agents#invoke-subagents-explicitly) · [Antigravity](https://antigravity.google/docs/subagents#custom-subagents)
+The configurations are in `.codex/agents/`, `.claude/agents/`, and `.agents/agents/`, respectively. In Codex and Antigravity App or CLI, ask the primary agent to delegate the review by name and pass the list of changed files. In Claude Code, mention `@agent-forecast-reviewer` or `@agent-integration-reviewer`. If your installed version does not show a subagent, give the primary agent the [review checklists](agents/reviewer.md). [Codex](https://learn.chatgpt.com/docs/agent-configuration/subagents#custom-agents) · [Claude Code](https://code.claude.com/docs/en/sub-agents#invoke-subagents-explicitly) · [Antigravity](https://antigravity.google/docs/subagents#custom-subagents)
 
-## Проверка перед демо
+## Verify before the demo
 
-1. Откройте приложение по URL OpenShift. Загрузите тестовый CSV, укажите начальный остаток 12 000 PLN и дату начала 23 ноября 2026.
-2. Убедитесь, что пятничный остаток 27 ноября равен **−5 000 PLN**.
-3. Перенесите платёж `INV-001` на 26 ноября. Убедитесь, что новый пятничный остаток равен **+4 000 PLN**, а базовая линия сохранилась.
-4. Запустите объяснение дефицита и проверьте, что запрос дошёл до реальной модели OpenShift AI и вернул объяснение с черновиком письма.
+1. Open the OpenShift app URL. Upload the sample CSV, enter PLN 12,000 as the opening balance, and set the start date to November 23, 2026.
+2. Verify that the balance on Friday, November 27, is **−PLN 5,000**.
+3. Move payment `INV-001` to November 26. Verify that the new Friday balance is **PLN 4,000** and the baseline still shows the original balance.
+4. Request a shortfall explanation. Verify that the OpenShift AI model handles the request and returns an explanation and a draft email.
