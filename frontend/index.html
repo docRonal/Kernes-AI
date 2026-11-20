@@ -1,17 +1,339 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light dark" />
-    <meta name="description" content="Autonomous CFO: a liquidity agent that looks 14 days ahead, explains what it finds and asks before it acts." />
-    <title>Autonomous CFO · Kernes</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%2316150F'/%3E%3Cpath d='M7 20h5v-6h5v4h5V9h3' fill='none' stroke='%23F3F0E8' stroke-width='2.6' stroke-linejoin='round'/%3E%3C/svg%3E" />
-    <script type="module" crossorigin src="/assets/app.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/styles.css">
-  </head>
-  <body>
-    <div id="root"></div>
-    <noscript>Autonomous CFO needs JavaScript to run the forecast.</noscript>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Autonomous CFO — Simple Cash Assistant</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script type="module" src="/assets/app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 28 28" width="22" height="22" fill="none">
+              <rect x="2" y="14" width="5" height="12" rx="1.5" fill="currentColor" opacity="0.55"/>
+              <rect x="11" y="9" width="5" height="17" rx="1.5" fill="currentColor" opacity="0.8"/>
+              <rect x="20" y="3" width="5" height="23" rx="1.5" fill="currentColor"/>
+            </svg>
+          </div>
+          <div>
+            <h1>Autonomous CFO</h1>
+            <p class="subtitle">Simple cash assistant for small businesses</p>
+          </div>
+        </div>
+        <div class="topbar-meta">
+          <button type="button" class="btn-topbar" id="change-file-btn" hidden>← Change file</button>
+          <span class="pill pill-neutral" id="account-pill">EUR Account</span>
+          <span class="pill pill-accent" id="agent-status-pill">Assistant Ready</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <!-- SCREEN 1: Dedicated Clean Upload / Start Screen -->
+      <section id="setup-screen" class="setup-screen" aria-labelledby="setup-heading">
+        <div class="setup-hero">
+          <span class="step-tag">Step 1 of 2 · Start Here</span>
+          <h2 id="setup-heading">Will your business have enough cash ahead?</h2>
+          <p class="setup-lead">Upload your bank CSV or use our built-in Pizzeria Amalfi example. We'll highlight any tight days, explain why in plain English, and help you test simple solutions.</p>
+        </div>
+
+        <div class="card setup-card">
+          <form id="forecast-form" class="setup-form" novalidate>
+            <div class="field">
+              <div class="field-label-row">
+                <label for="csv-file">Bank statement (CSV file)</label>
+                <button type="button" class="btn-link" id="download-sample-btn">Download sample CSV</button>
+              </div>
+              <div class="file-dropzone file-dropzone-lg" id="file-dropzone">
+                <input id="csv-file" name="file" type="file" accept=".csv,text/csv">
+                <div class="file-dropzone-content">
+                  <span class="file-icon" aria-hidden="true">📄</span>
+                  <div class="file-copy">
+                    <span class="file-name" id="file-name">Pizzeria Amalfi example (ready to use)</span>
+                    <span class="file-hint">Drop your semicolon-delimited bank CSV here, or click to browse</span>
+                  </div>
+                  <span class="file-action">Browse</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="setup-fields-row">
+              <div class="field">
+                <label for="opening-balance">Cash in bank today (EUR)</label>
+                <input id="opening-balance" name="opening_balance" inputmode="decimal" value="5000.00" placeholder="5000.00" required>
+              </div>
+
+              <div class="field">
+                <label for="start-date">Start date</label>
+                <input id="start-date" name="start_date" type="date" value="2025-06-22" required>
+              </div>
+
+              <div class="field">
+                <label for="horizon-select">Look ahead</label>
+                <select id="horizon-select" name="horizon">
+                  <option value="14" selected>Next 14 days</option>
+                  <option value="30">Next 30 days</option>
+                  <option value="all">Whole file</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="setup-actions">
+              <button type="submit" class="btn btn-primary btn-lg" id="run-forecast-btn">Check my cash →</button>
+              <button type="button" class="btn btn-ghost" id="load-sample-btn">Try Pizzeria Amalfi sample</button>
+            </div>
+          </form>
+
+          <div id="status" class="status-banner" role="status" aria-live="polite" hidden></div>
+        </div>
+      </section>
+
+      <!-- SCREEN 2: Full-Focus Guided Results Story -->
+      <div id="results" class="dashboard" hidden>
+        <!-- Inline status bar for scenario updates on Screen 2 -->
+        <div id="results-status" class="status-banner" role="status" aria-live="polite" hidden></div>
+
+        <!-- 1. Big Plain-English Verdict Banner -->
+        <section class="card hero-card" id="hero-card" aria-live="polite">
+          <div class="hero-top">
+            <div class="hero-copy">
+              <span class="pill pill-warning" id="hero-badge">Heads up</span>
+              <h2 class="hero-title" id="hero-title">Checking your cash…</h2>
+              <p class="hero-summary" id="hero-summary"></p>
+            </div>
+            <div class="hero-stats">
+              <div class="hero-stat">
+                <span class="hero-stat-label">Cash today</span>
+                <strong class="hero-stat-value" id="kpi-opening">—</strong>
+                <span class="hero-stat-sub" id="kpi-horizon">14 days</span>
+              </div>
+              <div class="hero-stat" id="kpi-first-card">
+                <span class="hero-stat-label">First dip below €0</span>
+                <strong class="hero-stat-value" id="kpi-first-shortfall">—</strong>
+                <span class="hero-stat-sub" id="kpi-first-date">—</span>
+              </div>
+              <div class="hero-stat" id="kpi-peak-card">
+                <span class="hero-stat-label">Biggest gap</span>
+                <strong class="hero-stat-value" id="kpi-peak-shortfall">—</strong>
+                <span class="hero-stat-sub" id="kpi-peak-date">—</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. Full-Width Visual Cash Graph -->
+        <section class="card chart-card" aria-labelledby="chart-heading">
+          <div class="card-header">
+            <div>
+              <h2 id="chart-heading">Your Cash Balance Over Time</h2>
+              <p class="card-desc" id="shortfall">Hover or tap any day on the graph to see what's coming in or going out.</p>
+            </div>
+            <div class="chart-controls">
+              <div class="horizon-pills" role="group" aria-label="Days to analyze">
+                <button type="button" class="horizon-pill is-active" data-horizon="14">14 days</button>
+                <button type="button" class="horizon-pill" data-horizon="30">30 days</button>
+                <button type="button" class="horizon-pill" data-horizon="all">Whole file</button>
+              </div>
+              <div class="chart-legend" aria-label="Chart legend">
+                <span class="legend-item"><i class="dot dot-baseline"></i>Your cash</span>
+                <span class="legend-item" id="legend-scenario" hidden><i class="dot dot-scenario"></i>If paid earlier</span>
+                <span class="legend-item" id="legend-facility" hidden><i class="dot dot-facility"></i>Credit line cover</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-wrapper" id="chart-container" aria-label="Cash balance graph"></div>
+        </section>
+
+        <!-- 3. Side-by-Side AI Assistant Briefing & Action Decision Card -->
+        <div class="story-grid">
+          <!-- Left: Healthy State OR Structured Friendly AI Briefing -->
+          <div class="story-col">
+            <section id="no-shortfall-card" class="card healthy-card" hidden>
+              <div class="card-header">
+                <h2>You're all set</h2>
+                <span class="pill pill-success">No shortfall</span>
+              </div>
+              <p class="card-desc">Your balance stays at or above €0.00 for every day in this period, so you don't need a credit line right now.</p>
+            </section>
+
+            <section id="assistant-card" class="card assistant-card" aria-labelledby="assistant-heading" hidden>
+              <div class="agent-box-header">
+                <div class="agent-title-wrap">
+                  <span class="agent-avatar" aria-hidden="true">AI</span>
+                  <div>
+                    <h2 id="assistant-heading">AI Financial Assistant</h2>
+                    <span class="agent-sub">Plain-English summary of your cash dip</span>
+                  </div>
+                </div>
+                <button type="button" class="btn-link" id="retry-advice-btn" hidden>Try again</button>
+              </div>
+
+              <div id="advice-loading" class="skeleton-stack" hidden>
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line short"></div>
+              </div>
+
+              <div id="advice-error" class="inline-alert inline-alert-soft" hidden></div>
+
+              <p id="explanation" class="agent-text" hidden></p>
+
+              <!-- 2-3 Plain-English Bullet Highlights -->
+              <div class="why-box">
+                <h3>Why it happens</h3>
+                <ul class="why-list" id="why-bullets"></ul>
+              </div>
+
+              <!-- Collapsible Biggest Payments (closed by default to keep it calm) -->
+              <details class="drivers-details">
+                <summary>Biggest payments affecting your cash</summary>
+                <ul class="tx-list" id="relevant-transactions"></ul>
+              </details>
+            </section>
+          </div>
+
+          <!-- Right: Action Decision Card (Credit Line Preview vs Move a Payment) -->
+          <div class="story-col">
+            <section class="card actions-card" aria-labelledby="actions-heading">
+              <div class="card-header compact-header">
+                <div>
+                  <span class="step-tag">Step 2 of 2 · Test Your Options</span>
+                  <h2 id="actions-heading">How do you want to handle this?</h2>
+                </div>
+              </div>
+
+              <div class="tab-bar" role="tablist" aria-label="Liquidity options">
+                <button type="button" role="tab" class="tab-btn is-active" id="tab-credit" aria-selected="true" aria-controls="panel-credit">
+                  1. Credit line preview
+                </button>
+                <button type="button" role="tab" class="tab-btn" id="tab-whatif" aria-selected="false" aria-controls="panel-whatif">
+                  2. Get paid earlier
+                </button>
+              </div>
+
+              <!-- Tab 1: Credit Line Simulation -->
+              <div id="panel-credit" class="tab-panel" role="tabpanel" aria-labelledby="tab-credit">
+                <div id="credit-none-note" class="muted-note" hidden>
+                  No credit line needed — your cash stays positive throughout this period.
+                </div>
+
+                <div id="proposal-card" hidden>
+                  <div class="credit-callout">
+                    <span class="credit-callout-label">Suggested safety net</span>
+                    <strong class="credit-callout-amount" id="proposal-limit-value">0.00 EUR</strong>
+                    <span class="credit-callout-sub" id="fact-peak-shortfall">Covers your lowest projected day</span>
+                  </div>
+
+                  <p class="sim-disclaimer">
+                    <strong>Preview only:</strong> Approving or rejecting below only updates this preview. No real loan, transfer, or email is sent.
+                  </p>
+
+                  <div class="decision-buttons">
+                    <button type="button" class="btn btn-approve" id="approve-sim-btn">Approve preview</button>
+                    <button type="button" class="btn btn-reject" id="reject-sim-btn">Reject preview</button>
+                  </div>
+
+                  <div id="simulation-outcome" class="outcome-box" hidden>
+                    <div class="outcome-top">
+                      <strong id="outcome-title"></strong>
+                      <button type="button" class="btn-link" id="reset-sim-btn">Reset</button>
+                    </div>
+                    <p id="outcome-details"></p>
+                    <div class="outcome-metric">
+                      <span>Cash still short:</span>
+                      <strong id="outcome-gap-value"></strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tab 2: What-If Earlier Payment + Editable Email Draft -->
+              <div id="panel-whatif" class="tab-panel" role="tabpanel" aria-labelledby="tab-whatif" hidden>
+                <p class="panel-intro">Test what happens if an expected payout arrives a few days sooner. Your original forecast stays saved.</p>
+
+                <form id="scenario-form" class="stack-form">
+                  <div class="field">
+                    <label for="move-tx-select">Which incoming payment?</label>
+                    <select id="move-tx-select" name="move_transaction_id" required></select>
+                  </div>
+                  <div class="field">
+                    <label for="move-date-input">What if it arrives on:</label>
+                    <input id="move-date-input" name="move_to_date" type="date" value="2025-06-28" required>
+                  </div>
+                  <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="compare-dates-btn">Preview earlier date</button>
+                    <button type="button" class="btn btn-ghost" id="clear-scenario-btn" hidden>Clear</button>
+                  </div>
+                </form>
+
+                <p id="no-incoming-msg" class="muted-note" hidden>No incoming payments found in this window to move.</p>
+                <div id="scenario-summary-box" class="inline-alert inline-alert-info" hidden></div>
+
+                <!-- Editable Email Reminder Draft -->
+                <div id="draft-card" class="draft-section" hidden>
+                  <hr class="divider">
+                  <h3>Ask for an earlier payment</h3>
+                  <p class="panel-intro">Get a polite email draft you can edit and send yourself.</p>
+                  <button type="button" class="btn btn-secondary btn-full" id="advice-button">Write reminder email draft</button>
+
+                  <div id="advice" class="draft-editor" hidden>
+                    <label for="draft">Editable draft (you send it yourself)</label>
+                    <textarea id="draft" rows="4"></textarea>
+                    <div class="draft-actions">
+                      <button type="button" class="btn btn-ghost" id="copy-draft-btn">Copy email</button>
+                      <span class="copy-feedback" id="copy-feedback" aria-live="polite"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- 4. Optional Expandable Day-by-Day Table -->
+        <section class="card details-card" aria-labelledby="table-heading">
+          <div class="details-bar">
+            <div>
+              <h2 id="table-heading">Day-by-day numbers</h2>
+              <p class="card-desc">Open whenever you want to inspect every day's exact balance and payments.</p>
+            </div>
+            <button type="button" class="btn btn-secondary" id="toggle-ledger-btn" aria-expanded="false" aria-controls="ledger-panel">
+              <span>Show table (<span id="table-count-pill">14 days</span>)</span>
+            </button>
+          </div>
+
+          <div id="ledger-panel" class="ledger-panel" hidden>
+            <p class="card-desc scenario-note" id="scenario-message" hidden></p>
+            <div class="table-scroll">
+              <table class="ledger-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Date</th>
+                    <th scope="col">What happens</th>
+                    <th scope="col" class="num">Balance</th>
+                    <th scope="col" class="num" id="scenario-heading" hidden>If paid earlier</th>
+                    <th scope="col" class="num" id="simulation-heading" hidden>Still short</th>
+                  </tr>
+                </thead>
+                <tbody id="balances"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer-inner">
+        <span>Autonomous CFO · Simple Cash Assistant</span>
+        <span>Preview mode · No real banking actions are triggered</span>
+      </div>
+    </footer>
+  </div>
+</body>
 </html>
