@@ -99,6 +99,13 @@
       "INV-001"
     ]
   },
+  "earlier_payments": [
+    {
+      "transaction_id": "INV-001",
+      "pay_by": "2026-11-26",
+      "limit_after_minor": 0
+    }
+  ],
   "scenario": {
     "days": [
       {

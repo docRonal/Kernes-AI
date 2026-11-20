@@ -1,25 +1,47 @@
-from datetime import date
-from typing import Literal
+from datetime import date, timedelta
+from typing import Annotated, Literal
 
 from fastapi import UploadFile
-from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, PositiveInt, StrictInt
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    NonNegativeInt,
+    PositiveInt,
+    StrictInt,
+    StringConstraints,
+    field_validator,
+)
+
+
+# Shared by the CSV parser and the JSON endpoints, so neither path accepts what the other refuses.
+HORIZON_DAYS = 14
+MAX_TRANSACTIONS = 5_000
+MAX_ID_LENGTH = 64
+MAX_LABEL_LENGTH = 200
+# PLN 1 billion per amount keeps every total below 2**53, so browsers read it exactly.
+MAX_ABS_MINOR = 100_000_000_000
+MAX_DELAY_DAYS = 365
+# Line breaks and other control characters would let a label add fake lines to the model prompt.
+NO_CONTROL_CHARACTERS = r"^[^\x00-\x1f\x7f-\x9f\u2028\u2029]*$"
 
 
 class ForecastRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     file: UploadFile
     starting_balance_minor: int
-    start_date: date
+    # A later start would push the 14-day window past the last date Python can represent.
+    start_date: date = Field(le=date.max - timedelta(days=HORIZON_DAYS - 1))
     move_transaction_id: str | None = None
     move_to_date: date | None = None
 
 
 class Transaction(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    id: str
+    id: str = Field(min_length=1, max_length=MAX_ID_LENGTH, pattern=NO_CONTROL_CHARACTERS)
     date: date
-    amount_minor: StrictInt
-    label: str
+    amount_minor: StrictInt = Field(ge=-MAX_ABS_MINOR, le=MAX_ABS_MINOR)
+    label: str = Field(min_length=1, max_length=MAX_LABEL_LENGTH, pattern=NO_CONTROL_CHARACTERS)
 
 
 class Deficit(BaseModel):
@@ -36,8 +58,15 @@ class DailyBalance(BaseModel):
 
 class Projection(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    days: list[DailyBalance] = Field(min_length=14, max_length=14)
+    days: list[DailyBalance] = Field(min_length=HORIZON_DAYS, max_length=HORIZON_DAYS)
     first_deficit: Deficit | None
+
+    @field_validator("days")
+    @classmethod
+    def _consecutive(cls, days: list[DailyBalance]) -> list[DailyBalance]:
+        if any((later.date - earlier.date).days != 1 for earlier, later in zip(days, days[1:])):
+            raise ValueError("the days must be consecutive dates")
+        return days
 
 
 class Proposal(BaseModel):
@@ -50,11 +79,21 @@ class Proposal(BaseModel):
     relevant_transaction_ids: list[str]
 
 
+class EarlierPayment(BaseModel):
+    """An incoming payment that would shrink the proposed facility if the client paid it by pay_by."""
+
+    model_config = ConfigDict(extra="forbid")
+    transaction_id: str
+    pay_by: date
+    limit_after_minor: NonNegativeInt
+
+
 class ForecastResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     transactions: list[Transaction]
     baseline: Projection
     proposal: Proposal | None
+    earlier_payments: list[EarlierPayment]
     scenario: Projection | None
 
 
@@ -67,8 +106,9 @@ class AdviceRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     baseline: Projection
-    transactions: list[Transaction] = Field(min_length=1)
-    client_delays: dict[str, NonNegativeInt] | None = None
+    transactions: list[Transaction] = Field(min_length=1, max_length=MAX_TRANSACTIONS)
+    # Larger delays would move a payment date past the end of the calendar.
+    client_delays: dict[str, Annotated[int, Field(ge=0, le=MAX_DELAY_DAYS)]] | None = None
 
 
 class AdviceResponse(BaseModel):
@@ -97,7 +137,7 @@ class ReminderSendRequest(BaseModel):
 
 class ReminderSendResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    status: Literal["simulated", "sent"]
+    status: Literal["simulated"]
     recipient: str
     subject: str
     message: str
@@ -129,3 +169,90 @@ class DecisionResponse(BaseModel):
     limit_minor: PositiveInt
     days: list[DecisionDay] = Field(min_length=14, max_length=14)
     largest_uncovered: Deficit | None
+
+
+class InsightRequest(BaseModel):
+    """The baseline and transactions from the forecast response. Every figure is recalculated from them."""
+
+    model_config = ConfigDict(extra="forbid")
+    baseline: Projection
+    transactions: list[Transaction] = Field(min_length=1, max_length=MAX_TRANSACTIONS)
+
+
+class StressScenario(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    description: str
+    deepest_shortfall: Deficit | None
+    extra_needed_minor: NonNegativeInt
+
+
+class StressTestResponse(BaseModel):
+    """Worst cases for the forecast and the extra credit they would need. Calculated, never from the model."""
+
+    model_config = ConfigDict(extra="forbid")
+    proposed_limit_minor: NonNegativeInt
+    scenarios: list[StressScenario]
+    buffer_minor: NonNegativeInt
+    recommended_limit_minor: NonNegativeInt
+
+
+class PaymentAction(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["collect_earlier", "pay_later"]
+    transaction_id: str
+    due_date: date
+    new_date: date
+    limit_after_minor: NonNegativeInt
+    saves_minor: PositiveInt
+
+
+class PaymentOptimizationResponse(BaseModel):
+    """Ways to need less credit, best first. Calculated, never from the model."""
+
+    model_config = ConfigDict(extra="forbid")
+    proposed_limit_minor: NonNegativeInt
+    actions: list[PaymentAction]
+
+
+class ScoreFactor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: Literal["repayment", "coverage", "duration", "depth", "concentration", "delays"]
+    points: NonNegativeInt
+    reason: str
+
+
+class CreditCheckResponse(BaseModel):
+    """A transparent scorecard for the proposed facility. The score is calculated; the model only explains it."""
+
+    model_config = ConfigDict(extra="forbid")
+    score: int = Field(ge=0, le=100)
+    risk: Literal["low", "medium", "high"]
+    limit_minor: PositiveInt
+    factors: list[ScoreFactor]
+    explanation: str | None
+    explanation_error: str | None
+    model: str | None
+    latency_ms: NonNegativeInt | None
+
+
+class AskRequest(InsightRequest):
+    question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+
+
+class WhatIf(BaseModel):
+    """The change the question asked about, recalculated by the application."""
+
+    model_config = ConfigDict(extra="forbid")
+    transaction_id: str
+    new_amount_minor: StrictInt
+    new_date: date
+    deepest_shortfall: Deficit | None
+
+
+class AskResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    answer: str
+    what_if: WhatIf | None
+    model: str
+    latency_ms: NonNegativeInt

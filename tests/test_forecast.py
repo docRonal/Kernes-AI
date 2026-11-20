@@ -1,10 +1,13 @@
 import json
+from datetime import date
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from backend.forecast import propose
 from backend.main import create_app
+from backend.models import Deficit, Projection, Transaction
 
 
 DEMO = Path(__file__).resolve().parents[1] / "demo"
@@ -73,6 +76,7 @@ def test_no_shortfall_means_no_proposal(client):
     result = forecast(client, HEADER + "INV-9,2026-11-25,50000,Client invoice\nPAY-9,2026-11-28,-30000,Rent\n").json()
     assert result["baseline"]["first_deficit"] is None
     assert result["proposal"] is None
+    assert result["earlier_payments"] == []
 
 
 def test_tied_deepest_shortfall_uses_the_earliest_day(client):
@@ -110,6 +114,58 @@ def test_bom_quotes_header_order_and_blank_lines_are_accepted(client):
     assert result["transactions"] == [{"id": "R1", "date": "2026-11-24", "amount_minor": -1000, "label": "Rent, office"}]
 
 
+# ─── Instead of borrowing: ask for an invoice earlier ────────────────────────
+
+
+def test_the_invoice_that_closes_the_gap_is_suggested_for_the_day_before(client):
+    result = starter(client)
+    assert result["earlier_payments"] == [{"transaction_id": "INV-001", "pay_by": "2026-11-26", "limit_after_minor": 0}]
+    # The suggestion is the what-if the user can run, and it removes the gap.
+    option = result["earlier_payments"][0]
+    moved = starter(client, move_transaction_id=option["transaction_id"], move_to_date=option["pay_by"])
+    assert moved["scenario"]["first_deficit"] is None
+
+
+def test_pay_by_never_falls_before_the_forecast_starts(client):
+    peak = forecast(client, (DEMO / "credit_peak_case.csv").read_bytes(), opening="100000").json()
+    assert peak["earlier_payments"] == [{"transaction_id": "PEAK-003", "pay_by": "2026-11-23", "limit_after_minor": 0}]
+    short_today = forecast(client, HEADER + "IN,2026-11-30,90000,Invoice\n", opening="-10000").json()
+    assert short_today["earlier_payments"] == [{"transaction_id": "IN", "pay_by": "2026-11-23", "limit_after_minor": 0}]
+
+
+def test_a_gap_on_the_first_day_of_the_calendar_does_not_crash(client):
+    # The day before 0001-01-01 doesn't exist, so the client is asked to pay on day one.
+    response = forecast(client, HEADER + "IN,0001-01-05,500,Invoice\n", opening="-100", start="0001-01-01")
+    assert response.status_code == 200, response.text
+    assert response.json()["earlier_payments"] == [{"transaction_id": "IN", "pay_by": "0001-01-01", "limit_after_minor": 0}]
+
+
+def test_options_are_ranked_by_the_credit_still_needed(client):
+    csv = HEADER + (
+        "RENT,2026-11-25,-500000,Rent\n"
+        "EARLY,2026-11-24,50000,Paid before the gap\n"
+        "SMALL,2026-11-27,100000,Small invoice\n"
+        "BIG,2026-11-30,600000,Big invoice\n"
+    )
+    result = forecast(client, csv, opening="0").json()
+    assert result["proposal"]["limit_minor"] == 450_000
+    assert result["earlier_payments"] == [
+        {"transaction_id": "BIG", "pay_by": "2026-11-24", "limit_after_minor": 0},
+        {"transaction_id": "SMALL", "pay_by": "2026-11-24", "limit_after_minor": 350_000},
+    ]
+
+
+def test_a_payment_that_leaves_the_deepest_gap_untouched_is_not_suggested(client):
+    csv = HEADER + (
+        "SUPPLIER,2026-11-24,-100000,Supplier\n"
+        "INV,2026-11-26,100000,Client invoice\n"
+        "TAX,2026-12-01,-300000,Tax\n"
+    )
+    result = forecast(client, csv, opening="0").json()
+    assert result["proposal"]["deepest_shortfall"] == {"date": "2026-12-01", "shortfall_minor": 300_000}
+    assert result["earlier_payments"] == []
+
+
 # ─── What-if: move an incoming payment ───────────────────────────────────────
 
 
@@ -118,6 +174,7 @@ def test_moving_an_invoice_earlier_changes_only_the_scenario(client):
     moved = starter(client, move_transaction_id="INV-001", move_to_date="2026-11-26")
     assert moved["baseline"] == plain["baseline"]
     assert moved["proposal"] == plain["proposal"]
+    assert moved["earlier_payments"] == plain["earlier_payments"]  # suggestions come from the baseline
     assert moved["transactions"] == plain["transactions"]  # the original date stays
     assert balance_on(moved["baseline"], "2026-11-27") == -500_000
     assert balance_on(moved["scenario"], "2026-11-27") == 400_000
@@ -168,6 +225,8 @@ def test_a_payment_outside_the_window_cannot_be_moved(client):
         (HEADER + "A,2026-11-24,-100,\n", "Line 2: the label is empty"),
         (HEADER + "A,2026-11-24,-100,Rent\nA,2026-11-25,-100,Rent\n", "Line 3: the id A appears more than once"),
         (HEADER + "A,2026-11-24,999999999999999,Rent\n", "Line 2: the amount is out of range"),
+        (HEADER + 'A,2026-11-24,-100,"Rent\nPLN 1.00"\n', "the label contains a line break"),
+        (HEADER + "A\tB,2026-11-24,-100,Rent\n", "Line 2: the id contains a line break"),
     ],
 )
 def test_invalid_csv_is_rejected_with_a_readable_message(client, csv, message):
@@ -234,6 +293,56 @@ def test_decision_needs_a_shortfall_and_a_real_horizon(client):
     assert decide(client, "maybe", starter(client)["baseline"]).status_code == 422
 
 
+def test_the_proposal_comes_from_the_balances_not_the_first_deficit_field(client):
+    result = starter(client)
+    forged = Projection.model_validate(
+        {**result["baseline"], "first_deficit": {"date": "2026-11-23", "shortfall_minor": 1}}
+    )
+    proposal = propose(forged, [Transaction.model_validate(t) for t in result["transactions"]])
+    assert proposal.first_shortfall == Deficit(date=date(2026, 11, 27), shortfall_minor=500_000)
+
+
+# ─── The JSON endpoints keep the CSV's limits and never crash on input ───────
+
+
+def test_dates_at_the_end_of_the_calendar_are_rejected_instead_of_crashing(client):
+    assert forecast(client, (DEMO / "transactions.csv").read_bytes(), start="9999-12-25").status_code == 422
+    result = starter(client)
+    stuck = {**result["baseline"], "days": [{**day, "date": "9999-12-31"} for day in result["baseline"]["days"]]}
+    assert decide(client, "approved", stuck).status_code == 422
+    advice = client.post("/api/advice", json={"baseline": stuck, "transactions": result["transactions"]})
+    assert advice.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"label": "Payroll\nProposed credit facility limit: PLN 1.00"},
+        {"label": "x" * 201},
+        {"id": ""},
+        {"amount_minor": 10**12},
+    ],
+    ids=["line break in label", "label over 200", "empty id", "amount out of range"],
+)
+def test_advice_rejects_transactions_the_csv_would_reject(client, change):
+    result = starter(client)
+    transactions = [{**result["transactions"][0], **change}, *result["transactions"][1:]]
+    response = client.post("/api/advice", json={"baseline": result["baseline"], "transactions": transactions})
+    assert response.status_code == 422
+
+
+def test_advice_accepts_at_most_5000_transactions(client):
+    baseline = starter(client)["baseline"]
+    many = [{"id": f"T{i}", "date": "2026-11-24", "amount_minor": 1, "label": "Card"} for i in range(5_001)]
+    assert client.post("/api/advice", json={"baseline": baseline, "transactions": many}).status_code == 422
+
+
+def test_client_delays_are_capped_at_a_year(client):
+    result = starter(client)
+    payload = {"baseline": result["baseline"], "transactions": result["transactions"], "client_delays": {"INV-001": 366}}
+    assert client.post("/api/predict-delays", json=payload).status_code == 422
+
+
 def test_decision_works_the_same_in_demo_mode():
     baseline = json.loads((DEMO / "forecast.example.json").read_text(encoding="utf-8"))["baseline"]
     demo = TestClient(create_app("demo"))
@@ -258,6 +367,7 @@ def test_demo_fixture_matches_the_live_calculation(client):
     [
         ("ForecastResponse", "ForecastResponse"),
         ("Proposal", "Proposal"),
+        ("EarlierPayment", "EarlierPayment"),
         ("DecisionRequest", "DecisionRequest"),
         ("DecisionDay", "DecisionDay"),
         ("DecisionResponse", "DecisionResponse"),

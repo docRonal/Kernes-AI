@@ -17,11 +17,18 @@ from pathlib import Path
 from fastapi import HTTPException, UploadFile
 
 from .models import (
+    HORIZON_DAYS,
+    MAX_ABS_MINOR,
+    MAX_ID_LENGTH,
+    MAX_LABEL_LENGTH,
+    MAX_TRANSACTIONS,
+    NO_CONTROL_CHARACTERS,
     DailyBalance,
     DecisionDay,
     DecisionRequest,
     DecisionResponse,
     Deficit,
+    EarlierPayment,
     ForecastResponse,
     Projection,
     Proposal,
@@ -35,17 +42,12 @@ DEMO_START = date(2026, 11, 23)
 DEMO_STARTING_BALANCE_MINOR = 1_200_000
 DEMO_MOVE = ("INV-001", date(2026, 11, 26))
 
-HORIZON_DAYS = 14
 CSV_HEADER = ("id", "date", "amount_minor", "label")
 MAX_CSV_BYTES = 1_000_000
-MAX_ROWS = 5_000
-MAX_ID_LENGTH = 64
-MAX_LABEL_LENGTH = 200
-# PLN 1 billion per amount keeps every total below 2**53, so browsers read it exactly.
-MAX_ABS_MINOR = 100_000_000_000
 
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 _WHOLE_NUMBER = re.compile(r"[+-]?\d{1,15}")
+_NO_CONTROL = re.compile(NO_CONTROL_CHARACTERS)
 
 
 class ForecastInputError(ValueError):
@@ -80,8 +82,8 @@ def parse_transactions(raw: bytes) -> list[Transaction]:
                 continue
             if len(row) != len(CSV_HEADER):
                 raise ForecastInputError(f"Line {line}: expected 4 values, found {len(row)}.")
-            if len(transactions) == MAX_ROWS:
-                raise ForecastInputError(f"The CSV has more than {MAX_ROWS} transactions.")
+            if len(transactions) == MAX_TRANSACTIONS:
+                raise ForecastInputError(f"The CSV has more than {MAX_TRANSACTIONS} transactions.")
             values = {name: row[index].strip() for name, index in position.items()}
             transaction = _read_row(values, line)
             if transaction.id in seen:
@@ -102,6 +104,8 @@ def _read_row(values: dict[str, str], line: int) -> Transaction:
         raise ForecastInputError(f"Line {line}: the id is empty.")
     if len(transaction_id) > MAX_ID_LENGTH:
         raise ForecastInputError(f"Line {line}: the id is longer than {MAX_ID_LENGTH} characters.")
+    if not _NO_CONTROL.fullmatch(transaction_id):
+        raise ForecastInputError(f"Line {line}: the id contains a line break or another control character.")
 
     if not _ISO_DATE.fullmatch(values["date"]):
         raise ForecastInputError(f"Line {line}: the date must look like 2026-11-27.")
@@ -123,6 +127,8 @@ def _read_row(values: dict[str, str], line: int) -> Transaction:
         raise ForecastInputError(f"Line {line}: the label is empty.")
     if len(label) > MAX_LABEL_LENGTH:
         raise ForecastInputError(f"Line {line}: the label is longer than {MAX_LABEL_LENGTH} characters.")
+    if not _NO_CONTROL.fullmatch(label):
+        raise ForecastInputError(f"Line {line}: the label contains a line break or another control character.")
 
     return Transaction(id=transaction_id, date=day, amount_minor=amount, label=label)
 
@@ -159,11 +165,14 @@ def propose(baseline: Projection, transactions: list[Transaction]) -> Proposal |
 
     The earliest day wins a tie. Relevant transactions are the ones in the window
     up to the day the balance recovers from that deepest gap, or the window's end.
+    Both shortfalls come from the balances: a baseline sent back by the browser
+    can't change them through its first_deficit field.
     """
     days = baseline.days
-    deepest = min(days, key=lambda day: day.balance_minor)  # min keeps the first of equal values
-    if deepest.balance_minor >= 0 or baseline.first_deficit is None:
+    first = next((day for day in days if day.balance_minor < 0), None)
+    if first is None:
         return None
+    deepest = min(days, key=lambda day: day.balance_minor)  # min keeps the first of equal values
 
     after_deepest = days[days.index(deepest) + 1 :]
     recovery = next((day.date for day in after_deepest if day.balance_minor >= 0), None)
@@ -176,10 +185,44 @@ def propose(baseline: Projection, transactions: list[Transaction]) -> Proposal |
     gap = -deepest.balance_minor
     return Proposal(
         limit_minor=gap,
-        first_shortfall=baseline.first_deficit,
+        first_shortfall=Deficit(date=first.date, shortfall_minor=-first.balance_minor),
         deepest_shortfall=Deficit(date=deepest.date, shortfall_minor=gap),
         relevant_transaction_ids=relevant,
     )
+
+
+def suggest_earlier_payments(
+    baseline: Projection, transactions: list[Transaction], proposal: Proposal | None
+) -> list[EarlierPayment]:
+    """Incoming payments worth asking for early instead of borrowing, best first.
+
+    Each one is due after the first shortfall. Paid by the day before that shortfall
+    (or on the first day of the forecast), it would leave limit_after_minor of the
+    facility still needed. Ranked by that amount, then by the soonest due date, which
+    is the smallest ask. Payments that wouldn't lower the limit are left out.
+    """
+    if proposal is None:
+        return []
+    days = baseline.days
+    first_gap = proposal.first_shortfall.date
+    # Not max(start, first_gap - 1 day): that subtraction fails when the forecast starts on 0001-01-01.
+    pay_by = first_gap - timedelta(days=1) if first_gap > days[0].date else days[0].date
+    ranked = []
+    for transaction in transactions:
+        if transaction.amount_minor <= 0 or not first_gap < transaction.date <= days[-1].date:
+            continue
+        # Paid on pay_by instead of its due date, the money lifts every balance in between.
+        lowest = min(
+            day.balance_minor + (transaction.amount_minor if pay_by <= day.date < transaction.date else 0)
+            for day in days
+        )
+        limit_after = max(0, -lowest)
+        if limit_after < proposal.limit_minor:
+            ranked.append((limit_after, transaction.date, -transaction.amount_minor, transaction.id))
+    return [
+        EarlierPayment(transaction_id=transaction_id, pay_by=pay_by, limit_after_minor=limit_after)
+        for limit_after, _, _, transaction_id in sorted(ranked)
+    ]
 
 
 def move_payment(transactions: list[Transaction], transaction_id: str, to_date: date, start: date) -> list[Transaction]:
@@ -219,10 +262,12 @@ def build_forecast(
         moved = move_payment(transactions, move_transaction_id, move_to_date, start)
         scenario = project(moved, opening_minor, start)
 
+    proposal = propose(baseline, transactions)
     return ForecastResponse(
         transactions=transactions,
         baseline=baseline,
-        proposal=propose(baseline, transactions),
+        proposal=proposal,
+        earlier_payments=suggest_earlier_payments(baseline, transactions, proposal),
         scenario=scenario,
     )
 
@@ -234,12 +279,10 @@ def simulate_decision(request: DecisionRequest) -> DecisionResponse:
     """What approving or rejecting the proposed facility would mean, day by day.
 
     The limit is recalculated from the baseline, so the client can't change it.
-    Balances stay as forecast; the facility only covers the gaps.
+    Balances stay as forecast; the facility only covers the gaps. The Projection
+    model has already checked for 14 consecutive days.
     """
     days = request.baseline.days
-    if [day.date for day in days] != horizon(days[0].date):
-        raise ForecastInputError("The baseline must list 14 consecutive days.")
-
     deepest = min(days, key=lambda day: day.balance_minor)
     if deepest.balance_minor >= 0:
         raise ForecastInputError("The baseline never goes below zero, so there is no credit facility to decide on.")

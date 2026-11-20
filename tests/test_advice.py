@@ -261,8 +261,9 @@ def test_client_delay_prediction_warns_owner_with_calculated_shift(live):
     assert "Wednesday, December 2" in prompt
 
 
-def test_send_reminder_simulates_when_smtp_unconfigured(live, monkeypatch):
-    monkeypatch.delenv("CFO_SMTP_HOST", raising=False)
+def test_send_reminder_is_always_simulated(live, monkeypatch):
+    # Old SMTP settings must not turn the simulation into a real email.
+    monkeypatch.setenv("CFO_SMTP_HOST", "smtp.example.invalid")
     client, _ = live([GOOD])
 
     response = client.post(

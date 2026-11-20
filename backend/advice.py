@@ -10,7 +10,6 @@ import json
 import logging
 import os
 import re
-import smtplib
 import socket
 import ssl
 import time
@@ -18,7 +17,6 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from datetime import date, timedelta
-from email.message import EmailMessage
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -505,41 +503,10 @@ def get_advice(*, mode: str, request: AdviceRequest) -> AdviceResponse:
 
 
 def send_reminder(request: ReminderSendRequest) -> ReminderSendResponse:
-    """Send a debtor reminder via SMTP when configured, or simulate delivery."""
-    smtp_host = os.environ.get("CFO_SMTP_HOST", "").strip()
-    if not smtp_host:
-        log.info("reminder simulated recipient=%s", request.to_email)
-        return ReminderSendResponse(
-            status="simulated",
-            recipient=request.to_email,
-            subject=request.subject,
-            message="Reminder queued in simulation mode (set CFO_SMTP_HOST for real SMTP delivery).",
-        )
-
-    smtp_port = int(os.environ.get("CFO_SMTP_PORT", "587"))
-    sender = os.environ.get("CFO_SMTP_FROM", "cfo@kernes-ai.local").strip()
-    msg = EmailMessage()
-    msg["From"] = sender
-    msg["To"] = request.to_email
-    msg["Subject"] = request.subject
-    msg.set_content(request.body)
-
-    try:
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as client:
-            if os.environ.get("CFO_SMTP_TLS", "1") == "1":
-                client.starttls()
-            user = os.environ.get("CFO_SMTP_USER", "").strip()
-            password = os.environ.get("CFO_SMTP_PASSWORD", "").strip()
-            if user and password:
-                client.login(user, password)
-            client.send_message(msg)
-    except (OSError, smtplib.SMTPException) as exc:
-        raise HTTPException(503, f"Failed to send reminder email: {exc}") from exc
-
-    log.info("reminder sent recipient=%s", request.to_email)
+    """Simulate sending the reminder. The agent never sends messages; the user sends the draft themselves."""
     return ReminderSendResponse(
-        status="sent",
+        status="simulated",
         recipient=request.to_email,
         subject=request.subject,
-        message="Reminder email sent via SMTP.",
+        message="Simulation only: nothing was sent. Copy the draft and send it from your own email.",
     )
