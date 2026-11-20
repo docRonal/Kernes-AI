@@ -87,12 +87,8 @@
         "required_amount_groups": [
           ["5,000", "5000", "5 000"]
         ],
-        "any_date_tokens": [
-          "2026-11-27",
-          "nov 27",
-          "27 nov",
-          "november 27",
-          "friday"
+        "required_date_groups": [
+          ["2026-11-27", "nov 27", "27 nov", "november 27", "friday"]
         ],
         "any_transaction_tokens": [
           "payroll",
@@ -103,6 +99,10 @@
           "inv-001",
           "client invoice"
         ]
+      },
+      "email_draft_expectations": {
+        "any_tokens": ["inv-001", "client invoice", "9,000", "9000", "november 26", "nov 26", "26 nov"],
+        "forbidden_tokens": ["credit facility", "credit line", "overdraft", "shortfall", "deficit"]
       }
     },
     {
@@ -193,15 +193,9 @@
           ["200"],
           ["700"]
         ],
-        "any_date_tokens": [
-          "2026-11-24",
-          "nov 24",
-          "24 nov",
-          "november 24",
-          "2026-11-26",
-          "nov 26",
-          "26 nov",
-          "november 26"
+        "required_date_groups": [
+          ["2026-11-24", "nov 24", "24 nov", "november 24"],
+          ["2026-11-26", "nov 26", "26 nov", "november 26"]
         ],
         "any_transaction_tokens": [
           "equipment",
@@ -211,6 +205,10 @@
           "client invoice",
           "peak-003"
         ]
+      },
+      "email_draft_expectations": {
+        "any_tokens": ["peak-003", "client invoice", "1,000", "1000", "november 23", "nov 23", "23 nov"],
+        "forbidden_tokens": ["credit facility", "credit line", "overdraft", "shortfall", "deficit"]
       }
     },
     {
@@ -240,7 +238,8 @@
       "expected_decisions": null,
       "expected_decision_status": 422,
       "scenario_move": null,
-      "explanation_expectations": null
+      "explanation_expectations": null,
+      "email_draft_expectations": null
     }
   ]
 }

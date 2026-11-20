@@ -117,6 +117,14 @@ def test_qa_cases_manifest_and_csv_fixtures():
             int(amount_minor)
             assert label.strip()
         assert len(case["expected_baseline_balances"]) == 14
+        if case["explanation_expectations"] is not None:
+            exp = case["explanation_expectations"]
+            assert exp["required_amount_groups"]
+            assert exp["required_date_groups"]
+            draft_exp = case["email_draft_expectations"]
+            assert isinstance(draft_exp, dict)
+            assert draft_exp["any_tokens"]
+            assert draft_exp["forbidden_tokens"]
 
 
 def test_demo_proposal_and_decision_simulation():
@@ -290,13 +298,26 @@ def _assert_explanation_grounded(explanation: str, expectations: dict) -> None:
         assert any(token.lower() in lower for token in group), (
             f"Explanation missing expected amount from {group}: {explanation!r}"
         )
-    assert any(token.lower() in lower for token in expectations["any_date_tokens"]), (
-        f"Explanation missing expected date token from {expectations['any_date_tokens']}: {explanation!r}"
-    )
+    for group in expectations["required_date_groups"]:
+        assert any(token.lower() in lower for token in group), (
+            f"Explanation missing expected date from {group}: {explanation!r}"
+        )
     assert any(
         re.search(rf"\b{re.escape(token.lower())}\b", lower) or token.lower() in lower
         for token in expectations["any_transaction_tokens"]
     ), f"Explanation missing expected transaction token: {explanation!r}"
+
+
+def _assert_email_draft_valid(email_draft: str | None, expectations: dict | None) -> None:
+    if expectations is None:
+        return
+    assert isinstance(email_draft, str) and email_draft.strip(), f"Expected non-empty email_draft, got {email_draft!r}"
+    lower = email_draft.lower()
+    assert any(token.lower() in lower for token in expectations["any_tokens"]), (
+        f"Email draft missing expected invoice/date token from {expectations['any_tokens']}: {email_draft!r}"
+    )
+    leaked = [token for token in expectations["forbidden_tokens"] if token.lower() in lower]
+    assert not leaked, f"Email draft leaked internal terms {leaked}: {email_draft!r}"
 
 
 @pytest.mark.skipif(
@@ -321,6 +342,8 @@ def test_remote_deployment_workflow():
     assert status == 200
     advice_props = openapi["components"]["schemas"]["AdviceRequest"]["properties"]
     uses_baseline_advice = "baseline" in advice_props
+    advice_resp_props = openapi["components"]["schemas"]["AdviceResponse"]["properties"]
+    returns_model = "model" in advice_resp_props
 
     for case in QA_CASES:
         csv_bytes = (DEMO / case["csv"]).read_bytes()
@@ -345,6 +368,16 @@ def test_remote_deployment_workflow():
                     ssl_ctx=ssl_ctx,
                 )
                 assert dec_status == case["expected_decision_status"]
+            if uses_baseline_advice:
+                adv_status, adv_body = _http_call(
+                    base_url,
+                    "/api/advice",
+                    method="POST",
+                    body=json.dumps({"baseline": body["baseline"], "transactions": body["transactions"]}).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    ssl_ctx=ssl_ctx,
+                )
+                assert adv_status == 422, f"{case['id']} expected /api/advice 422, got {adv_status}: {adv_body}"
         else:
             for decision_kind, expected_decision in case["expected_decisions"].items():
                 dec_status, dec_body = _http_call(
@@ -377,6 +410,9 @@ def test_remote_deployment_workflow():
             )
             if adv_status == 200:
                 _assert_explanation_grounded(adv_body["explanation"], case["explanation_expectations"])
+                _assert_email_draft_valid(adv_body.get("email_draft"), case.get("email_draft_expectations"))
+                if returns_model:
+                    assert isinstance(adv_body.get("model"), str) and adv_body["model"].strip()
             elif require_advice:
                 pytest.fail(f"{case['id']} expected live /api/advice 200, got HTTP {adv_status}: {adv_body}")
             else:
