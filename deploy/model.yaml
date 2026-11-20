@@ -1,0 +1,87 @@
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: kernes-llama-cpp
+  annotations:
+    openshift.io/display-name: Kernes llama.cpp CPU
+spec:
+  supportedModelFormats:
+    - name: gguf
+      version: "1"
+      autoSelect: false
+  multiModel: false
+  containers:
+    - name: kserve-container
+      image: ghcr.io/ggml-org/llama.cpp@sha256:5b43086e3ba7ea5794d72904654f6cd41224a9b1c6ac0398f4940ee380d30f23
+      args:
+        - --host
+        - 0.0.0.0
+        - --port
+        - "8080"
+        - --ctx-size
+        - "4096"
+        - --parallel
+        - "1"
+        - --threads
+        - "2"
+        - --alias
+        - kernes-qwen
+        - --model
+        - /tmp/kernes-qwen.gguf
+        - --model-url
+        - https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/91cad51170dc346986eccefdc2dd33a9da36ead9/qwen2.5-1.5b-instruct-q4_k_m.gguf
+      env:
+        - name: LLAMA_CACHE
+          value: /tmp/llama-cache
+      ports:
+        - name: http
+          containerPort: 8080
+      startupProbe:
+        httpGet:
+          path: /health
+          port: 8080
+        periodSeconds: 5
+        failureThreshold: 60
+      readinessProbe:
+        httpGet:
+          path: /health
+          # The KServe agent builds its health URL from this numeric port.
+          port: 8080
+        periodSeconds: 5
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities:
+          drop: [ALL]
+        seccompProfile:
+          type: RuntimeDefault
+---
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: kernes-qwen
+  annotations:
+    openshift.io/display-name: Kernes Qwen2.5 1.5B Instruct
+    opendatahub.io/hardware-profile-name: default-profile
+    opendatahub.io/hardware-profile-namespace: redhat-ods-applications
+    opendatahub.io/model-type: generative
+    serving.kserve.io/deploymentMode: Standard
+  labels:
+    opendatahub.io/dashboard: "true"
+    networking.knative.dev/visibility: cluster-local
+spec:
+  predictor:
+    minReplicas: 1
+    maxReplicas: 1
+    model:
+      runtime: kernes-llama-cpp
+      modelFormat:
+        name: gguf
+        version: "1"
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+        limits:
+          cpu: "2"
+          memory: 4Gi
