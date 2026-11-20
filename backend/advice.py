@@ -98,6 +98,20 @@ class ModelConfig:
             ssl_context=ssl_context,
         )
 
+    @classmethod
+    def fallback_from_env(cls, *, timeout: float, ssl_context: ssl.SSLContext | None) -> "ModelConfig | None":
+        url = os.environ.get("CFO_FALLBACK_MODEL_URL", "").strip()
+        name = os.environ.get("CFO_FALLBACK_MODEL_NAME", "").strip()
+        if not url.startswith(("http://", "https://")) or not name:
+            return None
+        return cls(
+            url=url,
+            name=name,
+            token=os.environ.get("CFO_FALLBACK_MODEL_TOKEN") or os.environ.get("CFO_MODEL_TOKEN") or None,
+            timeout=timeout,
+            ssl_context=ssl_context,
+        )
+
 
 # ─── Facts ───────────────────────────────────────────────────────────────────
 
@@ -289,11 +303,12 @@ def call_model(config: ModelConfig, messages: list[dict[str, str]]) -> str:
         raise ModelError("The model endpoint returned an unexpected response.") from exc
 
 
-def live_advice(request: AdviceRequest) -> AdviceResponse:
-    facts = build_facts(request)
-    config = ModelConfig.from_env()
-    messages = build_messages(facts)
-    started = time.monotonic()
+def _run_attempts(
+    config: ModelConfig,
+    facts: Facts,
+    messages: list[dict[str, str]],
+    started: float,
+) -> AdviceResponse:
     problem = "no answer"
     for attempt in range(1, ATTEMPTS + 1):
         explanation, draft = parse_answer(call_model(config, messages))
@@ -309,6 +324,29 @@ def live_advice(request: AdviceRequest) -> AdviceResponse:
             )
         log.warning("advice model=%s attempt=%d rejected: %s", config.name, attempt, problem)
     raise ModelError(f"The model's explanation didn't match the calculated figures: {problem}.")
+
+
+def live_advice(request: AdviceRequest) -> AdviceResponse:
+    facts = build_facts(request)
+    primary = ModelConfig.from_env()
+    messages = build_messages(facts)
+    started = time.monotonic()
+    try:
+        return _run_attempts(primary, facts, messages, started)
+    except ModelError as primary_exc:
+        fallback = ModelConfig.fallback_from_env(
+            timeout=primary.timeout,
+            ssl_context=primary.ssl_context,
+        )
+        if fallback is None:
+            raise
+        log.warning(
+            "advice primary model=%s failed (%s); falling back to model=%s",
+            primary.name,
+            primary_exc,
+            fallback.name,
+        )
+        return _run_attempts(fallback, facts, messages, started)
 
 
 # ─── API entry point ─────────────────────────────────────────────────────────

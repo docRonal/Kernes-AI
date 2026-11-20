@@ -16,6 +16,12 @@ parameters:
   - name: CFO_MODEL_TIMEOUT
     description: Seconds to wait for one model answer. A CPU model can take tens of seconds.
     value: "90"
+  - name: CFO_FALLBACK_MODEL_URL
+    description: Optional fallback inference endpoint URL if the primary model fails.
+    value: ""
+  - name: CFO_FALLBACK_MODEL_NAME
+    description: Optional fallback model identifier.
+    value: ""
 objects:
   - apiVersion: apps/v1
     kind: Deployment
@@ -46,6 +52,10 @@ objects:
                   value: "${CFO_MODEL_NAME}"
                 - name: CFO_MODEL_TIMEOUT
                   value: "${CFO_MODEL_TIMEOUT}"
+                - name: CFO_FALLBACK_MODEL_URL
+                  value: "${CFO_FALLBACK_MODEL_URL}"
+                - name: CFO_FALLBACK_MODEL_NAME
+                  value: "${CFO_FALLBACK_MODEL_NAME}"
                 - name: CFO_MODEL_TOKEN
                   valueFrom:
                     secretKeyRef:

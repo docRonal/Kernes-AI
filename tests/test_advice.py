@@ -1,4 +1,5 @@
 import json
+import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -208,3 +209,28 @@ def test_invalid_ca_bundle_returns_503(live, monkeypatch):
 )
 def test_cited_amounts(text, expected):
     assert cited_amounts(text) == expected
+
+
+
+def test_fallback_model_succeeds_when_primary_unreachable(live, monkeypatch):
+    client, model = live([GOOD])
+    fallback_url = model.requests  # reuse the live fixture's local HTTP server URL via env
+    assert fallback_url == []
+    monkeypatch.setenv("CFO_FALLBACK_MODEL_URL", os.environ["CFO_MODEL_URL"])
+    monkeypatch.setenv("CFO_FALLBACK_MODEL_NAME", "kernes-qwen")
+    monkeypatch.setenv("CFO_MODEL_URL", "http://127.0.0.1:9/v1/chat/completions")
+    monkeypatch.setenv("CFO_MODEL_NAME", "llama-32-3b-instruct")
+
+    response = client.post("/api/advice", json=advice_payload(client))
+    assert response.status_code == 200
+    assert response.json()["model"] == "kernes-qwen"
+    assert model.requests[0]["model"] == "kernes-qwen"
+
+
+def test_returns_503_when_both_primary_and_fallback_fail(live, monkeypatch):
+    client, _ = live([GOOD], status=500)
+    monkeypatch.setenv("CFO_FALLBACK_MODEL_URL", "http://127.0.0.1:9/v1/chat/completions")
+    monkeypatch.setenv("CFO_FALLBACK_MODEL_NAME", "kernes-qwen")
+
+    response = client.post("/api/advice", json=advice_payload(client))
+    assert response.status_code == 503
