@@ -79,7 +79,7 @@ def test_demo_rejects_unsupported_inputs(data, csv):
 def test_live_mode_exposes_health_without_demo_fallbacks():
     client = TestClient(create_app("live"))
     assert client.get("/health").status_code == 200
-    assert forecast(client, BASE_INPUT).status_code == 503
+    assert forecast(client, BASE_INPUT).status_code == 200  # live forecast is implemented
     response = client.post(
         "/api/advice",
         json={"first_deficit": {"date": "2026-11-27", "shortfall_minor": 1}, "transactions": []},

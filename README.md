@@ -26,6 +26,15 @@ Open the [app](http://127.0.0.1:8080) or the [Swagger UI](http://127.0.0.1:8080/
 uv run --locked pytest -q
 ```
 
+The UI source lives in `web/`. The built files in `frontend/` are committed, so the app and tests run without Node. The container rebuilds them from `web/` in its first stage. For hot reload, keep the backend running on port 8080 and start Vite, which proxies the API.
+
+```sh
+cd web
+npm ci
+npm run dev      # http://localhost:5173
+npm run build    # refresh frontend/ before committing UI changes
+```
+
 In `demo` mode, the app accepts [demo/transactions.csv](demo/transactions.csv) and returns a saved response. The starter includes two forecast outcomes and a sample model response. The `live` mode is the integration point for live forecasting and calls to OpenShift AI. See the [deployment guide](deploy/README.md).
 
 For local configuration, copy `.env.example` to `.env` and add `--env-file .env` immediately after `uv run --locked`. The app starts in `demo` mode by default.
@@ -35,7 +44,7 @@ For local configuration, copy `.env.example` to `.env` and add `--env-file .env`
 | Layer | Technology |
 | --- | --- |
 | Backend | Python 3.12+, FastAPI, Pydantic, Uvicorn, and `python-multipart` for CSV uploads. The container uses Python 3.12. |
-| Frontend | HTML, CSS, and vanilla JavaScript. FastAPI serves the page and assets. The browser calls the API with `fetch`. |
+| Frontend | React 19, TypeScript, and Vite in `web/`, with Motion for animation and self-hosted Geist and Instrument Serif fonts. `npm run build` writes the static app to `frontend/`, which FastAPI serves. The browser calls the API with `fetch`. |
 | Forecast data | Python's `csv` module, integer grosz amounts, and in-memory request processing. Synthetic CSVs and example responses live in `demo/`. |
 | AI inference | An open-source or open-weight model served on the team's assigned Red Hat OpenShift AI environment. Use Python's `urllib.request` for server-side JSON calls to the configured endpoint. MaaS is an optional bonus path if available. |
 | Deployment | One container built from `Containerfile`. Red Hat OpenShift runs it through a Deployment, Service, and HTTPS Route. Store the model token in an OpenShift Secret. |
