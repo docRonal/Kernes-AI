@@ -4,9 +4,9 @@ Help small-business owners spot cash shortfalls early, compare payment dates, an
 
 ## Shared files
 
-- [README.md](README.md) covers setup, roles, and demo verification.
+- [README.md](README.md) defines the tech stack, role owners, branches, and integration workflow.
 - [contracts/openapi.json](contracts/openapi.json) defines the API. [demo/](demo/) contains synthetic CSV data and sample responses for frontend development.
-- [agents/](agents/) contains role assignments and reviewer checklists. Read your role file before editing.
+- Each role has a folder in [agents/](agents/) with its scope and starter prompt. Read your role guide before editing. Review subagents use [agents/reviewer.md](agents/reviewer.md).
 
 ## Working in parallel
 

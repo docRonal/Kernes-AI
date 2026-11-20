@@ -20,30 +20,46 @@ In `demo` mode, the app accepts [demo/transactions.csv](demo/transactions.csv) a
 
 For local configuration, copy `.env.example` to `.env` and add `--env-file .env` immediately after `uv run --locked`. The app starts in `demo` mode by default.
 
-## Team branches
+## Tech stack
 
-Clone the team repository and create a branch from `main` for each contributor. Use the first prompt in the corresponding role file.
+| Layer | Technology |
+| --- | --- |
+| Backend | Python 3.12+, FastAPI, Pydantic, Uvicorn, and `python-multipart` for CSV uploads. The container uses Python 3.12. |
+| Frontend | HTML, CSS, and vanilla JavaScript. FastAPI serves the page and assets. The browser calls the API with `fetch`. |
+| Forecast data | Python's `csv` module, integer grosz amounts, and in-memory request processing. Synthetic CSVs and example responses live in `demo/`. |
+| AI inference | A model deployed on Red Hat OpenShift AI. Use Python's `urllib.request` for server-side JSON calls to the configured endpoint. Use the OpenShift AI model gateway (MaaS) if it is available for the bonus. |
+| Deployment | One container built from `Containerfile`. Red Hat OpenShift runs it through a Deployment, Service, and HTTPS Route. Store the model token in an OpenShift Secret. |
+| Tooling and verification | `uv` and `uv.lock` for dependencies, `pytest` for automated tests, and GitHub for branches and PRs. Use an OpenShift AI Jupyter workbench for the optional evaluation notebook. |
 
-| Tool | Branch | First prompt |
-| --- | --- | --- |
-| Claude Code | `feat/backend` | [Cash flow forecast and API](agents/backend.md) |
-| Antigravity | `feat/frontend` | [UI and browser checks](agents/frontend.md) |
-| Codex | `feat/openshift` | [Model client, container, and cluster](agents/openshift.md) |
+## Team roles
 
-On separate laptops, each contributor works in their own clone. On a shared computer, open each agent in its own Git worktree. Run these commands from the main clone.
+Each folder contains the owner's responsibilities, file scope, checks, and starter prompt. Application files stay in their component directories, so each role works against the same runnable app.
+
+| Owner | Tool | Role | Branch |
+| --- | --- | --- | --- |
+| Mikhail | Codex | [Deployment & Integration](agents/deployment/README.md) | `feat/openshift` |
+| Andrii | Claude Code | [Cash Flow Backend](agents/backend/README.md) | `feat/backend` |
+| Timur | Antigravity | [Frontend & UX](agents/frontend/README.md) | `feat/frontend` |
+| Ivan | Antigravity | [AI Model Integration](agents/ai-integration/README.md) | `feat/advice` |
+| Yuri | Antigravity | [QA, Demo & Evaluation](agents/qa/README.md) | `feat/qa-demo` |
+
+## How we stay in sync
+
+1. Start your role branch from the latest `origin/main`. Open the repository root in your coding tool and use your role's starter prompt. On a shared laptop, use one Git worktree per branch.
+2. Treat [the OpenAPI contract](contracts/openapi.json) and the examples in [demo/](demo/) as shared. Propose changes to the contract, dependency files, or shared fixtures in the PR and coordinate them with Mikhail and the affected owners.
+3. Open a PR with what changed, the checks you ran, and anything another role needs to pick up. Mikhail coordinates reviews and merges. When a dependency merges, bring the latest `main` into your branch and rerun your checks.
+4. Deploy the starter early while the frontend uses the saved HTTP responses and the backend and AI owners build their implementations. Switch the deployed app to `live` after the real forecast and model call are integrated. Yuri runs the end-to-end demo check on that same deployment.
+
+To start a branch from a personal clone, use the branch name from the table. For example:
 
 ```sh
 git fetch origin
-git worktree add ../cfo-backend -b feat/backend origin/main
-git worktree add ../cfo-frontend -b feat/frontend origin/main
-git worktree add ../cfo-openshift -b feat/openshift origin/main
+git switch -c feat/backend origin/main
 ```
-
-Assign one person to coordinate integration. They review changes to `contracts/openapi.json`, look after shared dependencies, and verify the final `main`. Each contributor opens a PR with their changes and local test results. Update your branch from `main` before the final check.
 
 ## Instructions and subagents
 
-All three primary agents use the shared rules in [AGENTS.md](AGENTS.md). [CLAUDE.md](CLAUDE.md) imports the same file. Open the root of the relevant clone or worktree in each tool.
+All role sessions use the shared rules in [AGENTS.md](AGENTS.md). [CLAUDE.md](CLAUDE.md) imports the same file for Claude Code. Open the root of the relevant clone or worktree in each tool.
 
 - `forecast-reviewer` checks the calculations, input validation, and payment-date scenario.
 - `integration-reviewer` checks how the UI, API, and OpenShift fit together.
