@@ -176,7 +176,8 @@ def test_no_reminder_without_a_later_incoming_payment(live):
 def test_reminder_drops_invented_fees_and_facility_mentions(live):
     draft = (
         "Hello,\n\nPlease pay INV-001 for PLN 9,000.00 by Thursday, November 26. This avoids late fees. "
-        "It aligns with the credit facility limit of PLN 5,000.00. Thank you.\n\nKind regards,\nThe finance team"
+        "It aligns with the credit facility limit of PLN 5,000.00. It covers our shortfall and overdraft. "
+        "Thank you.\n\nKind regards,\nThe finance team"
     )
     client, _ = live([{**GOOD, "email_draft": draft}])
     response = client.post("/api/advice", json=advice_payload(client))
@@ -185,6 +186,14 @@ def test_reminder_drops_invented_fees_and_facility_mentions(live):
         "Hello,\n\nPlease pay INV-001 for PLN 9,000.00 by Thursday, November 26. Thank you.\n\n"
         "Kind regards,\nThe finance team"
     )
+
+
+def test_invalid_ca_bundle_returns_503(live, monkeypatch):
+    client, _ = live([GOOD])
+    monkeypatch.setenv("CFO_CA_BUNDLE", "/nonexistent/ca.crt")
+    response = client.post("/api/advice", json=advice_payload(client))
+    assert response.status_code == 503
+    assert "CFO_CA_BUNDLE" in response.json()["detail"]
 
 
 @pytest.mark.parametrize(

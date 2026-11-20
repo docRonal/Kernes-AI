@@ -11,6 +11,7 @@ import logging
 import os
 import re
 import socket
+import ssl
 import time
 import urllib.error
 import urllib.request
@@ -67,6 +68,7 @@ class ModelConfig:
     name: str
     token: str | None
     timeout: float
+    ssl_context: ssl.SSLContext | None = None
 
     @classmethod
     def from_env(cls) -> "ModelConfig":
@@ -74,11 +76,27 @@ class ModelConfig:
         name = os.environ.get("CFO_MODEL_NAME", "").strip()
         if not url.startswith(("http://", "https://")) or not name:
             raise ModelError("The model endpoint isn't configured. Set CFO_MODEL_URL and CFO_MODEL_NAME.")
+        raw_timeout = os.environ.get("CFO_MODEL_TIMEOUT") or os.environ.get("CFO_MODEL_TIMEOUT_SECONDS") or ""
         try:
-            timeout = float(os.environ.get("CFO_MODEL_TIMEOUT", DEFAULT_TIMEOUT_SECONDS))
+            timeout = float(raw_timeout) if raw_timeout.strip() else DEFAULT_TIMEOUT_SECONDS
+            if timeout <= 0:
+                timeout = DEFAULT_TIMEOUT_SECONDS
         except ValueError:
             timeout = DEFAULT_TIMEOUT_SECONDS
-        return cls(url=url, name=name, token=os.environ.get("CFO_MODEL_TOKEN") or None, timeout=timeout)
+        ca_bundle = os.environ.get("CFO_CA_BUNDLE", "").strip()
+        ssl_context: ssl.SSLContext | None = None
+        if ca_bundle:
+            try:
+                ssl_context = ssl.create_default_context(cafile=ca_bundle)
+            except (OSError, ssl.SSLError) as exc:
+                raise ModelError("Invalid CFO_CA_BUNDLE configuration.") from exc
+        return cls(
+            url=url,
+            name=name,
+            token=os.environ.get("CFO_MODEL_TOKEN") or None,
+            timeout=timeout,
+            ssl_context=ssl_context,
+        )
 
 
 # ─── Facts ───────────────────────────────────────────────────────────────────
@@ -204,8 +222,11 @@ def check_explanation(text: str, facts: Facts) -> str | None:
     return None
 
 
-# The reminder goes to a client, so it must not invent fees or reveal the credit facility.
-_OFF_LIMITS = re.compile(r"\b(fee|fees|penalt\w*|interest|credit|facility|forecast|balance)\b", re.IGNORECASE)
+# The reminder goes to a client, so it must not invent fees or reveal internal liquidity terms.
+_OFF_LIMITS = re.compile(
+    r"\b(fee|fees|penalt\w*|interest|credit|facility|forecast|balance|overdraft|shortfall|deficit)\b",
+    re.IGNORECASE,
+)
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
 
@@ -254,7 +275,7 @@ def call_model(config: ModelConfig, messages: list[dict[str, str]]) -> str:
         headers["Authorization"] = f"Bearer {config.token}"
     request = urllib.request.Request(config.url, data=json.dumps(body).encode(), headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(request, timeout=config.timeout) as response:
+        with urllib.request.urlopen(request, timeout=config.timeout, context=config.ssl_context) as response:
             payload = json.loads(response.read(1_000_000))
     except urllib.error.HTTPError as exc:
         raise ModelError(f"The model endpoint answered HTTP {exc.code}.") from exc
