@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Autonomous CFO</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script type="module" src="/assets/app.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Autonomous CFO</h1>
+      <p>Find when upcoming payments could take your cash balance below zero.</p>
+    </header>
+
+    <form id="forecast-form">
+      <label>Transactions CSV <input name="file" type="file" accept=".csv,text/csv"></label>
+      <label>Opening balance (PLN) <input name="opening_balance" inputmode="decimal" value="12000" required></label>
+      <label>Forecast start <input name="start_date" type="date" value="2026-11-23" required></label>
+      <button type="submit">Run forecast</button>
+      <p class="hint">Leave the file empty to load the <a href="/demo/transactions.csv">synthetic sample</a>.</p>
+    </form>
+
+    <p id="status" role="status" aria-live="polite"></p>
+
+    <section id="results" hidden>
+      <h2>14-day forecast</h2>
+      <p id="shortfall"></p>
+      <form id="scenario-form">
+        <label>Incoming payment <select name="move_transaction_id" required></select></label>
+        <label>New payment date <input name="move_to_date" type="date" value="2026-11-26" required></label>
+        <button type="submit">Compare dates</button>
+      </form>
+      <p id="scenario-message" hidden></p>
+      <table>
+        <thead><tr><th scope="col">Date</th><th scope="col">Original balance</th><th scope="col" id="scenario-heading" hidden>Adjusted balance</th></tr></thead>
+        <tbody id="balances"></tbody>
+      </table>
+      <button type="button" id="advice-button">Get explanation and draft</button>
+      <div id="advice" hidden>
+        <p id="explanation"></p>
+        <label for="draft">Payment reminder draft</label>
+        <textarea id="draft" rows="5"></textarea>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,88 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: autonomous-cfo
+parameters:
+  - name: APP_IMAGE
+    description: Container image accessible to the target namespace, including a version tag or digest.
+    required: true
+  - name: CFO_MODE
+    description: demo for fixture checks; live after the forecast and real model client are implemented.
+    value: demo
+  - name: CFO_MODEL_URL
+    description: Full inference endpoint URL issued for the team.
+  - name: CFO_MODEL_NAME
+    description: Model identifier expected by that endpoint.
+objects:
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: autonomous-cfo
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: autonomous-cfo
+      template:
+        metadata:
+          labels:
+            app: autonomous-cfo
+        spec:
+          containers:
+            - name: app
+              image: "${APP_IMAGE}"
+              ports:
+                - name: http
+                  containerPort: 8080
+              env:
+                - name: CFO_MODE
+                  value: "${CFO_MODE}"
+                - name: CFO_MODEL_URL
+                  value: "${CFO_MODEL_URL}"
+                - name: CFO_MODEL_NAME
+                  value: "${CFO_MODEL_NAME}"
+                - name: CFO_MODEL_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: autonomous-cfo-model
+                      key: CFO_MODEL_TOKEN
+                      optional: true
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities:
+                  drop: [ALL]
+                seccompProfile:
+                  type: RuntimeDefault
+              readinessProbe:
+                httpGet:
+                  path: /health
+                  port: http
+              livenessProbe:
+                httpGet:
+                  path: /health
+                  port: http
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: autonomous-cfo
+    spec:
+      selector:
+        app: autonomous-cfo
+      ports:
+        - name: http
+          port: 8080
+          targetPort: http
+  - apiVersion: route.openshift.io/v1
+    kind: Route
+    metadata:
+      name: autonomous-cfo
+    spec:
+      to:
+        kind: Service
+        name: autonomous-cfo
+      port:
+        targetPort: http
+      tls:
+        termination: edge
+        insecureEdgeTerminationPolicy: Redirect

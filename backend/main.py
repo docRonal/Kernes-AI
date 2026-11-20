@@ -1,0 +1,56 @@
+import os
+from pathlib import Path
+from typing import Annotated
+
+from fastapi import FastAPI, File
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from .advice import get_advice
+from .forecast import DEMO_FILE, get_forecast
+from .models import AdviceRequest, AdviceResponse, ForecastRequest, ForecastResponse
+
+
+FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
+
+
+def create_app(mode: str | None = None) -> FastAPI:
+    if mode is None:
+        mode = os.environ.get("CFO_MODE", "demo")
+    if mode not in {"demo", "live"}:
+        raise ValueError("CFO_MODE must be demo or live.")
+
+    app = FastAPI(title="Autonomous CFO", version="0.1.0")
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIR / "assets"), name="assets")
+
+    @app.get("/", include_in_schema=False)
+    def index() -> FileResponse:
+        return FileResponse(FRONTEND_DIR / "index.html", media_type="text/html")
+
+    @app.get("/demo/transactions.csv", include_in_schema=False)
+    def sample_csv() -> FileResponse:
+        return FileResponse(DEMO_FILE, media_type="text/csv", filename="transactions.csv")
+
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok"}
+
+    @app.post("/api/forecast", response_model=ForecastResponse)
+    async def forecast(request: Annotated[ForecastRequest, File()]) -> dict:
+        return await get_forecast(
+            mode=mode,
+            file=request.file,
+            starting_balance_minor=request.starting_balance_minor,
+            start_date=request.start_date,
+            move_transaction_id=request.move_transaction_id,
+            move_to_date=request.move_to_date,
+        )
+
+    @app.post("/api/advice", response_model=AdviceResponse)
+    def advice(request: AdviceRequest) -> AdviceResponse:
+        return get_advice(mode=mode, request=request)
+
+    return app
+
+
+app = create_app()

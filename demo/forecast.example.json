@@ -1,0 +1,147 @@
+{
+  "transactions": [
+    {
+      "id": "PAY-001",
+      "date": "2026-11-27",
+      "amount_minor": -1100000,
+      "label": "Payroll"
+    },
+    {
+      "id": "PAY-002",
+      "date": "2026-11-27",
+      "amount_minor": -600000,
+      "label": "Office rent"
+    },
+    {
+      "id": "INV-001",
+      "date": "2026-11-30",
+      "amount_minor": 900000,
+      "label": "Client invoice"
+    }
+  ],
+  "baseline": {
+    "days": [
+      {
+        "date": "2026-11-23",
+        "balance_minor": 1200000
+      },
+      {
+        "date": "2026-11-24",
+        "balance_minor": 1200000
+      },
+      {
+        "date": "2026-11-25",
+        "balance_minor": 1200000
+      },
+      {
+        "date": "2026-11-26",
+        "balance_minor": 1200000
+      },
+      {
+        "date": "2026-11-27",
+        "balance_minor": -500000
+      },
+      {
+        "date": "2026-11-28",
+        "balance_minor": -500000
+      },
+      {
+        "date": "2026-11-29",
+        "balance_minor": -500000
+      },
+      {
+        "date": "2026-11-30",
+        "balance_minor": 400000
+      },
+      {
+        "date": "2026-12-01",
+        "balance_minor": 400000
+      },
+      {
+        "date": "2026-12-02",
+        "balance_minor": 400000
+      },
+      {
+        "date": "2026-12-03",
+        "balance_minor": 400000
+      },
+      {
+        "date": "2026-12-04",
+        "balance_minor": 400000
+      },
+      {
+        "date": "2026-12-05",
+        "balance_minor": 400000
+      },
+      {
+        "date": "2026-12-06",
+        "balance_minor": 400000
+      }
+    ],
+    "first_deficit": {
+      "date": "2026-11-27",
+      "shortfall_minor": 500000
+    }
+  },
+  "scenario": {
+    "days": [
+      {
+        "date": "2026-11-23",
+        "balance_minor": 1200000
+      },
+      {
+        "date": "2026-11-24",
+        "balance_minor": 1200000
+      },
+      {
+        "date": "2026-11-25",
+        "balance_minor": 1200000
+      },
+      {
+        "date": "2026-11-26",
+        "balance_minor": 2100000
+      },
+      {
+        "date": "2026-11-27",
+        "balance_minor": 400000
+      },
+      {
+        "date": "2026-11-28",
+        "balance_minor": 400000
+      },
+      {
+        "date": "2026-11-29",
+        "balance_minor": 400000
+      },
+      {
+        "date": "2026-11-30",
+        "balance_minor": 400000
+      },
+      {
+        "date": "2026-12-01",
+        "balance_minor": 400000
+      },
+      {
+        "date": "2026-12-02",
+        "balance_minor": 400000
+      },
+      {
+        "date": "2026-12-03",
+        "balance_minor": 400000
+      },
+      {
+        "date": "2026-12-04",
+        "balance_minor": 400000
+      },
+      {
+        "date": "2026-12-05",
+        "balance_minor": 400000
+      },
+      {
+        "date": "2026-12-06",
+        "balance_minor": 400000
+      }
+    ],
+    "first_deficit": null
+  }
+}

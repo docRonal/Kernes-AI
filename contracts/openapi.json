@@ -1,0 +1,287 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Autonomous CFO demo API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Process is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "ok"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/forecast": {
+      "post": {
+        "description": "Compute 14 end-of-day balances including start_date. Opening balance is before any start_date movement. Sum all dated movements through day 14. Ignore rows outside this window in the projection and return the original CSV rows in transactions. Report the first strictly negative end-of-day balance as a positive shortfall. Both move fields must be supplied together or omitted. If supplied, shift a positive transaction within the window to another date within that window in the scenario only. If omitted, scenario is null.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ForecastRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Computed forecast",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid CSV, fields, transaction ID or scenario date"
+          },
+          "503": {
+            "description": "Forecast unavailable in live mode until its implementation is connected"
+          }
+        }
+      }
+    },
+    "/api/advice": {
+      "post": {
+        "description": "Explain the baseline shortfall and draft a message using the baseline first_deficit and the original transactions from the forecast response. Return a draft for human review.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdviceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Explanation and editable draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdviceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request"
+          },
+          "503": {
+            "description": "OpenShift AI model unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Transaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "amount_minor": {
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "amount_minor",
+          "label"
+        ],
+        "additionalProperties": false
+      },
+      "Deficit": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "shortfall_minor": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "date",
+          "shortfall_minor"
+        ],
+        "additionalProperties": false
+      },
+      "DailyBalance": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "balance_minor": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "balance_minor"
+        ],
+        "additionalProperties": false
+      },
+      "Forecast": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyBalance"
+            },
+            "minItems": 14,
+            "maxItems": 14
+          },
+          "first_deficit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Deficit"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "days",
+          "first_deficit"
+        ],
+        "additionalProperties": false
+      },
+      "ForecastRequest": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "UTF-8 CSV. Header id,date,amount_minor,label. Unique IDs; ISO dates; signed integer grosz."
+          },
+          "starting_balance_minor": {
+            "type": "integer"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "move_transaction_id": {
+            "type": "string"
+          },
+          "move_to_date": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": [
+          "file",
+          "starting_balance_minor",
+          "start_date"
+        ],
+        "additionalProperties": false
+      },
+      "ForecastResponse": {
+        "type": "object",
+        "properties": {
+          "transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            }
+          },
+          "baseline": {
+            "$ref": "#/components/schemas/Forecast"
+          },
+          "scenario": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Forecast"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "transactions",
+          "baseline",
+          "scenario"
+        ],
+        "additionalProperties": false
+      },
+      "AdviceRequest": {
+        "type": "object",
+        "properties": {
+          "first_deficit": {
+            "$ref": "#/components/schemas/Deficit"
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            }
+          }
+        },
+        "required": [
+          "first_deficit",
+          "transactions"
+        ],
+        "additionalProperties": false
+      },
+      "AdviceResponse": {
+        "type": "object",
+        "properties": {
+          "explanation": {
+            "type": "string"
+          },
+          "email_draft": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "explanation",
+          "email_draft"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

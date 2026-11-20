@@ -1,0 +1,11 @@
+*
+!pyproject.toml
+!uv.lock
+!backend/
+!backend/**
+!frontend/
+!frontend/**
+!demo/
+!demo/**
+**/__pycache__/
+**/*.py[cod]
