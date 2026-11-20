@@ -323,9 +323,10 @@ def run_optimize_payments(*, mode: str, request: OptimizePaymentsRequest) -> Opt
 
     facts = [f"Current baseline credit limit needed: {pln(baseline_limit)}."]
     if actions:
-        for a in actions:
+        for idx, a in enumerate(actions, start=1):
+            verb = "Accelerate incoming payment" if a.action_type == "accelerate_inflow" else "Defer outgoing payment"
             facts.append(
-                f"- {a.action_type}: {a.label} ({a.transaction_id}) -> move to {day_name(a.suggested_date)}, "
+                f"Option {idx}: {verb} '{a.label}' ({a.transaction_id}) to {day_name(a.suggested_date)} — "
                 f"reduces credit needed by {pln(a.limit_reduction_minor)} (new limit {pln(a.new_limit_minor)})."
             )
     else:
@@ -342,7 +343,7 @@ def run_optimize_payments(*, mode: str, request: OptimizePaymentsRequest) -> Opt
         try:
             recommendation, model, latency = _ask_model_text(
                 facts,
-                "Recommend the single best payment action to minimize or eliminate the credit facility.",
+                "Recommend Option 1 above (the highest-impact action) in plain English.",
                 frozenset(allowed),
             )
         except ModelError as exc:
@@ -368,10 +369,18 @@ def run_ask_cfo(*, mode: str, request: AskCfoRequest) -> AskCfoResponse:
     proposal = propose(request.baseline, request.transactions)
     min_day = min(request.baseline.days, key=lambda d: d.balance_minor)
 
+    total_inflows = sum(t.amount_minor for t in request.transactions if t.amount_minor > 0 and window[0] <= t.date <= window[-1])
+    total_outflows = sum(abs(t.amount_minor) for t in request.transactions if t.amount_minor < 0 and window[0] <= t.date <= window[-1])
+    daily_nets: dict[date, int] = {}
+    for t in request.transactions:
+        if window[0] <= t.date <= window[-1]:
+            daily_nets[t.date] = daily_nets.get(t.date, 0) + t.amount_minor
+
     facts = [
         f"Forecast window: {day_name(window[0])} to {day_name(window[-1])}, {window[0].year}.",
         f"Lowest projected balance: {pln(min_day.balance_minor)} on {day_name(min_day.date)}.",
         f"Proposed credit facility limit: {pln(proposal.limit_minor) if proposal else pln(0)}.",
+        f"Total incoming in window: {pln(total_inflows)}; total outgoing in window: {pln(total_outflows)}.",
         "Transactions:",
     ]
     for t in sorted(request.transactions, key=lambda item: (item.date, item.id)):
@@ -379,7 +388,8 @@ def run_ask_cfo(*, mode: str, request: AskCfoRequest) -> AskCfoResponse:
         facts.append(f"- {day_name(t.date)}: {t.label} ({t.id}), {direction} {pln(abs(t.amount_minor))}.")
 
     allowed = (
-        {0, proposal.limit_minor if proposal else 0}
+        {0, proposal.limit_minor if proposal else 0, total_inflows, total_outflows}
+        | {abs(v) for v in daily_nets.values()}
         | {abs(d.balance_minor) for d in request.baseline.days}
         | {abs(t.amount_minor) for t in request.transactions}
     )
