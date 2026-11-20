@@ -52,7 +52,7 @@ SYSTEM_PROMPT = """You are the Liquidity Agent of a small company's finance assi
 The application has already calculated every figure. You only explain them.
 Rules:
 - Use only the facts you are given. Copy amounts and dates exactly as written.
-- Never calculate, round or invent an amount, date, transaction or interest rate.
+- Never calculate, round or invent an amount, date, transaction, fee, penalty or interest rate.
 - Write plain English for a busy business owner. No markdown, no bullet points.
 - Reply with JSON: {"explanation": "...", "email_draft": "..."}."""
 
@@ -158,22 +158,25 @@ def _reminder_target(transactions: list[Transaction], first_gap: date, window: l
 
 
 def build_messages(facts: Facts) -> list[dict[str, str]]:
+    limit = pln(facts.proposal.limit_minor)
     task = [
         "Facts:",
         *facts.lines,
         "",
-        "Write the explanation in 2 to 4 sentences. Say when the balance first goes below zero and by how much, "
-        "name the deepest point if it differs, name the transactions that cause the gap, and say why a credit "
-        f"facility of {pln(facts.proposal.limit_minor)} covers it. Mention that the limit is a proposal for the "
-        "owner to approve or reject.",
+        "Task 1, explanation: write exactly 3 sentences about the forecast, in the future tense "
+        '("is projected to"). Sentence 1: when the balance first goes below zero and by how much, and the '
+        "deepest point if it is a different day. Sentence 2: which transactions cause the gap and when money "
+        f"comes back. Sentence 3: why a credit facility of {limit} covers the gap, and that the owner can "
+        "approve or reject this proposal. Do not mention any email.",
     ]
     if facts.reminder:
         task.append(
-            f"Then write email_draft: a short, polite payment reminder to the client. {facts.reminder} "
-            "Sign it as 'the finance team'. Do not mention the credit facility in the email."
+            "Task 2, email_draft: a polite payment reminder to the client, under 70 words. Start with "
+            f'"Hello,". {facts.reminder} Do not mention the credit facility, fees or penalties. '
+            'End with "Kind regards,\nThe finance team".'
         )
     else:
-        task.append('There is no incoming payment to ask for, so set email_draft to "".')
+        task.append('Task 2: there is no incoming payment to ask for, so set email_draft to "".')
     return [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": "\n".join(task)}]
 
 
