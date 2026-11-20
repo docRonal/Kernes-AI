@@ -185,11 +185,11 @@ export function renderCashflowChart(container, config) {
         "text",
         {
           x: pad.left + plotW - 4,
-          y: limitY - 6,
+          y: Math.min(limitY + 14, pad.top + plotH - 4),
           "text-anchor": "end",
           class: "facility-tag",
         },
-        `Simulated facility limit (${formatCompactMoney(-facilityLimitMinor, currencySymbol)})`,
+        `Credit line cover (${formatCompactMoney(-facilityLimitMinor, currencySymbol)})`,
       ),
     );
   }

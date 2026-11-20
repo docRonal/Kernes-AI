@@ -46,7 +46,8 @@
   padding: 0.05rem 0.3rem;
 }
 
-.eyebrow {
+.eyebrow,
+.step-tag {
   display: inline-block;
   font-size: 0.72rem;
   font-weight: 700;
@@ -66,6 +67,91 @@
 
 .text-link:hover {
   text-decoration: underline;
+}
+
+/* Dedicated Step 1 Upload Screen */
+.setup-screen {
+  max-width: 720px;
+  width: 100%;
+  margin: 1.5rem auto 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.setup-hero {
+  text-align: center;
+  padding: 0 0.5rem;
+}
+
+.setup-hero h2 {
+  margin: 0.35rem 0 0.5rem;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.setup-lead {
+  margin: 0 auto;
+  max-width: 36rem;
+  font-size: 0.96rem;
+  color: var(--text-secondary);
+}
+
+.setup-card {
+  padding: 1.65rem;
+  box-shadow: var(--shadow-md);
+}
+
+.setup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+.field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.file-dropzone-lg {
+  padding: 1rem 1.1rem;
+}
+
+.file-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.file-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.setup-fields-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.setup-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding-top: 0.25rem;
+}
+
+.btn-lg {
+  padding: 0.72rem 1.45rem;
+  font-size: 0.95rem;
 }
 
 /* Form Controls */
@@ -292,6 +378,7 @@ textarea {
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .btn-link:hover {
@@ -334,6 +421,12 @@ textarea {
   background: var(--teal-soft);
   color: #115e59;
   border: 1px solid #99f6e4;
+}
+
+.inline-alert-soft {
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
 }
 
 /* Empty State */

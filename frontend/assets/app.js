@@ -26,15 +26,25 @@ const downloadSampleBtn = document.querySelector("#download-sample-btn");
 const horizonSelect = document.querySelector("#horizon-select");
 
 const statusBanner = document.querySelector("#status");
-const emptyState = document.querySelector("#empty-state");
+const resultsStatusBanner = document.querySelector("#results-status");
+const setupScreen = document.querySelector("#setup-screen");
 const resultsSection = document.querySelector("#results");
+const changeFileBtn = document.querySelector("#change-file-btn");
 const agentStatusPill = document.querySelector("#agent-status-pill");
 
-const agentPulse = document.querySelector("#agent-pulse");
 const adviceLoading = document.querySelector("#advice-loading");
 const adviceError = document.querySelector("#advice-error");
 const retryAdviceBtn = document.querySelector("#retry-advice-btn");
 const explanationEl = document.querySelector("#explanation");
+
+const toggleLedgerBtn = document.querySelector("#toggle-ledger-btn");
+const ledgerPanel = document.querySelector("#ledger-panel");
+const horizonPills = document.querySelectorAll(".horizon-pill");
+
+const tabCredit = document.querySelector("#tab-credit");
+const tabWhatIf = document.querySelector("#tab-whatif");
+const panelCredit = document.querySelector("#panel-credit");
+const panelWhatIf = document.querySelector("#panel-whatif");
 
 const adviceButton = document.querySelector("#advice-button");
 const adviceWrap = document.querySelector("#advice");
@@ -56,14 +66,47 @@ const state = {
 };
 
 function showStatus(message, isError = false) {
-  statusBanner.textContent = message;
-  statusBanner.classList.toggle("error", isError);
-  statusBanner.hidden = !message;
+  const activeBanner = resultsSection.hidden ? statusBanner : resultsStatusBanner;
+  const inactiveBanner = resultsSection.hidden ? resultsStatusBanner : statusBanner;
+  inactiveBanner.hidden = true;
+  activeBanner.textContent = message;
+  activeBanner.classList.toggle("error", isError);
+  activeBanner.hidden = !message;
+}
+
+function showSetupScreen() {
+  setupScreen.hidden = false;
+  resultsSection.hidden = true;
+  changeFileBtn.hidden = true;
+  resultsStatusBanner.hidden = true;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function setActiveTab(tab) {
+  const isCredit = tab === "credit";
+  tabCredit.classList.toggle("is-active", isCredit);
+  tabCredit.setAttribute("aria-selected", String(isCredit));
+  panelCredit.hidden = !isCredit;
+
+  tabWhatIf.classList.toggle("is-active", !isCredit);
+  tabWhatIf.setAttribute("aria-selected", String(!isCredit));
+  panelWhatIf.hidden = isCredit;
+}
+
+function syncHorizonPills(value) {
+  const strVal = String(value);
+  for (const pill of horizonPills) {
+    const active = pill.dataset.horizon === strVal;
+    pill.classList.toggle("is-active", active);
+    pill.setAttribute("aria-pressed", String(active));
+  }
 }
 
 function renderAll() {
-  emptyState.hidden = true;
+  setupScreen.hidden = true;
   resultsSection.hidden = false;
+  changeFileBtn.hidden = false;
+  syncHorizonPills(state.horizonDays);
   renderKpis(state);
   renderLedgerAndChart(state);
   renderProposalPanel(state);
@@ -77,8 +120,7 @@ async function fetchAdvice({ revealDraft = false } = {}) {
   adviceError.hidden = true;
   retryAdviceBtn.hidden = true;
   explanationEl.hidden = true;
-  agentPulse.className = "agent-pulse is-loading";
-  agentStatusPill.textContent = "AI Agent Thinking…";
+  agentStatusPill.textContent = "Assistant thinking…";
 
   try {
     const data = await requestAdvice({
@@ -93,15 +135,14 @@ async function fetchAdvice({ revealDraft = false } = {}) {
     draftTextarea.value = data.email_draft || "";
     if (revealDraft) {
       adviceWrap.hidden = false;
-      adviceButton.textContent = "Refresh reminder draft";
+      adviceButton.textContent = "Refresh email draft";
     }
-    agentPulse.className = "agent-pulse";
-    agentStatusPill.textContent = "AI Explanation Ready";
-  } catch (error) {
+    agentStatusPill.textContent = "Assistant Ready";
+  } catch {
     if (reqId !== state.adviceRequestId) return;
-    agentPulse.className = "agent-pulse is-error";
-    agentStatusPill.textContent = "AI Model Unavailable";
-    adviceError.textContent = `AI explanation unavailable (${error.message}). Forecast and deterministic credit facility figures above remain valid.`;
+    agentStatusPill.textContent = "AI Offline";
+    adviceError.textContent =
+      "Our AI writer is temporarily offline, but your cash numbers and suggested credit line below are accurate and ready to test.";
     adviceError.hidden = false;
     retryAdviceBtn.hidden = false;
   } finally {
@@ -115,7 +156,7 @@ async function runBaselineForecast() {
   const submitBtn = document.querySelector("#run-forecast-btn");
   submitBtn.disabled = true;
   loadSampleBtn.disabled = true;
-  showStatus("Parsing bank statement and calculating cash forecast…");
+  showStatus("Checking your upcoming cash…");
 
   try {
     const selectedFile = fileInput.files?.[0];
@@ -141,17 +182,18 @@ async function runBaselineForecast() {
     state.simulationDecision = null;
     state.advice = null;
     adviceWrap.hidden = true;
-    adviceButton.textContent = "Show editable reminder draft";
+    adviceButton.textContent = "Write reminder email draft";
     copyFeedback.textContent = "";
 
     populateIncomingPayments(state, scenarioForm);
+    setActiveTab(state.proposal ? "credit" : "whatif");
     showStatus("");
     renderAll();
 
     if (state.proposal) {
       fetchAdvice({ revealDraft: false });
     } else {
-      agentStatusPill.textContent = "AI Agent Ready";
+      agentStatusPill.textContent = "Assistant Ready";
     }
   } catch (error) {
     showStatus(error.message, true);
@@ -161,12 +203,40 @@ async function runBaselineForecast() {
   }
 }
 
+// Return to Step 1 (Upload / Settings)
+changeFileBtn.addEventListener("click", showSetupScreen);
+
+// Live horizon switcher on Step 2 (14 days / 30 days / Whole file)
+for (const pill of horizonPills) {
+  pill.addEventListener("click", () => {
+    const next = pill.dataset.horizon;
+    if (!next || String(state.horizonDays) === next) return;
+    horizonSelect.value = next;
+    runBaselineForecast();
+  });
+}
+
+// Tabs
+tabCredit.addEventListener("click", () => setActiveTab("credit"));
+tabWhatIf.addEventListener("click", () => setActiveTab("whatif"));
+
+// Collapsible day-by-day table toggle
+toggleLedgerBtn.addEventListener("click", () => {
+  const isOpen = !ledgerPanel.hidden;
+  ledgerPanel.hidden = isOpen;
+  toggleLedgerBtn.setAttribute("aria-expanded", String(!isOpen));
+  const count = document.querySelector("#table-count-pill").textContent;
+  toggleLedgerBtn.innerHTML = isOpen
+    ? `<span>Show table (<span id="table-count-pill">${count}</span>)</span>`
+    : `<span>Hide table (<span id="table-count-pill">${count}</span>)</span>`;
+});
+
 // File upload & drag-and-drop
 fileInput.addEventListener("change", () => {
   const file = fileInput.files?.[0];
   fileNameEl.textContent = file
     ? `${file.name} (${Math.max(1, Math.round(file.size / 1024))} KB)`
-    : `Using built-in sample (${AMALFI_SAMPLE_FILENAME})`;
+    : "Pizzeria Amalfi example (ready to use)";
 });
 
 ["dragenter", "dragover"].forEach((evt) => {
@@ -203,7 +273,7 @@ forecastForm.addEventListener("submit", (event) => {
 
 loadSampleBtn.addEventListener("click", () => {
   fileInput.value = "";
-  fileNameEl.textContent = `Using built-in sample (${AMALFI_SAMPLE_FILENAME})`;
+  fileNameEl.textContent = "Pizzeria Amalfi example (ready to use)";
   forecastForm.elements.opening_balance.value = AMALFI_DEFAULT_OPENING_EUR;
   forecastForm.elements.start_date.value = AMALFI_DEFAULT_START_DATE;
   horizonSelect.value = "14";
@@ -218,7 +288,7 @@ scenarioForm.addEventListener("submit", async (event) => {
 
   const btn = document.querySelector("#compare-dates-btn");
   btn.disabled = true;
-  showStatus("Comparing baseline and adjusted payment date…");
+  showStatus("Testing earlier payment date…");
   try {
     state.forecast = await resolveForecast({
       csvFile: state.csvFile,
@@ -271,7 +341,7 @@ adviceButton.addEventListener("click", () => {
   if (state.advice && adviceWrap.hidden) {
     draftTextarea.value = state.advice.email_draft || "";
     adviceWrap.hidden = false;
-    adviceButton.textContent = "Refresh reminder draft";
+    adviceButton.textContent = "Refresh email draft";
     return;
   }
   fetchAdvice({ revealDraft: true });
@@ -280,7 +350,7 @@ adviceButton.addEventListener("click", () => {
 copyDraftBtn.addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(draftTextarea.value);
-    copyFeedback.textContent = "Copied to clipboard";
+    copyFeedback.textContent = "Copied!";
     setTimeout(() => {
       copyFeedback.textContent = "";
     }, 2200);

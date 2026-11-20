@@ -1,36 +1,23 @@
-/* Laptop / Medium Desktop (<= 1240px) */
-@media (max-width: 1240px) {
-  .forecast-form {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .field-file {
-    grid-column: 1 / -1;
-  }
-  .form-actions {
-    grid-column: 1 / -1;
-  }
-  .workspace-grid {
-    grid-template-columns: minmax(0, 1.25fr) minmax(300px, 1fr);
-  }
-}
-
-/* Tablet & Narrow Laptop (<= 1060px) */
-@media (max-width: 1060px) {
-  .kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .workspace-grid {
+/* Tablet & Narrow Laptop (<= 960px) */
+@media (max-width: 960px) {
+  .story-grid {
     grid-template-columns: 1fr;
   }
+  .hero-stats {
+    width: 100%;
+  }
+  .hero-stat {
+    flex: 1 1 150px;
+  }
 }
 
-/* Mobile (<= 600px) */
-@media (max-width: 600px) {
+/* Mobile (<= 640px) */
+@media (max-width: 640px) {
   .container {
-    padding: 0 0.85rem;
+    padding: 0 0.9rem;
   }
   .topbar-inner {
-    padding: 0.75rem 0.85rem;
+    padding: 0.75rem 0.9rem;
   }
   .brand h1 {
     font-size: 1.05rem;
@@ -38,23 +25,32 @@
   .subtitle {
     font-size: 0.75rem;
   }
-  .card {
-    padding: 1rem;
+  .setup-screen {
+    margin-top: 0.75rem;
   }
-  .forecast-form {
+  .setup-card,
+  .card,
+  .hero-card {
+    padding: 1.1rem;
+  }
+  .setup-fields-row {
     grid-template-columns: 1fr;
   }
-  .kpi-grid {
-    grid-template-columns: 1fr;
+  .setup-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
-  .kpi-value {
-    font-size: 1.25rem;
+  .hero-title {
+    font-size: 1.18rem;
   }
-  .facts-grid {
-    grid-template-columns: 1fr;
+  .hero-stats {
+    flex-direction: column;
   }
   .decision-buttons {
     flex-direction: column;
+  }
+  .tab-bar {
+    grid-template-columns: 1fr;
   }
   .ledger-table th,
   .ledger-table td {

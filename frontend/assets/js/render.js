@@ -9,7 +9,8 @@ export function renderKpis(state) {
   const lastDay = baseline.days[baseline.days.length - 1]?.date;
 
   if (forecast.account_number) {
-    document.querySelector("#account-pill").textContent = `EUR · ${forecast.account_number}`;
+    const shortIban = `${forecast.account_number.slice(0, 6)}…${forecast.account_number.slice(-4)}`;
+    document.querySelector("#account-pill").textContent = `EUR · ${shortIban}`;
   }
 
   document.querySelector("#kpi-opening").textContent =
@@ -17,60 +18,73 @@ export function renderKpis(state) {
   document.querySelector("#kpi-horizon").textContent =
     firstDay && lastDay
       ? `${printDate(firstDay)} – ${printDate(lastDay)}`
-      : `${baseline.days.length}-day window`;
+      : `${baseline.days.length} days`;
+
+  const heroCard = document.querySelector("#hero-card");
+  const heroBadge = document.querySelector("#hero-badge");
+  const heroTitle = document.querySelector("#hero-title");
+  const heroSummary = document.querySelector("#hero-summary");
 
   const firstCard = document.querySelector("#kpi-first-card");
   const peakCard = document.querySelector("#kpi-peak-card");
-  const facilityCard = document.querySelector("#kpi-facility-card");
-
   const firstVal = document.querySelector("#kpi-first-shortfall");
   const firstDate = document.querySelector("#kpi-first-date");
   const peakVal = document.querySelector("#kpi-peak-shortfall");
   const peakDate = document.querySelector("#kpi-peak-date");
-  const facilityVal = document.querySelector("#kpi-facility-limit");
-  const facilityStatus = document.querySelector("#kpi-facility-status");
 
   if (proposal) {
+    heroCard.classList.add("is-warning");
+    heroCard.classList.remove("is-healthy");
     firstCard.classList.add("is-danger");
     peakCard.classList.add("is-danger");
-    facilityCard.classList.add("is-accent");
 
-    firstVal.textContent = printMoney(proposal.firstDeficit.shortfall_minor);
-    firstVal.className = "kpi-value negative";
+    if (simulationDecision === "approved") {
+      heroBadge.textContent = "Preview: Covered";
+      heroBadge.className = "pill pill-success";
+      heroTitle.textContent = `Covered with a ${printMoney(proposal.recommendedLimitMinor)} credit line`;
+      heroSummary.textContent = `In this preview, a temporary ${printMoney(proposal.recommendedLimitMinor)} credit line covers your cash dip so your uncovered gap drops to 0.00 EUR.`;
+    } else if (simulationDecision === "rejected") {
+      heroBadge.textContent = "Preview: Uncovered";
+      heroBadge.className = "pill pill-danger";
+      heroTitle.textContent = `Short by ${printMoney(proposal.peakDeficit.shortfall_minor)} on ${printDate(proposal.peakDeficit.date)}`;
+      heroSummary.textContent = `Without a credit line, your account dips below €0 on ${printDate(proposal.firstDeficit.date)} and stays up to ${printMoney(proposal.peakDeficit.shortfall_minor)} short. Try moving an incoming payment earlier.`;
+    } else {
+      heroBadge.textContent = "Heads up · Cash dip ahead";
+      heroBadge.className = "pill pill-warning";
+      heroTitle.textContent = `You may run ${printMoney(proposal.peakDeficit.shortfall_minor)} short on ${printDate(proposal.peakDeficit.date)}`;
+      heroSummary.textContent = `Your cash first goes below €0 on ${printDate(proposal.firstDeficit.date)} (−${printMoney(proposal.firstDeficit.shortfall_minor)}). Review the AI summary and test a credit line or earlier payment below.`;
+    }
+
+    firstVal.textContent = `−${printMoney(proposal.firstDeficit.shortfall_minor)}`;
+    firstVal.className = "hero-stat-value negative";
     firstDate.textContent = `On ${printDate(proposal.firstDeficit.date)}`;
 
-    peakVal.textContent = printMoney(proposal.peakDeficit.shortfall_minor);
-    peakVal.className = "kpi-value negative";
-    peakDate.textContent = `On ${printDate(proposal.peakDeficit.date)}`;
-
-    facilityVal.textContent = printMoney(proposal.recommendedLimitMinor);
-    facilityVal.className = "kpi-value positive";
-    facilityStatus.textContent =
-      simulationDecision === "approved"
-        ? "Approved (simulation)"
-        : simulationDecision === "rejected"
-          ? "Rejected (simulation)"
-          : "Pending review (simulation)";
+    peakVal.textContent = `−${printMoney(proposal.peakDeficit.shortfall_minor)}`;
+    peakVal.className = "hero-stat-value negative";
+    peakDate.textContent = `Lowest on ${printDate(proposal.peakDeficit.date)}`;
   } else {
+    heroCard.classList.remove("is-warning");
+    heroCard.classList.add("is-healthy");
     firstCard.classList.remove("is-danger");
     peakCard.classList.remove("is-danger");
-    facilityCard.classList.remove("is-accent");
-
-    firstVal.textContent = "None";
-    firstVal.className = "kpi-value positive";
-    firstDate.textContent = `All ${baseline.days.length} days ≥ 0.00 EUR`;
 
     const lowestDay = baseline.days.reduce(
       (acc, d) => (d.balance_minor < acc.balance_minor ? d : acc),
       baseline.days[0],
     );
-    peakVal.textContent = printMoney(lowestDay.balance_minor);
-    peakVal.className = "kpi-value";
-    peakDate.textContent = `Lowest on ${printDate(lowestDay.date)}`;
 
-    facilityVal.textContent = printMoney(0);
-    facilityVal.className = "kpi-value";
-    facilityStatus.textContent = "No credit facility needed";
+    heroBadge.textContent = "All good";
+    heroBadge.className = "pill pill-success";
+    heroTitle.textContent = "Your cash looks healthy";
+    heroSummary.textContent = `Your balance stays above €0 for all ${baseline.days.length} days. Your lowest projected day is ${printMoney(lowestDay.balance_minor)} on ${printDate(lowestDay.date)}.`;
+
+    firstVal.textContent = "None";
+    firstVal.className = "hero-stat-value positive";
+    firstDate.textContent = "Stays above €0";
+
+    peakVal.textContent = printMoney(lowestDay.balance_minor);
+    peakVal.className = "hero-stat-value";
+    peakDate.textContent = `Lowest on ${printDate(lowestDay.date)}`;
   }
 }
 
@@ -81,10 +95,9 @@ export function renderLedgerAndChart(state) {
   const txByDate = groupTransactionsByDate(forecast.transactions);
 
   const shortfallEl = document.querySelector("#shortfall");
-  shortfallEl.classList.toggle("negative", Boolean(baseline.first_deficit));
   shortfallEl.textContent = baseline.first_deficit
-    ? `First shortfall of ${printMoney(baseline.first_deficit.shortfall_minor)} on ${printDate(baseline.first_deficit.date)} (deepest: ${printMoney(proposal.peakDeficit.shortfall_minor)} on ${printDate(proposal.peakDeficit.date)}).`
-    : `No projected shortfall within the ${baseline.days.length}-day horizon.`;
+    ? "Red dots mark days below €0. Hover or tap any day to see the payments."
+    : "Your balance stays above €0 every day. Hover or tap any day for details.";
 
   document.querySelector("#legend-scenario").hidden = !scenario;
   document.querySelector("#legend-facility").hidden = !(simulationDecision === "approved" && proposal);
@@ -112,8 +125,8 @@ export function renderLedgerAndChart(state) {
   if (scenario) {
     const adjDeficit = scenario.first_deficit;
     const summaryText = adjDeficit
-      ? `Adjusted scenario still shows a shortfall of ${printMoney(adjDeficit.shortfall_minor)} on ${printDate(adjDeficit.date)}.`
-      : `Adjusted scenario stays at or above 0.00 EUR for all ${baseline.days.length} days.`;
+      ? `Even if paid earlier, you would still dip by ${printMoney(adjDeficit.shortfall_minor)} on ${printDate(adjDeficit.date)}.`
+      : `Great news — moving that payment keeps your balance above 0.00 EUR for the whole period!`;
     scenarioMessage.textContent = summaryText;
 
     if (baseline.first_deficit) {
@@ -122,7 +135,7 @@ export function renderLedgerAndChart(state) {
       const adjDay = scenario.days.find((d) => d.date === targetDate);
       scenarioSummaryBox.textContent =
         baseDay && adjDay
-          ? `${summaryText} On ${printDate(targetDate)}, balance changes from ${printMoney(baseDay.balance_minor)} (baseline) to ${printMoney(adjDay.balance_minor)} (adjusted). Baseline and proposal remain preserved.`
+          ? `${summaryText} On ${printDate(targetDate)}, your balance improves from ${printMoney(baseDay.balance_minor)} to ${printMoney(adjDay.balance_minor)}.`
           : summaryText;
     } else {
       scenarioSummaryBox.textContent = summaryText;
@@ -144,7 +157,7 @@ export function renderLedgerAndChart(state) {
   document.querySelector("#table-count-pill").textContent =
     visibleEntries.length === baseline.days.length
       ? `${baseline.days.length} days`
-      : `${visibleEntries.length} active of ${baseline.days.length} days`;
+      : `${visibleEntries.length} active days`;
 
   const rows = visibleEntries.map(({ day, idx }) => {
     const tr = document.createElement("tr");
@@ -167,12 +180,12 @@ export function renderLedgerAndChart(state) {
             ? ` [${printMoney(tx.original_amount_minor, tx.original_currency)}]`
             : "";
         chip.textContent = `${tx.label} (${sign}${printMoney(tx.amount_minor)})${fxTag}`;
-        if (tx.reference) chip.title = `${tx.transaction_type || ""} · ${tx.reference}`;
+        if (tx.reference) chip.title = tx.reference;
         wrap.append(chip);
       }
       eventsCell.append(wrap);
     } else {
-      eventsCell.textContent = "—";
+      eventsCell.textContent = "No payments";
       eventsCell.className = "muted-note";
     }
 
@@ -205,28 +218,60 @@ export function renderLedgerAndChart(state) {
 export function renderProposalPanel(state) {
   const { proposal, simulationDecision } = state;
   const noShortfallCard = document.querySelector("#no-shortfall-card");
+  const assistantCard = document.querySelector("#assistant-card");
   const proposalCard = document.querySelector("#proposal-card");
+  const creditNoneNote = document.querySelector("#credit-none-note");
   const draftCard = document.querySelector("#draft-card");
 
   if (!proposal) {
+    assistantCard.hidden = true;
     proposalCard.hidden = true;
     draftCard.hidden = true;
     noShortfallCard.hidden = false;
+    creditNoneNote.hidden = false;
     return;
   }
 
   noShortfallCard.hidden = true;
+  creditNoneNote.hidden = true;
+  assistantCard.hidden = false;
   proposalCard.hidden = false;
   draftCard.hidden = false;
 
   document.querySelector("#proposal-limit-value").textContent = printMoney(proposal.recommendedLimitMinor);
-  document.querySelector("#fact-first-shortfall").textContent =
-    `${printMoney(proposal.firstDeficit.shortfall_minor)} · ${printDate(proposal.firstDeficit.date)}`;
   document.querySelector("#fact-peak-shortfall").textContent =
-    `${printMoney(proposal.peakDeficit.shortfall_minor)} · ${printDate(proposal.peakDeficit.date)}`;
+    `Covers your lowest day (${printDate(proposal.peakDeficit.date)})`;
+
+  // Populate 2-3 plain-English "Why it happens" bullets
+  const outflows = proposal.relevantTransactions.filter((tx) => tx.amount_minor < 0);
+  const topOutflow = outflows[0];
+  const bullets = [
+    `Your balance first dips below €0 on ${printDate(proposal.firstDeficit.date)} (−${printMoney(proposal.firstDeficit.shortfall_minor)}).`,
+  ];
+  if (proposal.peakDeficit.date !== proposal.firstDeficit.date) {
+    bullets.push(
+      `It reaches its lowest point on ${printDate(proposal.peakDeficit.date)} (−${printMoney(proposal.peakDeficit.shortfall_minor)}).`,
+    );
+  }
+  if (topOutflow) {
+    bullets.push(
+      `One of the largest outgoing payments is ${topOutflow.label} (${printMoney(topOutflow.amount_minor)}) on ${printDate(topOutflow.date)}.`,
+    );
+  }
+  bullets.push(
+    `A ${printMoney(proposal.recommendedLimitMinor)} safety net covers every negative day in this forecast.`,
+  );
+
+  document.querySelector("#why-bullets").replaceChildren(
+    ...bullets.slice(0, 3).map((text) => {
+      const li = document.createElement("li");
+      li.textContent = text;
+      return li;
+    }),
+  );
 
   document.querySelector("#relevant-transactions").replaceChildren(
-    ...proposal.relevantTransactions.map((tx) => {
+    ...proposal.relevantTransactions.slice(0, 5).map((tx) => {
       const li = document.createElement("li");
       const meta = document.createElement("div");
       meta.className = "tx-meta";
@@ -235,12 +280,11 @@ export function renderProposalPanel(state) {
       label.textContent = tx.label;
       const sub = document.createElement("span");
       sub.className = "tx-sub";
-      const typePart = tx.transaction_type ? `${tx.transaction_type} · ` : `${tx.id} · `;
       const fxPart =
         tx.original_currency && tx.original_currency !== "EUR"
           ? ` · ${printMoney(tx.original_amount_minor, tx.original_currency)}`
           : "";
-      sub.textContent = `${typePart}${printDate(tx.date)}${fxPart}`;
+      sub.textContent = `${printDate(tx.date)}${fxPart}`;
       meta.append(label, sub);
 
       const amt = document.createElement("span");
@@ -252,7 +296,6 @@ export function renderProposalPanel(state) {
     }),
   );
 
-  const proposalBadge = document.querySelector("#proposal-badge");
   const simulationOutcome = document.querySelector("#simulation-outcome");
   const outcomeTitle = document.querySelector("#outcome-title");
   const outcomeDetails = document.querySelector("#outcome-details");
@@ -262,25 +305,19 @@ export function renderProposalPanel(state) {
   document.querySelector("#reject-sim-btn").classList.toggle("is-selected", simulationDecision === "rejected");
 
   if (simulationDecision === "approved") {
-    proposalBadge.textContent = "Approved (Simulation)";
-    proposalBadge.className = "pill pill-success";
     simulationOutcome.className = "outcome-box approved";
-    outcomeTitle.textContent = "Simulation Approved — Credit Facility Applied";
-    outcomeDetails.textContent = `Simulated access to a ${printMoney(proposal.recommendedLimitMinor)} credit facility covers the baseline cash shortfall. Underlying baseline balances remain unchanged.`;
+    outcomeTitle.textContent = "Preview Approved — You're Covered";
+    outcomeDetails.textContent = `A ${printMoney(proposal.recommendedLimitMinor)} credit line covers every negative day in this forecast.`;
     const peakUncovered = Math.max(0, proposal.peakDeficit.shortfall_minor - proposal.recommendedLimitMinor);
     outcomeGapValue.textContent = printMoney(peakUncovered);
     simulationOutcome.hidden = false;
   } else if (simulationDecision === "rejected") {
-    proposalBadge.textContent = "Rejected (Simulation)";
-    proposalBadge.className = "pill pill-danger";
     simulationOutcome.className = "outcome-box rejected";
-    outcomeTitle.textContent = "Simulation Rejected — Shortfall Unfunded";
-    outcomeDetails.textContent = `No credit facility is applied in this simulation. The projected shortfall on ${printDate(proposal.peakDeficit.date)} remains uncovered unless incoming settlements move earlier.`;
+    outcomeTitle.textContent = "Preview Rejected — Gap Remains";
+    outcomeDetails.textContent = `Without a credit line, you'll still be short on ${printDate(proposal.peakDeficit.date)}. You can test moving a payment earlier in Tab 2.`;
     outcomeGapValue.textContent = printMoney(proposal.peakDeficit.shortfall_minor);
     simulationOutcome.hidden = false;
   } else {
-    proposalBadge.textContent = "Action Required";
-    proposalBadge.className = "pill pill-warning";
     simulationOutcome.hidden = true;
   }
 }
@@ -299,7 +336,7 @@ export function populateIncomingPayments(state, scenarioForm) {
     .slice(0, 40)
     .map(
       ({ id, label, date, amount_minor }) =>
-        new Option(`${label} (+${printMoney(amount_minor)} · ${printDate(date)})`, id),
+        new Option(`${label} (+${printMoney(amount_minor)} on ${printDate(date)})`, id),
     );
 
   scenarioForm.elements.move_transaction_id.replaceChildren(...incoming);
