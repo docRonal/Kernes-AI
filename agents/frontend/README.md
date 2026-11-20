@@ -4,7 +4,7 @@
 
 ## Scope
 
-Own `frontend/`. Use the starter's HTML, CSS, and JavaScript and run the app from the repository root. Follow the [API contract](../../contracts/openapi.json) and coordinate proposed contract changes with Mikhail. See the [team workflow and tech stack](../../README.md).
+Own `web/` (React, TypeScript, and Vite) and its build output in `frontend/`. Run `npm run build` in `web/` before committing so `frontend/` matches the source. Follow the [API contract](../../contracts/openapi.json) and coordinate proposed contract changes with Mikhail. See the [team workflow and tech stack](../../README.md).
 
 ## Deliverables
 
@@ -17,4 +17,4 @@ Agree on the proposal, advice, and decision flow in Mikhail's shared contract PR
 
 ## Starter prompt
 
-> Read AGENTS.md, agents/frontend/README.md, and contracts/openapi.json. Work on feat/frontend and edit frontend/. Implement the automatic explanatory proposal and the human decision simulation within the CSV-to-forecast flow. Preserve the what-if comparison and verify both decisions in a browser.
+> Read AGENTS.md, agents/frontend/README.md, and contracts/openapi.json. Work on feat/frontend and edit web/. Implement the automatic explanatory proposal and the human decision simulation within the CSV-to-forecast flow. Preserve the what-if comparison and verify both decisions in a browser.
