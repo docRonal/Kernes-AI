@@ -133,6 +133,13 @@ def test_pay_by_never_falls_before_the_forecast_starts(client):
     assert short_today["earlier_payments"] == [{"transaction_id": "IN", "pay_by": "2026-11-23", "limit_after_minor": 0}]
 
 
+def test_a_gap_on_the_first_day_of_the_calendar_does_not_crash(client):
+    # The day before 0001-01-01 doesn't exist, so the client is asked to pay on day one.
+    response = forecast(client, HEADER + "IN,0001-01-05,500,Invoice\n", opening="-100", start="0001-01-01")
+    assert response.status_code == 200, response.text
+    assert response.json()["earlier_payments"] == [{"transaction_id": "IN", "pay_by": "0001-01-01", "limit_after_minor": 0}]
+
+
 def test_options_are_ranked_by_the_credit_still_needed(client):
     csv = HEADER + (
         "RENT,2026-11-25,-500000,Rent\n"

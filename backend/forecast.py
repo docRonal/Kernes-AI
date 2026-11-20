@@ -205,7 +205,8 @@ def suggest_earlier_payments(
         return []
     days = baseline.days
     first_gap = proposal.first_shortfall.date
-    pay_by = max(days[0].date, first_gap - timedelta(days=1))
+    # Not max(start, first_gap - 1 day): that subtraction fails when the forecast starts on 0001-01-01.
+    pay_by = first_gap - timedelta(days=1) if first_gap > days[0].date else days[0].date
     ranked = []
     for transaction in transactions:
         if transaction.amount_minor <= 0 or not first_gap < transaction.date <= days[-1].date:
