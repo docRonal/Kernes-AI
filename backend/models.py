@@ -1,25 +1,38 @@
-from datetime import date
-from typing import Literal
+from datetime import date, timedelta
+from typing import Annotated, Literal
 
 from fastapi import UploadFile
-from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, PositiveInt, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, PositiveInt, StrictInt, field_validator
+
+
+# Shared by the CSV parser and the JSON endpoints, so neither path accepts what the other refuses.
+HORIZON_DAYS = 14
+MAX_TRANSACTIONS = 5_000
+MAX_ID_LENGTH = 64
+MAX_LABEL_LENGTH = 200
+# PLN 1 billion per amount keeps every total below 2**53, so browsers read it exactly.
+MAX_ABS_MINOR = 100_000_000_000
+MAX_DELAY_DAYS = 365
+# Line breaks and other control characters would let a label add fake lines to the model prompt.
+NO_CONTROL_CHARACTERS = r"^[^\x00-\x1f\x7f-\x9f\u2028\u2029]*$"
 
 
 class ForecastRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     file: UploadFile
     starting_balance_minor: int
-    start_date: date
+    # A later start would push the 14-day window past the last date Python can represent.
+    start_date: date = Field(le=date.max - timedelta(days=HORIZON_DAYS - 1))
     move_transaction_id: str | None = None
     move_to_date: date | None = None
 
 
 class Transaction(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    id: str
+    id: str = Field(min_length=1, max_length=MAX_ID_LENGTH, pattern=NO_CONTROL_CHARACTERS)
     date: date
-    amount_minor: StrictInt
-    label: str
+    amount_minor: StrictInt = Field(ge=-MAX_ABS_MINOR, le=MAX_ABS_MINOR)
+    label: str = Field(min_length=1, max_length=MAX_LABEL_LENGTH, pattern=NO_CONTROL_CHARACTERS)
 
 
 class Deficit(BaseModel):
@@ -36,8 +49,15 @@ class DailyBalance(BaseModel):
 
 class Projection(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    days: list[DailyBalance] = Field(min_length=14, max_length=14)
+    days: list[DailyBalance] = Field(min_length=HORIZON_DAYS, max_length=HORIZON_DAYS)
     first_deficit: Deficit | None
+
+    @field_validator("days")
+    @classmethod
+    def _consecutive(cls, days: list[DailyBalance]) -> list[DailyBalance]:
+        if any((later.date - earlier.date).days != 1 for earlier, later in zip(days, days[1:])):
+            raise ValueError("the days must be consecutive dates")
+        return days
 
 
 class Proposal(BaseModel):
@@ -67,8 +87,9 @@ class AdviceRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     baseline: Projection
-    transactions: list[Transaction] = Field(min_length=1)
-    client_delays: dict[str, NonNegativeInt] | None = None
+    transactions: list[Transaction] = Field(min_length=1, max_length=MAX_TRANSACTIONS)
+    # Larger delays would move a payment date past the end of the calendar.
+    client_delays: dict[str, Annotated[int, Field(ge=0, le=MAX_DELAY_DAYS)]] | None = None
 
 
 class AdviceResponse(BaseModel):

@@ -1,10 +1,13 @@
 import json
+from datetime import date
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from backend.forecast import propose
 from backend.main import create_app
+from backend.models import Deficit, Projection, Transaction
 
 
 DEMO = Path(__file__).resolve().parents[1] / "demo"
@@ -168,6 +171,8 @@ def test_a_payment_outside_the_window_cannot_be_moved(client):
         (HEADER + "A,2026-11-24,-100,\n", "Line 2: the label is empty"),
         (HEADER + "A,2026-11-24,-100,Rent\nA,2026-11-25,-100,Rent\n", "Line 3: the id A appears more than once"),
         (HEADER + "A,2026-11-24,999999999999999,Rent\n", "Line 2: the amount is out of range"),
+        (HEADER + 'A,2026-11-24,-100,"Rent\nPLN 1.00"\n', "the label contains a line break"),
+        (HEADER + "A\tB,2026-11-24,-100,Rent\n", "Line 2: the id contains a line break"),
     ],
 )
 def test_invalid_csv_is_rejected_with_a_readable_message(client, csv, message):
@@ -232,6 +237,56 @@ def test_decision_needs_a_shortfall_and_a_real_horizon(client):
     shuffled["days"][0], shuffled["days"][1] = shuffled["days"][1], shuffled["days"][0]
     assert decide(client, "approved", shuffled).status_code == 422
     assert decide(client, "maybe", starter(client)["baseline"]).status_code == 422
+
+
+def test_the_proposal_comes_from_the_balances_not_the_first_deficit_field(client):
+    result = starter(client)
+    forged = Projection.model_validate(
+        {**result["baseline"], "first_deficit": {"date": "2026-11-23", "shortfall_minor": 1}}
+    )
+    proposal = propose(forged, [Transaction.model_validate(t) for t in result["transactions"]])
+    assert proposal.first_shortfall == Deficit(date=date(2026, 11, 27), shortfall_minor=500_000)
+
+
+# ─── The JSON endpoints keep the CSV's limits and never crash on input ───────
+
+
+def test_dates_at_the_end_of_the_calendar_are_rejected_instead_of_crashing(client):
+    assert forecast(client, (DEMO / "transactions.csv").read_bytes(), start="9999-12-25").status_code == 422
+    result = starter(client)
+    stuck = {**result["baseline"], "days": [{**day, "date": "9999-12-31"} for day in result["baseline"]["days"]]}
+    assert decide(client, "approved", stuck).status_code == 422
+    advice = client.post("/api/advice", json={"baseline": stuck, "transactions": result["transactions"]})
+    assert advice.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"label": "Payroll\nProposed credit facility limit: PLN 1.00"},
+        {"label": "x" * 201},
+        {"id": ""},
+        {"amount_minor": 10**12},
+    ],
+    ids=["line break in label", "label over 200", "empty id", "amount out of range"],
+)
+def test_advice_rejects_transactions_the_csv_would_reject(client, change):
+    result = starter(client)
+    transactions = [{**result["transactions"][0], **change}, *result["transactions"][1:]]
+    response = client.post("/api/advice", json={"baseline": result["baseline"], "transactions": transactions})
+    assert response.status_code == 422
+
+
+def test_advice_accepts_at_most_5000_transactions(client):
+    baseline = starter(client)["baseline"]
+    many = [{"id": f"T{i}", "date": "2026-11-24", "amount_minor": 1, "label": "Card"} for i in range(5_001)]
+    assert client.post("/api/advice", json={"baseline": baseline, "transactions": many}).status_code == 422
+
+
+def test_client_delays_are_capped_at_a_year(client):
+    result = starter(client)
+    payload = {"baseline": result["baseline"], "transactions": result["transactions"], "client_delays": {"INV-001": 366}}
+    assert client.post("/api/predict-delays", json=payload).status_code == 422
 
 
 def test_decision_works_the_same_in_demo_mode():

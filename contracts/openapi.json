@@ -130,17 +130,25 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]*$"
           },
           "date": {
             "type": "string",
             "format": "date"
           },
           "amount_minor": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": -100000000000,
+            "maximum": 100000000000
           },
           "label": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]*$"
           }
         },
         "required": [
@@ -195,7 +203,8 @@
               "$ref": "#/components/schemas/DailyBalance"
             },
             "minItems": 14,
-            "maxItems": 14
+            "maxItems": 14,
+            "description": "14 end-of-day balances on consecutive dates."
           },
           "first_deficit": {
             "anyOf": [
@@ -418,7 +427,8 @@
             "minItems": 1,
             "items": {
               "$ref": "#/components/schemas/Transaction"
-            }
+            },
+            "maxItems": 5000
           }
         },
         "required": [
