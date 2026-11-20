@@ -223,12 +223,16 @@ def build_facts(request: AdviceRequest) -> Facts:
 
     lines = [
         f"Forecast period: {day_name(window[0])} to {day_name(window[-1])}, {window[0].year}.",
-        f"First day below zero: {day_name(first.date)}, balance {pln(-first.shortfall_minor)}.",
+        f"First day below zero: {day_name(first.date)}. The balance that day is {pln(-first.shortfall_minor)}, "
+        f"a gap of {pln(first.shortfall_minor)}. This gap is not a transaction amount.",
     ]
     if deepest.date == first.date:
         lines.append(f"This is also the deepest point of the forecast: a gap of {pln(deepest.shortfall_minor)}.")
     else:
-        lines.append(f"Deepest point: {day_name(deepest.date)}, balance {pln(-deepest.shortfall_minor)}.")
+        lines.append(
+            f"Deepest point: {day_name(deepest.date)}. The balance that day is {pln(-deepest.shortfall_minor)}, "
+            f"a gap of {pln(deepest.shortfall_minor)}."
+        )
     lines.append(
         f"Proposed credit facility limit: {pln(proposal.limit_minor)}. "
         "It equals the deepest projected gap, so it covers every day of the forecast."
@@ -279,8 +283,9 @@ def build_messages(facts: Facts) -> list[dict[str, str]]:
         *facts.lines,
         "",
         "Task 1, explanation: write exactly 3 sentences about the forecast, in the future tense "
-        '("is projected to"). Sentence 1: when the balance first goes below zero and by how much, and the '
-        "deepest point if it is a different day. Sentence 2: which transactions cause the gap and when money "
+        '("is projected to"). Sentence 1: when the balance first goes below zero and the size of that gap, and the '
+        "deepest point and its gap if it is a different day. Take the gap amounts from the facts, never from a "
+        "transaction. Sentence 2: which transactions cause the gap and when money "
         f"comes back. Sentence 3: why a credit facility of {limit} covers the gap, and that the owner can "
         "approve or reject this proposal. Do not mention any email.",
     ]
@@ -314,14 +319,35 @@ def cited_amounts(text: str) -> list[int]:
     return amounts
 
 
+_BELOW_ZERO = re.compile(r"below zero|negative|overdra\w*|in the red|shortfall|short\b", re.IGNORECASE)
+
+
 def check_explanation(text: str, facts: Facts) -> str | None:
-    """Return a problem with the explanation's figures, or None when they match."""
+    """Return a problem with the explanation's figures, or None when they match.
+
+    Every cited amount must come from the forecast. The first gap, the deepest gap
+    and the limit must all be cited, and a sentence about going below zero may
+    only quote gap or limit amounts, so a transaction amount can't pose as the gap.
+    """
     amounts = cited_amounts(text)
     unknown = [amount for amount in amounts if amount not in facts.allowed_minor]
     if unknown:
         return f"it cites {pln(unknown[0])}, which isn't in the forecast"
-    if facts.proposal.limit_minor not in amounts:
-        return f"it doesn't cite the proposed limit of {pln(facts.proposal.limit_minor)}"
+    proposal = facts.proposal
+    required = {
+        "proposed limit": proposal.limit_minor,
+        "first gap": proposal.first_shortfall.shortfall_minor,
+        "deepest gap": proposal.deepest_shortfall.shortfall_minor,
+    }
+    for name, amount in required.items():
+        if amount not in amounts:
+            return f"it doesn't cite the {name} of {pln(amount)}"
+    gap_amounts = set(required.values())
+    for sentence in _SENTENCE_END.split(text):
+        if _BELOW_ZERO.search(sentence):
+            wrong = [amount for amount in cited_amounts(sentence) if amount not in gap_amounts]
+            if wrong:
+                return f"it calls {pln(wrong[0])} the gap, but that amount isn't a gap or the limit"
     return None
 
 
