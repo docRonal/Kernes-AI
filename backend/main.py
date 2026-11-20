@@ -8,17 +8,31 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .advice import get_advice, predict_delays, send_reminder
+from .consultant import (
+    run_ask_cfo,
+    run_credit_check,
+    run_optimize_payments,
+    run_stress_test,
+)
 from .forecast import DEMO_FILE, get_decision, get_forecast
 from .models import (
     AdviceRequest,
     AdviceResponse,
+    AskCfoRequest,
+    AskCfoResponse,
+    CreditCheckRequest,
+    CreditCheckResponse,
     DecisionRequest,
     DecisionResponse,
     DelayPredictResponse,
     ForecastRequest,
     ForecastResponse,
+    OptimizePaymentsRequest,
+    OptimizePaymentsResponse,
     ReminderSendRequest,
     ReminderSendResponse,
+    StressTestRequest,
+    StressTestResponse,
 )
 
 
@@ -83,6 +97,22 @@ def create_app(mode: str | None = None) -> FastAPI:
     @app.post("/api/send-reminder", response_model=ReminderSendResponse)
     def reminder(request: ReminderSendRequest) -> ReminderSendResponse:
         return send_reminder(request)
+
+    @app.post("/api/credit-check", response_model=CreditCheckResponse)
+    def credit_check(request: CreditCheckRequest) -> CreditCheckResponse:
+        return run_credit_check(mode=mode, request=request)
+
+    @app.post("/api/stress-test", response_model=StressTestResponse)
+    def stress_test(request: StressTestRequest) -> StressTestResponse:
+        return run_stress_test(mode=mode, request=request)
+
+    @app.post("/api/optimize-payments", response_model=OptimizePaymentsResponse)
+    def optimize_payments(request: OptimizePaymentsRequest) -> OptimizePaymentsResponse:
+        return run_optimize_payments(mode=mode, request=request)
+
+    @app.post("/api/ask-cfo", response_model=AskCfoResponse)
+    def ask_cfo(request: AskCfoRequest) -> AskCfoResponse:
+        return run_ask_cfo(mode=mode, request=request)
 
     return app
 
