@@ -2,7 +2,16 @@ from datetime import date, timedelta
 from typing import Annotated, Literal
 
 from fastapi import UploadFile
-from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, PositiveInt, StrictInt, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    NonNegativeInt,
+    PositiveInt,
+    StrictInt,
+    StringConstraints,
+    field_validator,
+)
 
 
 # Shared by the CSV parser and the JSON endpoints, so neither path accepts what the other refuses.
@@ -160,3 +169,90 @@ class DecisionResponse(BaseModel):
     limit_minor: PositiveInt
     days: list[DecisionDay] = Field(min_length=14, max_length=14)
     largest_uncovered: Deficit | None
+
+
+class InsightRequest(BaseModel):
+    """The baseline and transactions from the forecast response. Every figure is recalculated from them."""
+
+    model_config = ConfigDict(extra="forbid")
+    baseline: Projection
+    transactions: list[Transaction] = Field(min_length=1, max_length=MAX_TRANSACTIONS)
+
+
+class StressScenario(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    description: str
+    deepest_shortfall: Deficit | None
+    extra_needed_minor: NonNegativeInt
+
+
+class StressTestResponse(BaseModel):
+    """Worst cases for the forecast and the extra credit they would need. Calculated, never from the model."""
+
+    model_config = ConfigDict(extra="forbid")
+    proposed_limit_minor: NonNegativeInt
+    scenarios: list[StressScenario]
+    buffer_minor: NonNegativeInt
+    recommended_limit_minor: NonNegativeInt
+
+
+class PaymentAction(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["collect_earlier", "pay_later"]
+    transaction_id: str
+    due_date: date
+    new_date: date
+    limit_after_minor: NonNegativeInt
+    saves_minor: PositiveInt
+
+
+class PaymentOptimizationResponse(BaseModel):
+    """Ways to need less credit, best first. Calculated, never from the model."""
+
+    model_config = ConfigDict(extra="forbid")
+    proposed_limit_minor: NonNegativeInt
+    actions: list[PaymentAction]
+
+
+class ScoreFactor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: Literal["repayment", "coverage", "duration", "depth", "concentration", "delays"]
+    points: NonNegativeInt
+    reason: str
+
+
+class CreditCheckResponse(BaseModel):
+    """A transparent scorecard for the proposed facility. The score is calculated; the model only explains it."""
+
+    model_config = ConfigDict(extra="forbid")
+    score: int = Field(ge=0, le=100)
+    risk: Literal["low", "medium", "high"]
+    limit_minor: PositiveInt
+    factors: list[ScoreFactor]
+    explanation: str | None
+    explanation_error: str | None
+    model: str | None
+    latency_ms: NonNegativeInt | None
+
+
+class AskRequest(InsightRequest):
+    question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+
+
+class WhatIf(BaseModel):
+    """The change the question asked about, recalculated by the application."""
+
+    model_config = ConfigDict(extra="forbid")
+    transaction_id: str
+    new_amount_minor: StrictInt
+    new_date: date
+    deepest_shortfall: Deficit | None
+
+
+class AskResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    answer: str
+    what_if: WhatIf | None
+    model: str
+    latency_ms: NonNegativeInt
