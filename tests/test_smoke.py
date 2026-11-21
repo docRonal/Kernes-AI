@@ -220,7 +220,7 @@ def test_live_workflow_all_synthetic_cases(case):
         assert key_scn == move["expected_scenario_minor"]
 
 
-def test_live_rejects_amalfi_semicolon_bank_statement():
+def test_live_forecasts_amalfi_semicolon_bank_statement():
     amalfi_snippet = (
         '"Account Number";"Booking Date";"Value Date";"Transaction Type";"Payment Reference";'
         '"Beneficiary/Payer";"Counterparty Account";"Bank Code";"Amount";"Currency";"Info"\n'
@@ -229,8 +229,9 @@ def test_live_rejects_amalfi_semicolon_bank_statement():
         '"HELADEFFXXX";"275,35";"EUR";"Transaction booked"\n'
     ).encode("utf-8")
     resp = forecast(TestClient(create_app("live")), BASE_INPUT, amalfi_snippet)
-    assert resp.status_code == 422
-    assert "header" in resp.json()["detail"].lower()
+    assert resp.status_code == 200, resp.text
+    # Its only row is from 2025, more than 28 days before the start, so nothing is expected in the window.
+    assert resp.json()["transactions"] == []
 
 
 # ─── Reusable Remote / OpenShift Deployment Verification ─────────────────────

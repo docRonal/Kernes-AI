@@ -366,6 +366,7 @@ def test_demo_fixture_matches_the_live_calculation(client):
     "schema_name, model_name",
     [
         ("ForecastResponse", "ForecastResponse"),
+        ("Transaction", "Transaction"),
         ("Proposal", "Proposal"),
         ("EarlierPayment", "EarlierPayment"),
         ("DecisionRequest", "DecisionRequest"),

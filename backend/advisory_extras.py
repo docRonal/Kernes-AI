@@ -49,7 +49,7 @@ _SYSTEM_PROMPT = (
 
 
 def _validate_window(baseline: Projection) -> list[date]:
-    window = horizon(baseline.days[0].date)
+    window = horizon(baseline.days[0].date, len(baseline.days))
     if [day.date for day in baseline.days] != window:
         raise HTTPException(422, "The baseline must list 14 consecutive days.")
     return window
@@ -160,7 +160,7 @@ def detect_anomalies(*, mode: str, request: AnomalyDetectRequest) -> AnomalyDete
                         transaction_ids=[t.id for t in day_txs],
                         detail=(
                             f"Payment concentration on {day_name(tx_date)}: {len(day_txs)} outflows "
-                            f"totaling {pln(day_sum)} out of {pln(total_window_out)} in the 14-day window."
+                            f"totaling {pln(day_sum)} out of {pln(total_window_out)} in the {len(window)}-day window."
                         ),
                     )
                 )
@@ -209,7 +209,7 @@ def detect_anomalies(*, mode: str, request: AnomalyDetectRequest) -> AnomalyDete
 
 
 def compare_financing_options(*, mode: str, request: CompareOptionsRequest) -> CompareOptionsResponse:
-    window = _validate_window(request.baseline)
+    _validate_window(request.baseline)
     proposal = propose(request.baseline, request.transactions)
     if proposal is None:
         return CompareOptionsResponse(

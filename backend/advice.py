@@ -209,7 +209,7 @@ def _predict_delay_impact(
 
 def build_facts(request: AdviceRequest) -> Facts:
     baseline = request.baseline
-    window = horizon(baseline.days[0].date)
+    window = horizon(baseline.days[0].date, len(baseline.days))
     if [day.date for day in baseline.days] != window:
         raise HTTPException(422, "The baseline must list 14 consecutive days.")
     proposal = propose(baseline, request.transactions)
@@ -240,7 +240,7 @@ def build_facts(request: AdviceRequest) -> Facts:
     if recovery:
         lines.append(f"The balance is back above zero on {day_name(recovery.date)} at {pln(recovery.balance_minor)}.")
     else:
-        lines.append("The balance stays below zero until the end of the 14-day forecast.")
+        lines.append(f"The balance stays below zero until the end of the {len(window)}-day forecast.")
     lines.append("Transactions that cause and close the gap:")
     for t in relevant:
         direction = "incoming" if t.amount_minor > 0 else "outgoing"

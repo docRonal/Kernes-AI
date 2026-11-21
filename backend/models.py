@@ -16,9 +16,11 @@ from pydantic import (
 
 # Shared by the CSV parser and the JSON endpoints, so neither path accepts what the other refuses.
 HORIZON_DAYS = 14
+HORIZONS = (14, 30)
 MAX_TRANSACTIONS = 5_000
 MAX_ID_LENGTH = 64
 MAX_LABEL_LENGTH = 200
+MAX_REASON_LENGTH = 500
 # PLN 1 billion per amount keeps every total below 2**53, so browsers read it exactly.
 MAX_ABS_MINOR = 100_000_000_000
 MAX_DELAY_DAYS = 365
@@ -34,6 +36,14 @@ class ForecastRequest(BaseModel):
     start_date: date = Field(le=date.max - timedelta(days=HORIZON_DAYS - 1))
     move_transaction_id: str | None = None
     move_to_date: date | None = None
+    horizon_days: int = HORIZON_DAYS
+
+    @field_validator("horizon_days")
+    @classmethod
+    def _known_horizon(cls, days: int) -> int:
+        if days not in HORIZONS:
+            raise ValueError("the forecast covers 14 or 30 days")
+        return days
 
 
 class Transaction(BaseModel):
@@ -42,6 +52,10 @@ class Transaction(BaseModel):
     date: date
     amount_minor: StrictInt = Field(ge=-MAX_ABS_MINOR, le=MAX_ABS_MINOR)
     label: str = Field(min_length=1, max_length=MAX_LABEL_LENGTH, pattern=NO_CONTROL_CHARACTERS)
+    # Why a payment forecast from a bank statement is expected, for the model to quote. Left out for CSV rows.
+    reason: str | None = Field(
+        default=None, max_length=MAX_REASON_LENGTH, pattern=NO_CONTROL_CHARACTERS, exclude_if=lambda value: value is None
+    )
 
 
 class Deficit(BaseModel):
@@ -58,12 +72,14 @@ class DailyBalance(BaseModel):
 
 class Projection(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    days: list[DailyBalance] = Field(min_length=HORIZON_DAYS, max_length=HORIZON_DAYS)
+    days: list[DailyBalance] = Field(min_length=min(HORIZONS), max_length=max(HORIZONS))
     first_deficit: Deficit | None
 
     @field_validator("days")
     @classmethod
     def _consecutive(cls, days: list[DailyBalance]) -> list[DailyBalance]:
+        if len(days) not in HORIZONS:
+            raise ValueError("the forecast covers 14 or 30 days")
         if any((later.date - earlier.date).days != 1 for earlier, later in zip(days, days[1:])):
             raise ValueError("the days must be consecutive dates")
         return days
@@ -167,7 +183,7 @@ class DecisionResponse(BaseModel):
     decision: DecisionKind
     simulated: Literal[True]
     limit_minor: PositiveInt
-    days: list[DecisionDay] = Field(min_length=14, max_length=14)
+    days: list[DecisionDay] = Field(min_length=min(HORIZONS), max_length=max(HORIZONS))
     largest_uncovered: Deficit | None
 
 

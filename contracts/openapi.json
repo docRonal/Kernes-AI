@@ -32,7 +32,7 @@
     },
     "/api/forecast": {
       "post": {
-        "description": "Compute 14 end-of-day balances including start_date. Opening balance is before any start_date movement. Sum all dated movements through day 14. Ignore rows outside this window in the projection and return the original CSV rows in transactions. Report the first strictly negative end-of-day balance as a positive shortfall. Both move fields must be supplied together or omitted. If supplied, shift a positive transaction within the window to another date within that window in the scenario only. If omitted, scenario is null. When the baseline goes below zero, proposal is a credit facility with limit_minor = max(0, -min(baseline balances)). deepest_shortfall is the lowest baseline balance; the earliest day wins a tie. relevant_transaction_ids lists the window's rows, by date, up to the day the balance recovers from that deepest gap or the window's end. proposal is null when every baseline balance is zero or above. The scenario never changes the proposal.",
+        "description": "Compute horizon_days (14 or 30) end-of-day balances including start_date. Opening balance is before any start_date movement. Sum all dated movements through day 14. Ignore rows outside this window in the projection and return the original CSV rows in transactions. Report the first strictly negative end-of-day balance as a positive shortfall. Both move fields must be supplied together or omitted. If supplied, shift a positive transaction within the window to another date within that window in the scenario only. If omitted, scenario is null. When the baseline goes below zero, proposal is a credit facility with limit_minor = max(0, -min(baseline balances)). deepest_shortfall is the lowest baseline balance; the earliest day wins a tie. relevant_transaction_ids lists the window's rows, by date, up to the day the balance recovers from that deepest gap or the window's end. proposal is null when every baseline balance is zero or above. The scenario never changes the proposal. A bank statement is forecast only from its rows dated before start_date. A payment from the same payee and transaction type on the same day of the month for at least 3 months in a row, or on the same weekday for at least 3 weeks in a row, at an amount within 25% of the latest one, continues at the average amount of that run. Its run must not have missed a payment before start_date. The other rows of the last 28 days (or of the whole history, if shorter) become a usual daily income and a usual daily spending. Rows in BGN, CZK, DKK, HUF, PLN, RON, SEK, CHF, UAH or GBP are converted to EUR at the rate in their Payment Reference, such as \"@ 1.047 EUR/CHF\"; other currencies, or a missing rate, are a 422. transactions then lists the forecast payments, each with a reason, and earlier_payments only considers the recurring ones.",
         "requestBody": {
           "required": true,
           "content": {
@@ -55,7 +55,7 @@
             }
           },
           "422": {
-            "description": "Invalid CSV, fields, transaction ID or scenario date. detail is a readable message, with the CSV line number where it applies."
+            "description": "Invalid CSV or bank statement, fields, transaction ID or scenario date. detail is a readable message, with the CSV line number where it applies."
           }
         }
       }
@@ -149,6 +149,12 @@
             "minLength": 1,
             "maxLength": 200,
             "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]*$"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]*$",
+            "description": "Why a payment forecast from a bank statement is expected, for the explanation. Left out for CSV rows."
           }
         },
         "required": [
@@ -203,8 +209,8 @@
               "$ref": "#/components/schemas/DailyBalance"
             },
             "minItems": 14,
-            "maxItems": 14,
-            "description": "14 end-of-day balances on consecutive dates."
+            "maxItems": 30,
+            "description": "14 or 30 end-of-day balances on consecutive dates."
           },
           "first_deficit": {
             "anyOf": [
@@ -229,7 +235,7 @@
           "file": {
             "type": "string",
             "format": "binary",
-            "description": "UTF-8 CSV, at most 1 MB and 5,000 rows. Header id,date,amount_minor,label in any order. Unique IDs; ISO dates; signed integer grosz up to 100,000,000,000 in absolute value. Blank lines are ignored."
+            "description": "UTF-8 CSV, at most 1 MB and 5,000 rows. Header id,date,amount_minor,label in any order. Unique IDs; ISO dates; signed integer grosz up to 100,000,000,000 in absolute value. Blank lines are ignored. Or a semicolon-delimited bank statement export, such as the Pizzeria Amalfi sample, with the columns Booking Date (DD.MM.YY), Transaction Type, Payment Reference, Beneficiary/Payer, Amount (-1149,36 or -1.149,36) and Currency."
           },
           "starting_balance_minor": {
             "type": "integer"
@@ -244,6 +250,14 @@
           "move_to_date": {
             "type": "string",
             "format": "date"
+          },
+          "horizon_days": {
+            "type": "integer",
+            "enum": [
+              14,
+              30
+            ],
+            "default": 14
           }
         },
         "required": [
@@ -426,7 +440,7 @@
               "$ref": "#/components/schemas/DecisionDay"
             },
             "minItems": 14,
-            "maxItems": 14
+            "maxItems": 30
           },
           "largest_uncovered": {
             "anyOf": [

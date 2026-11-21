@@ -79,6 +79,7 @@ def create_app(mode: str | None = None) -> FastAPI:
             start_date=request.start_date,
             move_transaction_id=request.move_transaction_id,
             move_to_date=request.move_to_date,
+            horizon_days=request.horizon_days,
         )
 
     @app.post("/api/decision", response_model=DecisionResponse)
