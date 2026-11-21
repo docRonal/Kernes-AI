@@ -4,54 +4,63 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Autonomous CFO — Simple Cash Assistant</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=timur">
-  <script type="module" src="/assets/app.js?v=timur"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/styles.css?v=tc3">
+  <script type="module" src="/assets/app.js?v=tc3"></script>
 </head>
 <body>
   <div class="app-shell">
-    <header class="topbar">
-      <div class="topbar-inner">
+    <!-- Floating Minimal Pill Navbar -->
+    <header class="topbar-wrap">
+      <nav class="topbar" aria-label="Main navigation">
         <div class="brand">
           <div class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 28 28" width="22" height="22" fill="none">
-              <rect x="2" y="14" width="5" height="12" rx="1.5" fill="currentColor" opacity="0.55"/>
-              <rect x="11" y="9" width="5" height="17" rx="1.5" fill="currentColor" opacity="0.8"/>
-              <rect x="20" y="3" width="5" height="23" rx="1.5" fill="currentColor"/>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none">
+              <rect x="2" y="12" width="4.5" height="10" rx="1.5" fill="currentColor" opacity="0.45"/>
+              <rect x="9.75" y="7" width="4.5" height="15" rx="1.5" fill="currentColor" opacity="0.75"/>
+              <rect x="17.5" y="2" width="4.5" height="20" rx="1.5" fill="currentColor"/>
             </svg>
           </div>
-          <div>
-            <h1>Autonomous CFO</h1>
-            <p class="subtitle">Simple cash assistant for small businesses</p>
-          </div>
+          <h1>Autonomous CFO</h1>
         </div>
         <div class="topbar-meta">
           <button type="button" class="btn-topbar" id="change-file-btn" hidden>← Change file</button>
           <span class="pill pill-neutral" id="account-pill">EUR Account</span>
-          <span class="pill pill-accent" id="agent-status-pill">Assistant Ready</span>
+          <span class="pill pill-status" id="agent-status-pill">Assistant Ready</span>
         </div>
-      </div>
+      </nav>
     </header>
 
     <main class="container">
-      <!-- SCREEN 1: Dedicated Clean Upload / Start Screen -->
+      <!-- SCREEN 1: Centered Editorial Upload / Start Screen -->
       <section id="setup-screen" class="setup-screen" aria-labelledby="setup-heading">
         <div class="setup-hero">
-          <span class="step-tag">Step 1 of 2 · Start Here</span>
+          <span class="eyebrow-pill">Step 1 of 2</span>
           <h2 id="setup-heading">Will your business have enough cash ahead?</h2>
-          <p class="setup-lead">Upload your bank CSV or use our built-in Pizzeria Amalfi example. We'll highlight any tight days, explain why in plain English, and help you test simple solutions.</p>
+          <p class="setup-lead">
+            <strong>Upload your bank CSV or try an example.</strong>
+            We spot tight days early, explain why in plain English, and let you test solutions before anything happens.
+          </p>
         </div>
 
-        <div class="card setup-card">
+        <div class="bento-frame setup-frame">
           <form id="forecast-form" class="setup-form" novalidate>
-            <div class="field">
+            <div class="bento-tile">
               <div class="field-label-row">
-                <label for="csv-file">Bank statement (CSV file)</label>
+                <label for="csv-file">Bank statement (CSV)</label>
                 <button type="button" class="btn-link" id="download-sample-btn">Download sample CSV</button>
               </div>
-              <div class="file-dropzone file-dropzone-lg" id="file-dropzone">
+              <div class="file-dropzone" id="file-dropzone">
                 <input id="csv-file" name="file" type="file" accept=".csv,text/csv">
                 <div class="file-dropzone-content">
-                  <span class="file-icon" aria-hidden="true">📄</span>
+                  <span class="file-icon" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M11.5 2.5H5.5a1.5 1.5 0 0 0-1.5 1.5v12a1.5 1.5 0 0 0 1.5 1.5h9a1.5 1.5 0 0 0 1.5-1.5V7l-4.5-4.5Z"/>
+                      <path d="M11.5 2.5V7H16"/>
+                    </svg>
+                  </span>
                   <div class="file-copy">
                     <span class="file-name" id="file-name">Pizzeria Amalfi example (ready to use)</span>
                     <span class="file-hint">Drop a bank statement or an EUR transaction CSV here, or click to browse</span>
@@ -62,17 +71,17 @@
             </div>
 
             <div class="setup-fields-row">
-              <div class="field">
+              <div class="bento-tile field">
                 <label for="opening-balance">Opening cash balance</label>
                 <input id="opening-balance" name="opening_balance" inputmode="decimal" value="5000.00" placeholder="5000.00" required>
               </div>
 
-              <div class="field">
+              <div class="bento-tile field">
                 <label for="start-date">Start date</label>
                 <input id="start-date" name="start_date" type="date" value="2025-06-22" required>
               </div>
 
-              <div class="field">
+              <div class="bento-tile field">
                 <label for="horizon-select">Look ahead</label>
                 <select id="horizon-select" name="horizon">
                   <option value="14" selected>Next 14 days</option>
@@ -84,8 +93,8 @@
 
             <div class="setup-actions">
               <button type="submit" class="btn btn-primary btn-lg" id="run-forecast-btn">Check my cash →</button>
-              <button type="button" class="btn btn-ghost" id="load-sample-btn">Try Pizzeria Amalfi sample</button>
-              <button type="button" class="btn btn-ghost" id="load-kernes-sample-btn">Try Kernes demo (EUR)</button>
+              <button type="button" class="btn btn-stone" id="load-sample-btn">Try Pizzeria Amalfi sample</button>
+              <button type="button" class="btn btn-stone" id="load-kernes-sample-btn">Try Kernes demo (EUR)</button>
             </div>
           </form>
 
@@ -93,44 +102,41 @@
         </div>
       </section>
 
-      <!-- SCREEN 2: Full-Focus Guided Results Story -->
+      <!-- SCREEN 2: Top-to-Bottom Editorial Results Story -->
       <div id="results" class="dashboard" hidden>
-        <!-- Inline status bar for scenario updates on Screen 2 -->
         <div id="results-status" class="status-banner" role="status" aria-live="polite" hidden></div>
 
-        <!-- 1. Big Plain-English Verdict Banner -->
-        <section class="card hero-card" id="hero-card" aria-live="polite">
-          <div class="hero-top">
-            <div class="hero-copy">
-              <span class="pill pill-warning" id="hero-badge">Heads up</span>
-              <h2 class="hero-title" id="hero-title">Checking your cash…</h2>
-              <p class="hero-summary" id="hero-summary"></p>
+        <!-- 1. Editorial Verdict Frame + Guttered 3-Stat Bento Strip -->
+        <section class="bento-frame hero-card" id="hero-card" aria-live="polite">
+          <div class="hero-main-tile">
+            <span class="pill pill-warning" id="hero-badge">Heads up</span>
+            <h2 class="hero-title" id="hero-title">Checking your cash…</h2>
+            <p class="hero-summary" id="hero-summary"></p>
+          </div>
+          <div class="hero-stats">
+            <div class="hero-stat">
+              <span class="hero-stat-label">Cash today</span>
+              <strong class="hero-stat-value" id="kpi-opening">—</strong>
+              <span class="hero-stat-sub" id="kpi-horizon">14 days</span>
             </div>
-            <div class="hero-stats">
-              <div class="hero-stat">
-                <span class="hero-stat-label">Cash today</span>
-                <strong class="hero-stat-value" id="kpi-opening">—</strong>
-                <span class="hero-stat-sub" id="kpi-horizon">14 days</span>
-              </div>
-              <div class="hero-stat" id="kpi-first-card">
-                <span class="hero-stat-label">First cash shortfall</span>
-                <strong class="hero-stat-value" id="kpi-first-shortfall">—</strong>
-                <span class="hero-stat-sub" id="kpi-first-date">—</span>
-              </div>
-              <div class="hero-stat" id="kpi-peak-card">
-                <span class="hero-stat-label">Biggest gap</span>
-                <strong class="hero-stat-value" id="kpi-peak-shortfall">—</strong>
-                <span class="hero-stat-sub" id="kpi-peak-date">—</span>
-              </div>
+            <div class="hero-stat" id="kpi-first-card">
+              <span class="hero-stat-label">First cash shortfall</span>
+              <strong class="hero-stat-value" id="kpi-first-shortfall">—</strong>
+              <span class="hero-stat-sub" id="kpi-first-date">—</span>
+            </div>
+            <div class="hero-stat" id="kpi-peak-card">
+              <span class="hero-stat-label">Biggest gap</span>
+              <strong class="hero-stat-value" id="kpi-peak-shortfall">—</strong>
+              <span class="hero-stat-sub" id="kpi-peak-date">—</span>
             </div>
           </div>
         </section>
 
-        <!-- 2. Full-Width Visual Cash Graph -->
+        <!-- 2. Full-Width Clean Cash Balance Graph -->
         <section class="card chart-card" aria-labelledby="chart-heading">
           <div class="card-header">
             <div>
-              <h2 id="chart-heading">Your Cash Balance Over Time</h2>
+              <h2 id="chart-heading">Your cash balance over time</h2>
               <p class="card-desc" id="shortfall">Hover or tap any day on the graph to see what's coming in or going out.</p>
             </div>
             <div class="chart-controls">
@@ -150,9 +156,9 @@
           <div class="chart-wrapper" id="chart-container" aria-label="Cash balance graph"></div>
         </section>
 
-        <!-- 3. Side-by-Side AI Assistant Briefing & Action Decision Card -->
+        <!-- 3. Side-by-Side: Light Briefing Card + Signature Warm Charcoal Decision Card -->
         <div class="story-grid">
-          <!-- Left: Healthy State OR Structured Friendly AI Briefing -->
+          <!-- Left: Light Editorial Briefing -->
           <div class="story-col">
             <section id="no-shortfall-card" class="card healthy-card" hidden>
               <div class="card-header">
@@ -164,12 +170,9 @@
 
             <section id="assistant-card" class="card assistant-card" aria-labelledby="assistant-heading" hidden>
               <div class="agent-box-header">
-                <div class="agent-title-wrap">
-                  <span class="agent-avatar" aria-hidden="true">AI</span>
-                  <div>
-                    <h2 id="assistant-heading">AI Financial Assistant</h2>
-                    <span class="agent-sub">Plain-English summary of your cash dip</span>
-                  </div>
+                <div>
+                  <span class="eyebrow-dot">Briefing</span>
+                  <h2 id="assistant-heading">Why your cash dips</h2>
                 </div>
                 <button type="button" class="btn-link" id="retry-advice-btn" hidden>Try again</button>
               </div>
@@ -187,11 +190,11 @@
 
               <!-- 2-3 Plain-English Bullet Highlights -->
               <div class="why-box">
-                <h3>Why it happens</h3>
+                <h3>Key facts</h3>
                 <ul class="why-list" id="why-bullets"></ul>
               </div>
 
-              <!-- Collapsible Biggest Payments (closed by default to keep it calm) -->
+              <!-- Collapsible Biggest Payments -->
               <details class="drivers-details">
                 <summary>Biggest payments affecting your cash</summary>
                 <ul class="tx-list" id="relevant-transactions"></ul>
@@ -199,19 +202,19 @@
             </section>
           </div>
 
-          <!-- Right: Action Decision Card (Credit Line Preview vs Move a Payment) -->
+          <!-- Right: Signature Warm Charcoal (#121211) Action Decision Card -->
           <div class="story-col">
             <section class="card actions-card" aria-labelledby="actions-heading">
               <div class="card-header compact-header">
                 <div>
-                  <span class="step-tag">Step 2 of 2 · Test Your Options</span>
+                  <span class="eyebrow-dark">Step 2 of 2</span>
                   <h2 id="actions-heading">How do you want to handle this?</h2>
                 </div>
               </div>
 
               <div class="tab-bar" role="tablist" aria-label="Liquidity options">
                 <button type="button" role="tab" class="tab-btn is-active" id="tab-credit" aria-selected="true" aria-controls="panel-credit">
-                  1. Credit line preview
+                  1. Credit line
                 </button>
                 <button type="button" role="tab" class="tab-btn" id="tab-whatif" aria-selected="false" aria-controls="panel-whatif">
                   2. Get paid earlier
@@ -220,7 +223,7 @@
 
               <!-- Tab 1: Credit Line Simulation -->
               <div id="panel-credit" class="tab-panel" role="tabpanel" aria-labelledby="tab-credit">
-                <div id="credit-none-note" class="muted-note" hidden>
+                <div id="credit-none-note" class="muted-note-dark" hidden>
                   No credit line needed — your cash stays positive throughout this period.
                 </div>
 
@@ -232,7 +235,7 @@
                   </div>
 
                   <p class="sim-disclaimer">
-                    <strong>Preview only:</strong> Approving or rejecting below only updates this preview. No real loan, transfer, or email is sent.
+                    Preview only — approving or rejecting updates this simulation without sending any real loan, transfer, or email.
                   </p>
 
                   <div class="decision-buttons">
@@ -243,11 +246,11 @@
                   <div id="simulation-outcome" class="outcome-box" hidden>
                     <div class="outcome-top">
                       <strong id="outcome-title"></strong>
-                      <button type="button" class="btn-link" id="reset-sim-btn">Reset</button>
+                      <button type="button" class="btn-link-dark" id="reset-sim-btn">Reset</button>
                     </div>
                     <p id="outcome-details"></p>
                     <div class="outcome-metric">
-                      <span>Cash still short:</span>
+                      <span>Cash still short</span>
                       <strong id="outcome-gap-value"></strong>
                     </div>
                   </div>
@@ -256,7 +259,7 @@
 
               <!-- Tab 2: What-If Earlier Payment + Editable Email Draft -->
               <div id="panel-whatif" class="tab-panel" role="tabpanel" aria-labelledby="tab-whatif" hidden>
-                <p class="panel-intro">Test what happens if an expected payout arrives a few days sooner. Your original forecast stays saved.</p>
+                <p class="panel-intro">Test what happens if an expected payout arrives sooner. Your original forecast stays saved.</p>
 
                 <form id="scenario-form" class="stack-form">
                   <div class="field">
@@ -264,30 +267,30 @@
                     <select id="move-tx-select" name="move_transaction_id" required></select>
                   </div>
                   <div class="field">
-                    <label for="move-date-input">What if it arrives on:</label>
+                    <label for="move-date-input">What if it arrives on</label>
                     <input id="move-date-input" name="move_to_date" type="date" value="2025-06-28" required>
                   </div>
                   <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" id="compare-dates-btn">Preview earlier date</button>
-                    <button type="button" class="btn btn-ghost" id="clear-scenario-btn" hidden>Clear</button>
+                    <button type="submit" class="btn btn-inverted" id="compare-dates-btn">Preview earlier date</button>
+                    <button type="button" class="btn btn-dark-ghost" id="clear-scenario-btn" hidden>Clear</button>
                   </div>
                 </form>
 
-                <p id="no-incoming-msg" class="muted-note" hidden>No incoming payments found in this window to move.</p>
-                <div id="scenario-summary-box" class="inline-alert inline-alert-info" hidden></div>
+                <p id="no-incoming-msg" class="muted-note-dark" hidden>No incoming payments found in this window to move.</p>
+                <div id="scenario-summary-box" class="inline-alert inline-alert-dark" hidden></div>
 
                 <!-- Editable Email Reminder Draft -->
                 <div id="draft-card" class="draft-section" hidden>
-                  <hr class="divider">
+                  <hr class="divider-dark">
                   <h3>Ask for an earlier payment</h3>
                   <p class="panel-intro">Get a polite email draft you can edit and send yourself.</p>
-                  <button type="button" class="btn btn-secondary btn-full" id="advice-button">Write reminder email draft</button>
+                  <button type="button" class="btn btn-dark-ghost btn-full" id="advice-button">Write reminder email draft</button>
 
                   <div id="advice" class="draft-editor" hidden>
-                    <label for="draft">Editable draft (you send it yourself)</label>
+                    <label for="draft">Editable draft (sent manually by you)</label>
                     <textarea id="draft" rows="4"></textarea>
                     <div class="draft-actions">
-                      <button type="button" class="btn btn-ghost" id="copy-draft-btn">Copy email</button>
+                      <button type="button" class="btn btn-inverted" id="copy-draft-btn">Copy email</button>
                       <span class="copy-feedback" id="copy-feedback" aria-live="polite"></span>
                     </div>
                   </div>
@@ -297,45 +300,121 @@
           </div>
         </div>
 
-        <!-- 4. Optional Expandable Day-by-Day Table -->
-        <section class="card details-card" aria-labelledby="table-heading">
-          <div class="details-bar">
+        <!-- 4. Milestone 1: Ask the CFO (Plain-English Q&A) -->
+        <section id="ask-cfo-card" class="card" aria-labelledby="ask-heading">
+          <div class="card-header">
             <div>
-              <h2 id="table-heading">Day-by-day numbers</h2>
-              <p class="card-desc">Open whenever you want to inspect every day's exact balance and payments.</p>
+              <span class="eyebrow-dot">Ask the CFO</span>
+              <h2 id="ask-heading">Have a "what-if" question?</h2>
+              <p class="card-desc">Ask in plain English — the app recalculates your numbers and explains the impact.</p>
             </div>
-            <button type="button" class="btn btn-secondary" id="toggle-ledger-btn" aria-expanded="false" aria-controls="ledger-panel">
-              <span>Show table (<span id="table-count-pill">14 days</span>)</span>
-            </button>
           </div>
 
-          <div id="ledger-panel" class="ledger-panel" hidden>
-            <p class="card-desc scenario-note" id="scenario-message" hidden></p>
-            <div class="table-scroll">
-              <table class="ledger-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Date</th>
-                    <th scope="col">What happens</th>
-                    <th scope="col" class="num">Balance</th>
-                    <th scope="col" class="num" id="scenario-heading" hidden>If paid earlier</th>
-                    <th scope="col" class="num" id="simulation-heading" hidden>Still short</th>
-                  </tr>
-                </thead>
-                <tbody id="balances"></tbody>
-              </table>
+          <form id="ask-cfo-form" class="ask-form" novalidate>
+            <input
+              id="ask-cfo-input"
+              name="question"
+              type="text"
+              placeholder="e.g. What if payroll grows by 2,000 EUR?"
+              maxlength="500"
+              required
+              aria-label="Ask a question about your cash forecast"
+            >
+            <button type="submit" class="btn btn-primary" id="ask-cfo-btn">Ask →</button>
+          </form>
+
+          <div class="ask-chips" aria-label="Example questions">
+            <button type="button" class="ask-chip" data-question="What is the riskiest day in this forecast?">What is the riskiest day?</button>
+            <button type="button" class="ask-chip" data-question="What if payroll grows by 2,000 EUR?">What if payroll grows by 2,000 EUR?</button>
+            <button type="button" class="ask-chip" data-question="What if the client pays 3 days late?">What if the client pays 3 days late?</button>
+          </div>
+
+          <div id="ask-answer-box" class="ask-answer" hidden>
+            <p id="ask-answer-text"></p>
+            <div id="ask-answer-meta" class="ask-answer-meta" hidden></div>
+          </div>
+          <div id="ask-error" class="inline-alert inline-alert-soft" hidden></div>
+        </section>
+
+        <!-- 5. Milestone 3: Compare Your Options Side-by-Side -->
+        <section id="compare-card" class="bento-frame" aria-labelledby="compare-heading" hidden>
+          <div class="card-header" style="padding: 18px 18px 0;">
+            <div>
+              <span class="eyebrow-dot">Compare Options</span>
+              <h2 id="compare-heading">Ways to cover the gap</h2>
+              <p class="card-desc">Side-by-side comparison of estimated cost and remaining credit needed.</p>
             </div>
           </div>
+          <div id="compare-grid" class="compare-grid"></div>
+          <p id="compare-explanation" class="compare-explanation" hidden></p>
+        </section>
+
+        <!-- 6. Milestone 4: Cash Health Score & Stress Test -->
+        <div id="health-stress-grid" class="story-grid" hidden>
+          <div class="story-col">
+            <section id="credit-score-card" class="card" aria-labelledby="score-heading">
+              <div class="card-header">
+                <div>
+                  <span class="eyebrow-dot">Cash Health</span>
+                  <h2 id="score-heading">Credit readiness score</h2>
+                </div>
+                <span class="pill pill-neutral" id="credit-risk-badge">—</span>
+              </div>
+
+              <div class="score-hero">
+                <strong class="score-number" id="credit-score-value">—</strong>
+                <span class="score-denom">/ 100</span>
+              </div>
+              <div class="score-bar-track" aria-hidden="true">
+                <div class="score-bar-fill score-bar-low" id="credit-score-fill" style="width: 0%"></div>
+              </div>
+              <p class="score-note" id="credit-score-note"></p>
+              <ul class="factor-list" id="credit-factors-list"></ul>
+            </section>
+          </div>
+
+          <div class="story-col">
+            <section id="stress-test-card" class="card" aria-labelledby="stress-heading">
+              <div class="card-header">
+                <div>
+                  <span class="eyebrow-dot">Stress Test</span>
+                  <h2 id="stress-heading">What if things go worse?</h2>
+                </div>
+              </div>
+
+              <div class="stress-summary-tile">
+                <span class="stress-summary-label">Recommended safety buffer limit</span>
+                <strong class="stress-summary-value" id="stress-rec-limit">—</strong>
+                <span class="stress-summary-sub" id="stress-buffer-sub"></span>
+              </div>
+
+              <ul class="stress-list" id="stress-scenarios-list"></ul>
+            </section>
+          </div>
+        </div>
+
+        <!-- 7. Milestone 2: Unusual Payments / Anomaly Alerts -->
+        <section id="anomalies-card" class="bento-frame" aria-labelledby="anomalies-heading" hidden>
+          <div class="card-header" style="padding: 18px 18px 0;">
+            <div>
+              <span class="eyebrow-dot">Payment Check</span>
+              <h2 id="anomalies-heading">Unusual payments &amp; spikes</h2>
+              <p class="card-desc" id="anomalies-summary"></p>
+            </div>
+            <span class="pill pill-neutral" id="anomalies-badge">—</span>
+          </div>
+          <div id="anomalies-list" class="anomalies-list"></div>
         </section>
       </div>
     </main>
 
-    <footer class="footer">
-      <div class="container footer-inner">
+    <!-- Minimal Dark Charcoal Footer -->
+    <div class="footer-wrap">
+      <footer class="footer">
         <span>Autonomous CFO · Simple Cash Assistant</span>
         <span>Preview mode · No real banking actions are triggered</span>
-      </div>
-    </footer>
+      </footer>
+    </div>
   </div>
 </body>
 </html>
