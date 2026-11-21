@@ -2,6 +2,32 @@
    KERNES CFO — Workspace Navigation, Signal Strip, Cash Calendar & Modules
    ========================================================================== */
 
+:root {
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes panelReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes chipPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 /* Topbar Print / Export button */
 .btn-topbar-ghost {
   background: transparent;
@@ -342,7 +368,12 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--ink);
-  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+  animation: chipPopIn 0.26s var(--ease-spring) both;
+  transition: background 0.22s var(--ease-spring), border-color 0.22s ease, opacity 0.22s ease, transform 0.2s var(--ease-spring);
+}
+
+.sim-chip:hover {
+  transform: translateY(-1px);
 }
 
 .sim-chip.is-enabled.sim-expense {
@@ -463,7 +494,7 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  animation: fadeInSoft 0.22s var(--ease-out) both;
+  animation: panelReveal 0.34s var(--ease-spring) both;
 }
 
 .workspace-section-divider {
@@ -755,7 +786,7 @@
 
 .donut-slice {
   cursor: pointer;
-  transition: opacity 0.16s ease, stroke-width 0.16s ease;
+  transition: opacity 0.24s ease, stroke-width 0.28s var(--ease-spring);
 }
 
 .donut-slice.is-dimmed {
@@ -807,13 +838,14 @@
   border: 1px solid transparent;
   font-size: 13px;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.22s var(--ease-spring);
 }
 
 .donut-legend-row:hover,
 .donut-legend-row.is-active {
   border-color: var(--hairline-strong);
   background: #ffffff;
+  transform: translateX(3px);
 }
 
 .donut-legend-left {
@@ -996,9 +1028,28 @@
    -------------------------------------------------------------------------- */
 .afford-form {
   display: grid;
-  grid-template-columns: minmax(180px, 1.4fr) minmax(130px, 0.9fr) minmax(140px, 0.9fr) auto;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.8fr) minmax(0, 1fr) auto;
   gap: 10px;
   align-items: end;
+}
+
+.afford-form .field {
+  min-width: 0;
+}
+
+.afford-form input {
+  width: 100%;
+  min-width: 0;
+}
+
+.whatif-chart-banner {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 920px) {
+  .afford-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .afford-presets {

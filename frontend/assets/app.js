@@ -14,7 +14,7 @@ import {
   requestStressTest,
   resolveForecast,
 } from "./js/api.js?v=tc16";
-import { renderActionPlan } from "./js/action_plan.js?v=amalfi-chat";
+import { renderActionPlan } from "./js/action_plan.js?v=tc28";
 import { extractCsvDefaults } from "./js/csv.js?v=1";
 import { printDate, printMoney, replayFade, toMinor } from "./js/format.js?v=tc11";
 import {
@@ -113,6 +113,7 @@ const askForm = document.querySelector("#ask-cfo-form");
 const askInput = document.querySelector("#ask-cfo-input");
 const askBtn = document.querySelector("#ask-cfo-btn");
 const askLoading = document.querySelector("#ask-loading");
+const askChipsContainer = document.querySelector("#ask-cfo-card .ask-chips");
 const askChips = document.querySelectorAll("#ask-cfo-card .ask-chip");
 const delayForm = document.querySelector("#delay-form");
 const delayTxSelect = document.querySelector("#delay-tx-select");
@@ -575,9 +576,28 @@ async function runBaselineForecast({ customOpeningMinor = null } = {}) {
       ...(ins || {}),
       advice: adv,
     }));
+function renderSuggestedAskChips(questions) {
+  if (!askChipsContainer || !Array.isArray(questions) || questions.length === 0) return;
+  const buttons = questions.slice(0, 4).map((q) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ask-chip";
+    btn.dataset.question = q;
+    btn.textContent = q;
+    btn.addEventListener("click", () => {
+      askInput.value = q;
+      submitAskQuestion(q);
+    });
+    return btn;
+  });
+  askChipsContainer.replaceChildren(...buttons);
+  replayFade(askChipsContainer);
+}
+
     renderActionPlan({
       state,
       insightsPromise: combinedPromise,
+      onSuggestedQuestions: renderSuggestedAskChips,
       onOpenEmailTab: data.forecast_basis === "history"
         ? null
         : (step) => {
@@ -923,6 +943,16 @@ scenarioForm.addEventListener("submit", async (event) => {
     }
     showStatus("");
     syncSimulationsAndRender();
+    const summaryBox = document.querySelector("#scenario-summary-box");
+    if (summaryBox && !summaryBox.hidden) {
+      const jump = document.createElement("button");
+      jump.type = "button";
+      jump.className = "btn-link-dark";
+      jump.style.marginLeft = "8px";
+      jump.textContent = "View on chart ↑";
+      jump.addEventListener("click", () => workspace.setWorkspace("overview", "#chart-heading"));
+      summaryBox.append(jump);
+    }
   } catch (error) {
     if (state.forecast?.baseline === baseline) showStatus(error.message, true);
   } finally {
