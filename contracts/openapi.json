@@ -465,10 +465,249 @@
           }
         }
       }
+    },
+    "/api/action-plan": {
+      "post": {
+        "summary": "Action Plan",
+        "operationId": "action_plan_api_action_plan_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionPlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionPlanResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ActionPlanRequest": {
+        "properties": {
+          "baseline": {
+            "$ref": "#/components/schemas/Projection"
+          },
+          "transactions": {
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            },
+            "type": "array",
+            "maxItems": 5000,
+            "minItems": 1,
+            "title": "Transactions"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "EUR",
+              "PLN",
+              "CHF",
+              "USD",
+              "GBP",
+              "CZK",
+              "SEK",
+              "DKK",
+              "HUF",
+              "RON",
+              "BGN",
+              "NOK"
+            ],
+            "title": "Currency",
+            "default": "EUR"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/UserProfile"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "baseline",
+          "transactions"
+        ],
+        "title": "ActionPlanRequest"
+      },
+      "ActionPlanResponse": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "survival",
+              "growth"
+            ],
+            "title": "Mode"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/ActionPlanStep"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "minItems": 1,
+            "title": "Steps"
+          },
+          "suggested_questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggested Questions"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "mode",
+          "headline",
+          "summary",
+          "steps",
+          "suggested_questions",
+          "model",
+          "latency_ms"
+        ],
+        "title": "ActionPlanResponse"
+      },
+      "ActionPlanStep": {
+        "properties": {
+          "step_number": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Step Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "autonomy_level": {
+            "type": "string",
+            "enum": [
+              "analyzed",
+              "recommended",
+              "requires_approval",
+              "simulation_only"
+            ],
+            "title": "Autonomy Level"
+          },
+          "action_kind": {
+            "type": "string",
+            "enum": [
+              "review_anomaly",
+              "shift_payment",
+              "credit_facility",
+              "growth_buffer",
+              "none"
+            ],
+            "title": "Action Kind"
+          },
+          "impact_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Impact Minor",
+            "default": 0
+          },
+          "counterparty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterparty"
+          },
+          "email_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "collect_early",
+                  "defer_supplier"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Kind"
+          },
+          "email_draft": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Draft"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "step_number",
+          "title",
+          "detail",
+          "autonomy_level",
+          "action_kind"
+        ],
+        "title": "ActionPlanStep"
+      },
       "AdviceRequest": {
         "properties": {
           "baseline": {
@@ -1762,6 +2001,86 @@
             "minLength": 1,
             "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]*$",
             "title": "Label"
+          },
+          "transaction_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transaction Type"
+          },
+          "counterparty": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterparty"
+          },
+          "payment_reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300,
+                "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Reference"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "retail_card",
+                  "card_acquirer",
+                  "b2b_client",
+                  "b2b_supplier",
+                  "rent",
+                  "owner_draw",
+                  "staff_payroll",
+                  "tax_social",
+                  "utility",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "actionability": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "email_collect_early",
+                  "email_defer_supplier",
+                  "owner_draw_flexible",
+                  "fixed_mandatory",
+                  "retail_non_contactable"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actionability"
           }
         },
         "additionalProperties": false,
@@ -1773,6 +2092,36 @@
           "label"
         ],
         "title": "Transaction"
+      },
+      "UserProfile": {
+        "properties": {
+          "business_type": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Business Type",
+            "default": "Small business"
+          },
+          "goal": {
+            "type": "string",
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Goal",
+            "default": "Keep cash flow healthy"
+          },
+          "experience_level": {
+            "type": "string",
+            "enum": [
+              "beginner",
+              "advanced"
+            ],
+            "title": "Experience Level",
+            "default": "beginner"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "UserProfile"
       },
       "ValidationError": {
         "properties": {

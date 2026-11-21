@@ -5,157 +5,287 @@
       "id": "TX-0026",
       "date": "2025-06-01",
       "amount_minor": -380000,
-      "label": "Main Street Real Estate GmbH"
+      "label": "Main Street Real Estate GmbH",
+      "transaction_type": "RENT PAYMENT",
+      "counterparty": "Main Street Real Estate GmbH",
+      "payment_reference": "Pizzeria Commercial Space Rent 06/2025",
+      "category": "rent",
+      "actionability": "email_defer_supplier"
     },
     {
       "id": "TX-0023",
       "date": "2025-06-10",
       "amount_minor": -65000,
-      "label": "City Energy & Utilities AG"
+      "label": "City Energy & Utilities AG",
+      "transaction_type": "DIRECT DEBIT",
+      "counterparty": "City Energy & Utilities AG",
+      "payment_reference": "Monthly Energy & Gas Advance Payment 06/2025",
+      "category": "utility",
+      "actionability": "fixed_mandatory"
     },
     {
       "id": "TX-0024",
       "date": "2025-06-10",
       "amount_minor": -88000,
-      "label": "Tax Office Frankfurt am Main"
+      "label": "Tax Office Frankfurt am Main",
+      "transaction_type": "TAX OFFICE TRANSFER",
+      "counterparty": "Tax Office Frankfurt am Main",
+      "payment_reference": "Payroll Wage Tax & Solidarity Surcharge 06/2025 Ref-ST-062025",
+      "category": "tax_social",
+      "actionability": "fixed_mandatory"
     },
     {
       "id": "TX-0025",
       "date": "2025-06-10",
       "amount_minor": -115000,
-      "label": "Tax Office Frankfurt am Main"
+      "label": "Tax Office Frankfurt am Main",
+      "transaction_type": "DIRECT DEBIT",
+      "counterparty": "Tax Office Frankfurt am Main",
+      "payment_reference": "SEPA Direct Debit Income Tax Prepayment Q2/2025 (Prior Year Profit \u20ac30k Basis)",
+      "category": "tax_social",
+      "actionability": "fixed_mandatory"
     },
     {
       "id": "TX-0022",
       "date": "2025-06-15",
       "amount_minor": -437500,
-      "label": "Luigi Amalfi (Luigi's Ristorante Zurich)"
+      "label": "Luigi Amalfi (Luigi's Ristorante Zurich)",
+      "transaction_type": "INTERNATIONAL WIRE TRANSFER",
+      "counterparty": "Luigi Amalfi (Luigi's Ristorante Zurich)",
+      "payment_reference": "Silent Partnership Capital Tranche 06/12 (4166.67 CHF @ 1.050 EUR/CHF) - Luigi's Ristorante",
+      "category": "tax_social",
+      "actionability": "fixed_mandatory"
     },
     {
       "id": "TX-0021",
       "date": "2025-06-27",
       "amount_minor": -265000,
-      "label": "Techniker Krankenkasse Social Health Fund"
+      "label": "Techniker Krankenkasse Social Health Fund",
+      "transaction_type": "DIRECT DEBIT",
+      "counterparty": "Techniker Krankenkasse Social Health Fund",
+      "payment_reference": "Social Security Contributions 06/2025 (Pension, Health, Unemployment)",
+      "category": "tax_social",
+      "actionability": "fixed_mandatory"
     },
     {
       "id": "TX-0017",
       "date": "2025-06-28",
       "amount_minor": -320000,
-      "label": "Vincenzo Amalfi"
+      "label": "Vincenzo Amalfi",
+      "transaction_type": "SALARY PAYMENT",
+      "counterparty": "Vincenzo Amalfi",
+      "payment_reference": "Owner Salary Withdrawal Vincenzo Amalfi 06/2025",
+      "category": "owner_draw",
+      "actionability": "owner_draw_flexible"
     },
     {
       "id": "TX-0018",
       "date": "2025-06-28",
       "amount_minor": -235000,
-      "label": "Yusuf Akcit"
+      "label": "Yusuf Akcit",
+      "transaction_type": "SALARY PAYMENT",
+      "counterparty": "Yusuf Akcit",
+      "payment_reference": "Net Salary Yusuf Akcit (Pizza Baker) 06/2025",
+      "category": "staff_payroll",
+      "actionability": "fixed_mandatory"
     },
     {
       "id": "TX-0019",
       "date": "2025-06-28",
       "amount_minor": -210000,
-      "label": "Rosa Pavese"
+      "label": "Rosa Pavese",
+      "transaction_type": "SALARY PAYMENT",
+      "counterparty": "Rosa Pavese",
+      "payment_reference": "Net Salary Rosa Pavese (Chef) 06/2025",
+      "category": "staff_payroll",
+      "actionability": "fixed_mandatory"
     },
     {
       "id": "TX-0020",
       "date": "2025-06-28",
       "amount_minor": -95000,
-      "label": "Vanessa Paradi"
+      "label": "Vanessa Paradi",
+      "transaction_type": "SALARY PAYMENT",
+      "counterparty": "Vanessa Paradi",
+      "payment_reference": "Net Salary Vanessa Paradi (Waitstaff) 06/2025",
+      "category": "staff_payroll",
+      "actionability": "fixed_mandatory"
     },
     {
       "id": "TX-0013",
       "date": "2025-07-01",
       "amount_minor": -380000,
-      "label": "Main Street Real Estate GmbH"
+      "label": "Main Street Real Estate GmbH",
+      "transaction_type": "RENT PAYMENT",
+      "counterparty": "Main Street Real Estate GmbH",
+      "payment_reference": "Pizzeria Commercial Space Rent 07/2025",
+      "category": "rent",
+      "actionability": "email_defer_supplier"
     },
     {
       "id": "TX-0014",
       "date": "2025-07-01",
       "amount_minor": 33552,
-      "label": "Pizzeria Amalfi Customers (Debit)"
+      "label": "Pizzeria Amalfi Customers (Debit)",
+      "transaction_type": "CARD SETTLEMENT (DEBIT)",
+      "counterparty": "Pizzeria Amalfi Customers (Debit)",
+      "payment_reference": "Daily Debit Card Revenue Settlement Pizzeria Amalfi 01.07.25",
+      "category": "retail_card",
+      "actionability": "retail_non_contactable"
     },
     {
       "id": "TX-0015",
       "date": "2025-07-01",
       "amount_minor": 262421,
-      "label": "Commerzbank Global Pay"
+      "label": "Commerzbank Global Pay",
+      "transaction_type": "CREDIT CARD PAYOUT",
+      "counterparty": "Commerzbank Global Pay",
+      "payment_reference": "Commerzbank Global Pay Card Settlement Ref-CGP-192936",
+      "category": "card_acquirer",
+      "actionability": "retail_non_contactable"
     },
     {
       "id": "TX-0016",
       "date": "2025-07-01",
       "amount_minor": -67050,
-      "label": "Asimex Wholesale Ltd"
+      "label": "Asimex Wholesale Ltd",
+      "transaction_type": "SUPPLIER PAYMENT",
+      "counterparty": "Asimex Wholesale Ltd",
+      "payment_reference": "Invoice AS-83339 Food & Italian Ingredients Delivery",
+      "category": "b2b_supplier",
+      "actionability": "email_defer_supplier"
     },
     {
       "id": "TX-0011",
       "date": "2025-07-02",
       "amount_minor": 29525,
-      "label": "Pizzeria Amalfi Customers (Debit)"
+      "label": "Pizzeria Amalfi Customers (Debit)",
+      "transaction_type": "CARD SETTLEMENT (DEBIT)",
+      "counterparty": "Pizzeria Amalfi Customers (Debit)",
+      "payment_reference": "Daily Debit Card Revenue Settlement Pizzeria Amalfi 02.07.25",
+      "category": "retail_card",
+      "actionability": "retail_non_contactable"
     },
     {
       "id": "TX-0012",
       "date": "2025-07-02",
       "amount_minor": -28432,
-      "label": "Central Wholesale Market"
+      "label": "Central Wholesale Market",
+      "transaction_type": "GIRO CARD PAYMENT",
+      "counterparty": "Central Wholesale Market",
+      "payment_reference": "Wholesale Market Fresh Produce Purchase 02.07.25",
+      "category": "retail_card",
+      "actionability": "retail_non_contactable"
     },
     {
       "id": "TX-0008",
       "date": "2025-07-03",
       "amount_minor": 30922,
-      "label": "Pizzeria Amalfi Customers (Debit)"
+      "label": "Pizzeria Amalfi Customers (Debit)",
+      "transaction_type": "CARD SETTLEMENT (DEBIT)",
+      "counterparty": "Pizzeria Amalfi Customers (Debit)",
+      "payment_reference": "Daily Debit Card Revenue Settlement Pizzeria Amalfi 03.07.25",
+      "category": "retail_card",
+      "actionability": "retail_non_contactable"
     },
     {
       "id": "TX-0009",
       "date": "2025-07-03",
       "amount_minor": -23298,
-      "label": "Central Wholesale Market"
+      "label": "Central Wholesale Market",
+      "transaction_type": "GIRO CARD PAYMENT",
+      "counterparty": "Central Wholesale Market",
+      "payment_reference": "Wholesale Market Fresh Produce Purchase 03.07.25",
+      "category": "retail_card",
+      "actionability": "retail_non_contactable"
     },
     {
       "id": "TX-0010",
       "date": "2025-07-03",
       "amount_minor": -57531,
-      "label": "Asimex Wholesale Ltd"
+      "label": "Asimex Wholesale Ltd",
+      "transaction_type": "SUPPLIER PAYMENT",
+      "counterparty": "Asimex Wholesale Ltd",
+      "payment_reference": "Invoice AS-51897 Food & Italian Ingredients Delivery",
+      "category": "b2b_supplier",
+      "actionability": "email_defer_supplier"
     },
     {
       "id": "TX-0004",
       "date": "2025-07-04",
       "amount_minor": 43594,
-      "label": "Pizzeria Amalfi Customers (Debit)"
+      "label": "Pizzeria Amalfi Customers (Debit)",
+      "transaction_type": "CARD SETTLEMENT (DEBIT)",
+      "counterparty": "Pizzeria Amalfi Customers (Debit)",
+      "payment_reference": "Daily Debit Card Revenue Settlement Pizzeria Amalfi 04.07.25",
+      "category": "retail_card",
+      "actionability": "retail_non_contactable"
     },
     {
       "id": "TX-0005",
       "date": "2025-07-04",
       "amount_minor": 416164,
-      "label": "Commerzbank Global Pay"
+      "label": "Commerzbank Global Pay",
+      "transaction_type": "CREDIT CARD PAYOUT",
+      "counterparty": "Commerzbank Global Pay",
+      "payment_reference": "Commerzbank Global Pay Card Settlement Ref-CGP-315881",
+      "category": "card_acquirer",
+      "actionability": "retail_non_contactable"
     },
     {
       "id": "TX-0006",
       "date": "2025-07-04",
       "amount_minor": -28474,
-      "label": "Central Wholesale Market"
+      "label": "Central Wholesale Market",
+      "transaction_type": "GIRO CARD PAYMENT",
+      "counterparty": "Central Wholesale Market",
+      "payment_reference": "Wholesale Market Fresh Produce Purchase 04.07.25",
+      "category": "retail_card",
+      "actionability": "retail_non_contactable"
     },
     {
       "id": "TX-0007",
       "date": "2025-07-04",
       "amount_minor": -77493,
-      "label": "Fattoria La Vino GmbH"
+      "label": "Fattoria La Vino GmbH",
+      "transaction_type": "SUPPLIER PAYMENT",
+      "counterparty": "Fattoria La Vino GmbH",
+      "payment_reference": "Invoice FLV-41884 Italian Wine & Fine Beverages",
+      "category": "b2b_supplier",
+      "actionability": "email_defer_supplier"
     },
     {
       "id": "TX-0001",
       "date": "2025-07-05",
       "amount_minor": 45756,
-      "label": "Pizzeria Amalfi Customers (Debit)"
+      "label": "Pizzeria Amalfi Customers (Debit)",
+      "transaction_type": "CARD SETTLEMENT (DEBIT)",
+      "counterparty": "Pizzeria Amalfi Customers (Debit)",
+      "payment_reference": "Daily Debit Card Revenue Settlement Pizzeria Amalfi 05.07.25",
+      "category": "retail_card",
+      "actionability": "retail_non_contactable"
     },
     {
       "id": "TX-0002",
       "date": "2025-07-05",
       "amount_minor": -22003,
-      "label": "Central Wholesale Market"
+      "label": "Central Wholesale Market",
+      "transaction_type": "GIRO CARD PAYMENT",
+      "counterparty": "Central Wholesale Market",
+      "payment_reference": "Wholesale Market Fresh Produce Purchase 05.07.25",
+      "category": "retail_card",
+      "actionability": "retail_non_contactable"
     },
     {
       "id": "TX-0003",
       "date": "2025-07-05",
       "amount_minor": -60560,
-      "label": "Asimex Wholesale Ltd"
+      "label": "Asimex Wholesale Ltd",
+      "transaction_type": "SUPPLIER PAYMENT",
+      "counterparty": "Asimex Wholesale Ltd",
+      "payment_reference": "Invoice AS-89243 Food & Italian Ingredients Delivery",
+      "category": "b2b_supplier",
+      "actionability": "email_defer_supplier"
     }
   ],
   "baseline": {
