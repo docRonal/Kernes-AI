@@ -118,3 +118,20 @@ export function requestStressTest(payload) {
 export function requestAskCfo(payload, question) {
   return post("/api/ask-cfo", { ...payload, question });
 }
+
+export async function requestHealth() {
+  const response = await request("/health");
+  return response.json();
+}
+
+export function requestOptimizePayments(payload) {
+  return post("/api/optimize-payments", payload);
+}
+
+export function requestPredictDelays(payload, clientDelays) {
+  return post("/api/predict-delays", { ...payload, client_delays: clientDelays });
+}
+
+export function requestSendReminder({ to_email, subject, body }) {
+  return post("/api/send-reminder", { to_email, subject, body });
+}

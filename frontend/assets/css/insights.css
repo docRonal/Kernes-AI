@@ -352,6 +352,95 @@
   color: var(--ink-secondary);
 }
 
+/* Smart Payment Moves & Client Delay Risk */
+.optimize-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.optimize-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.optimize-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.optimize-savings {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.optimize-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.optimize-meta {
+  font-size: 12.5px;
+  color: var(--ink-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.optimize-actions {
+  margin-top: 4px;
+}
+
+.btn-xs {
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
+
+.delay-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.delay-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 108px;
+  gap: 8px;
+  align-items: end;
+}
+
+.delay-row select {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delay-result {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.delay-warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.delay-warning.is-note {
+  background: var(--surface-tile);
+  color: var(--ink-secondary);
+}
+
 @media (max-width: 860px) {
   .compare-grid {
     grid-template-columns: 1fr;
@@ -364,5 +453,8 @@
     align-items: stretch;
     border-radius: 18px;
     padding: 10px;
+  }
+  .delay-row {
+    grid-template-columns: 1fr;
   }
 }

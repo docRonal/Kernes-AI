@@ -33,15 +33,24 @@ export function resetInsightsUi() {
     "#anomalies-card",
     "#compare-card",
     "#health-stress-grid",
+    "#optimize-delay-grid",
+    "#optimize-card",
+    "#delay-predict-card",
   ];
   for (const sel of sections) {
     const el = document.querySelector(sel);
     if (el) el.hidden = true;
   }
-  const askAnswer = document.querySelector("#ask-answer-box");
-  const askError = document.querySelector("#ask-error");
-  if (askAnswer) askAnswer.hidden = true;
-  if (askError) askError.hidden = true;
+  const hiddenIds = [
+    "#ask-answer-box",
+    "#ask-error",
+    "#delay-result-box",
+    "#delay-error",
+  ];
+  for (const sel of hiddenIds) {
+    const el = document.querySelector(sel);
+    if (el) el.hidden = true;
+  }
 }
 
 export function renderAnomalies(data, currency = "EUR") {
@@ -256,6 +265,151 @@ export function renderAskError(message) {
   const box = document.querySelector("#ask-answer-box");
   const errorEl = document.querySelector("#ask-error");
   box.hidden = true;
+  errorEl.textContent = message;
+  errorEl.hidden = false;
+}
+
+export function renderOptimizePayments(data, transactions, currency = "EUR", onPreviewCollect = null) {
+  const grid = document.querySelector("#optimize-delay-grid");
+  const card = document.querySelector("#optimize-card");
+  const list = document.querySelector("#optimize-list");
+
+  const labelById = new Map((transactions || []).map((tx) => [tx.id, tx.label]));
+  const actions = data?.actions || [];
+
+  if (actions.length === 0) {
+    list.replaceChildren(
+      createEl(
+        "div",
+        "bento-tile insight-empty",
+        "No payment timing moves improve the credit limit in this window.",
+      ),
+    );
+  } else {
+    list.replaceChildren(
+      ...actions.map((action) => {
+        const tile = createEl("article", "bento-tile optimize-tile");
+        const top = createEl("div", "optimize-top");
+        const isCollect = action.kind === "collect_earlier";
+        const kindBadge = createEl(
+          "span",
+          isCollect ? "pill pill-success" : "pill pill-neutral",
+          isCollect ? "Collect earlier" : "Pay later",
+        );
+        const savings = createEl(
+          "strong",
+          "optimize-savings positive",
+          `Saves ${printMoney(action.saves_minor, currency)}`,
+        );
+        top.append(kindBadge, savings);
+
+        const label = labelById.get(action.transaction_id) || action.transaction_id;
+        const title = createEl("strong", "optimize-title", `${label} (${action.transaction_id})`);
+        const meta = createEl(
+          "span",
+          "optimize-meta",
+          `${printDate(action.due_date)} → ${printDate(action.new_date)} · Credit after: ${printMoney(action.limit_after_minor, currency)}`,
+        );
+
+        tile.append(top, title, meta);
+
+        if (isCollect && onPreviewCollect) {
+          const btnWrap = createEl("div", "optimize-actions");
+          const btn = createEl("button", "btn btn-stone btn-xs", "Preview on chart");
+          btn.type = "button";
+          btn.addEventListener("click", () => onPreviewCollect(action));
+          btnWrap.append(btn);
+          tile.append(btnWrap);
+        }
+
+        return tile;
+      }),
+    );
+  }
+
+  card.hidden = false;
+  grid.hidden = false;
+}
+
+export function populateDelayCandidates(forecast, currency = "EUR") {
+  const grid = document.querySelector("#optimize-delay-grid");
+  const card = document.querySelector("#delay-predict-card");
+  const form = document.querySelector("#delay-form");
+  const select = document.querySelector("#delay-tx-select");
+  const emptyEl = document.querySelector("#delay-empty");
+  const resultBox = document.querySelector("#delay-result-box");
+  const errorEl = document.querySelector("#delay-error");
+
+  resultBox.hidden = true;
+  errorEl.hidden = true;
+
+  const days = forecast?.baseline?.days || [];
+  const startDate = days[0]?.date;
+  const endDate = days[Math.min(13, days.length - 1)]?.date;
+  const hasShortfall = Boolean(forecast?.baseline?.first_deficit);
+
+  const incoming = (forecast?.transactions || [])
+    .filter(
+      ({ amount_minor, date }) =>
+        amount_minor > 0 && (!startDate || date >= startDate) && (!endDate || date <= endDate),
+    )
+    .sort((a, b) => b.amount_minor - a.amount_minor)
+    .slice(0, 40);
+
+  select.replaceChildren(
+    ...incoming.map(
+      ({ id, label, date, amount_minor }) =>
+        new Option(`${label} (+${printMoney(amount_minor, currency)} on ${printDate(date)})`, id),
+    ),
+  );
+
+  if (hasShortfall && incoming.length > 0) {
+    form.hidden = false;
+    emptyEl.hidden = true;
+  } else {
+    form.hidden = true;
+    emptyEl.textContent =
+      "Delay prediction requires a projected shortfall and at least one incoming payment in the 14-day window.";
+    emptyEl.hidden = false;
+  }
+
+  card.hidden = false;
+  grid.hidden = false;
+}
+
+export function renderDelayResult(data) {
+  const resultBox = document.querySelector("#delay-result-box");
+  const warningBox = document.querySelector("#delay-warning-box");
+  const explanationEl = document.querySelector("#delay-explanation");
+  const metaEl = document.querySelector("#delay-meta");
+  const errorEl = document.querySelector("#delay-error");
+
+  errorEl.hidden = true;
+
+  if (data.delay_warning) {
+    warningBox.textContent = data.delay_warning;
+    warningBox.className = "delay-warning";
+  } else {
+    warningBox.textContent =
+      "Demo mode returned the bundled explanation. In live mode, delay-specific warnings appear here.";
+    warningBox.className = "delay-warning is-note";
+  }
+
+  explanationEl.textContent = data.explanation || "";
+
+  const metaParts = [];
+  if (data.model) metaParts.push(`Model: ${data.model}`);
+  if (data.latency_ms != null) metaParts.push(`${data.latency_ms} ms`);
+  metaEl.textContent = metaParts.join(" · ");
+  metaEl.hidden = metaParts.length === 0;
+
+  resultBox.hidden = false;
+}
+
+export function renderDelayError(message) {
+  const resultBox = document.querySelector("#delay-result-box");
+  const errorEl = document.querySelector("#delay-error");
+  resultBox.hidden = true;
   errorEl.textContent = message;
   errorEl.hidden = false;
 }
