@@ -1,39 +1,43 @@
 :root {
-  --bg: #f6f7f4;
+  /* TakeControl Warm Stone & Charcoal Palette */
+  --bg-top: #eaeae7;
+  --bg-bottom: #f7f7f6;
   --surface: #ffffff;
-  --surface-subtle: #f8f9f6;
-  --border: #e3e7e0;
-  --border-strong: #c5ccc1;
-  --text: #112119;
-  --text-secondary: #485950;
-  --text-muted: #697a71;
+  --surface-tile: #f7f7f6;
+  --surface-stone: #eaeae7;
+  --surface-dark: #121211;
+  --surface-dark-tile: #1c1c1a;
 
-  --primary: #0f5132;
-  --primary-hover: #0b3d26;
-  --primary-soft: #e7f5ee;
+  --hairline: #eaeae7;
+  --hairline-strong: #d8d8d3;
+  --hairline-dark: rgba(255, 255, 255, 0.12);
 
-  --teal: #0d9488;
-  --teal-soft: #e6f7f5;
+  --ink: #121211;
+  --ink-secondary: #666665;
+  --ink-muted: #8e8e8b;
 
-  --danger: #b91c1c;
-  --danger-soft: #fef2f2;
-  --danger-border: #fecaca;
+  /* Sparing Coral-Orange Brand Accent */
+  --accent: #ff7b4b;
+  --accent-soft: #fff2ec;
 
-  --warning: #b45309;
-  --warning-soft: #fffbeb;
-  --warning-border: #fde68a;
+  /* Semantic Cash Status (only for positive/negative cash) */
+  --positive: #1f8a4c;
+  --positive-soft: #edf9f1;
+  --danger: #d9383a;
+  --danger-soft: #fdf0f0;
+  --warning: #b85c00;
+  --warning-soft: #fff4eb;
 
-  --info: #1d4ed8;
-  --info-soft: #eff6ff;
-  --info-border: #bfdbfe;
+  --shadow-nav: 0 4px 14px rgba(18, 18, 17, 0.06);
+  --shadow-card: 0 4px 30px rgba(18, 18, 17, 0.04);
+  --shadow-dark: 0 14px 36px rgba(18, 18, 17, 0.14);
 
-  --shadow-sm: 0 1px 3px rgba(17, 33, 25, 0.04);
-  --shadow-md: 0 10px 28px rgba(17, 33, 25, 0.07);
-  --radius-sm: 10px;
-  --radius-md: 16px;
-  --radius-lg: 20px;
+  --radius-frame: 26px;
+  --radius-tile: 18px;
+  --radius-input: 12px;
+  --radius-pill: 999px;
 
-  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Figtree", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
@@ -47,19 +51,20 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
-  color: var(--text);
+  background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 380px, var(--bg-bottom) 100%);
+  color: var(--ink);
   font-family: var(--font-sans);
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
 }
 
 [hidden] {
   display: none !important;
 }
 
-/* Layout Shell */
+/* Layout Shell & 964px Editorial Spine */
 .app-shell {
   min-height: 100vh;
   display: flex;
@@ -68,157 +73,158 @@ body {
 
 .container {
   width: 100%;
-  max-width: 1320px;
+  max-width: 964px;
   margin: 0 auto;
-  padding: 0 1.25rem;
+  padding: 0 24px;
 }
 
 main.container {
   flex: 1;
-  padding-top: 1.5rem;
-  padding-bottom: 3rem;
+  padding-top: 28px;
+  padding-bottom: 56px;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 24px;
 }
 
-/* Top Navigation Bar */
-.topbar {
-  background: #0b241d;
-  color: #f8fafc;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+/* Floating White Pill Navbar */
+.topbar-wrap {
   position: sticky;
-  top: 0;
-  z-index: 20;
+  top: 14px;
+  z-index: 30;
+  padding: 0 24px;
+  margin-top: 14px;
 }
 
-.topbar-inner {
-  max-width: 1320px;
+.topbar {
+  max-width: 916px;
   margin: 0 auto;
-  padding: 0.85rem 1.25rem;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--radius-pill);
+  padding: 8px 10px 8px 14px;
+  box-shadow: var(--shadow-nav);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
+  gap: 10px;
 }
 
 .brand-mark {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #16a34a, #0f5132);
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #fbbca6 0%, var(--accent) 100%);
   color: #ffffff;
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .brand h1 {
   margin: 0;
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-}
-
-.subtitle {
-  margin: 0.1rem 0 0;
-  font-size: 0.82rem;
-  color: #cbd5e1;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ink);
 }
 
 .topbar-meta {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
 .btn-topbar {
-  background: rgba(255, 255, 255, 0.14);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 999px;
-  padding: 0.3rem 0.85rem;
+  background: var(--surface-stone);
+  color: var(--ink);
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
 .btn-topbar:hover {
-  background: rgba(255, 255, 255, 0.24);
+  background: #dfdfd9;
 }
 
-/* Pills & Badges */
+/* Restrained Pills */
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0.65rem;
-  border-radius: 999px;
-  font-size: 0.76rem;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 12.5px;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
   white-space: nowrap;
 }
 
 .pill-neutral {
-  background: #e2e8f0;
-  color: #334155;
+  background: var(--surface-tile);
+  color: var(--ink-secondary);
 }
 
-.topbar .pill-neutral {
-  background: rgba(255, 255, 255, 0.12);
-  color: #e2e8f0;
+.pill-status {
+  background: var(--surface-tile);
+  color: var(--ink);
 }
 
-.pill-accent {
-  background: rgba(22, 163, 74, 0.2);
-  color: #86efac;
-  border: 1px solid rgba(134, 239, 172, 0.25);
+.pill-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
 }
 
 .pill-success {
-  background: var(--primary-soft);
-  color: var(--primary);
+  background: var(--positive-soft);
+  color: var(--positive);
 }
 
 .pill-warning {
   background: var(--warning-soft);
   color: var(--warning);
-  border: 1px solid var(--warning-border);
 }
 
 .pill-danger {
   background: var(--danger-soft);
   color: var(--danger);
-  border: 1px solid var(--danger-border);
 }
 
-/* Footer */
+/* Minimal Dark Charcoal Footer */
+.footer-wrap {
+  max-width: 964px;
+  width: 100%;
+  margin: auto auto 24px;
+  padding: 0 24px;
+}
+
 .footer {
-  border-top: 1px solid var(--border);
-  background: var(--surface);
-  padding: 0.9rem 0;
-  margin-top: auto;
-}
-
-.footer-inner {
+  background: var(--surface-dark);
+  color: #a2a2a1;
+  border-radius: var(--radius-frame);
+  padding: 18px 26px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 0.75rem;
+  gap: 12px;
   flex-wrap: wrap;
-  font-size: 0.78rem;
-  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
 }
