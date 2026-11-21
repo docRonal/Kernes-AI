@@ -13,6 +13,8 @@ from pydantic import (
     field_validator,
 )
 
+from .currency import DEFAULT_CURRENCY, Currency
+
 
 # Shared by the CSV parser and the JSON endpoints, so neither path accepts what the other refuses.
 HORIZON_DAYS = 14
@@ -28,6 +30,7 @@ NO_CONTROL_CHARACTERS = r"^[^\x00-\x1f\x7f-\x9f\u2028\u2029]*$"
 
 class ForecastRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    currency: Currency = DEFAULT_CURRENCY
     file: UploadFile
     starting_balance_minor: int
     # A later start would push the 14-day window past the last date Python can represent.
@@ -90,6 +93,7 @@ class EarlierPayment(BaseModel):
 
 class ForecastResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    currency: Currency
     transactions: list[Transaction]
     baseline: Projection
     proposal: Proposal | None
@@ -105,6 +109,7 @@ class AdviceRequest(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
+    currency: Currency = DEFAULT_CURRENCY
     baseline: Projection
     transactions: list[Transaction] = Field(min_length=1, max_length=MAX_TRANSACTIONS)
     # Larger delays would move a payment date past the end of the calendar.
@@ -148,6 +153,7 @@ DecisionKind = Literal["approved", "rejected"]
 
 class DecisionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    currency: Currency = DEFAULT_CURRENCY
     decision: DecisionKind
     baseline: Projection
 
@@ -175,6 +181,7 @@ class InsightRequest(BaseModel):
     """The baseline and transactions from the forecast response. Every figure is recalculated from them."""
 
     model_config = ConfigDict(extra="forbid")
+    currency: Currency = DEFAULT_CURRENCY
     baseline: Projection
     transactions: list[Transaction] = Field(min_length=1, max_length=MAX_TRANSACTIONS)
 
@@ -269,6 +276,7 @@ class AnomalyFinding(BaseModel):
 
 class AnomalyDetectRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    currency: Currency = DEFAULT_CURRENCY
     baseline: Projection
     transactions: list[Transaction] = Field(min_length=1)
 
@@ -293,6 +301,7 @@ class FinancingOption(BaseModel):
 
 class CompareOptionsRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    currency: Currency = DEFAULT_CURRENCY
     baseline: Projection
     transactions: list[Transaction] = Field(min_length=1)
     annual_rate_bps: NonNegativeInt = Field(default=1200, le=10000)

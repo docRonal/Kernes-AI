@@ -7,9 +7,11 @@ from fastapi import FastAPI, File
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from .api_docs import ROUTES
 from .advice import get_advice, predict_delays, send_reminder
 from .advisory_extras import compare_financing_options, detect_anomalies
 from .consultant import ask_cfo, credit_check
+from .currency import use_currency
 from .forecast import DEMO_FILE, get_decision, get_forecast
 from .insights import optimize_payments, stress_test
 from .models import (
@@ -55,7 +57,11 @@ def create_app(mode: str | None = None) -> FastAPI:
         raise ValueError("CFO_MODE must be demo or live.")
 
     _log_to_stderr()
-    app = FastAPI(title="Autonomous CFO", version="0.1.0")
+    app = FastAPI(
+        title="Autonomous CFO API",
+        version="0.2.0",
+        description="Liquidity agent: forecast, credit facility proposal, simulated decision and explanations from a model served on OpenShift AI.",
+    )
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIR / "assets"), name="assets")
 
     @app.get("/", include_in_schema=False)
@@ -66,60 +72,70 @@ def create_app(mode: str | None = None) -> FastAPI:
     def sample_csv() -> FileResponse:
         return FileResponse(DEMO_FILE, media_type="text/csv", filename="transactions.csv")
 
-    @app.get("/health")
+    @app.get("/health", description="Liveness of the app process. Model health is checked separately.")
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.post("/api/forecast", response_model=ForecastResponse)
+    @app.post("/api/forecast", response_model=ForecastResponse, **ROUTES["forecast"])
     async def forecast(request: Annotated[ForecastRequest, File()]) -> ForecastResponse | dict:
-        return await get_forecast(
-            mode=mode,
-            file=request.file,
-            starting_balance_minor=request.starting_balance_minor,
-            start_date=request.start_date,
-            move_transaction_id=request.move_transaction_id,
-            move_to_date=request.move_to_date,
-        )
+        with use_currency(request.currency):
+            return await get_forecast(
+                mode=mode,
+                file=request.file,
+                starting_balance_minor=request.starting_balance_minor,
+                start_date=request.start_date,
+                move_transaction_id=request.move_transaction_id,
+                move_to_date=request.move_to_date,
+            )
 
-    @app.post("/api/decision", response_model=DecisionResponse)
+    @app.post("/api/decision", response_model=DecisionResponse, **ROUTES["decision"])
     def decision(request: DecisionRequest) -> DecisionResponse:
-        return get_decision(request)
+        with use_currency(request.currency):
+            return get_decision(request)
 
-    @app.post("/api/advice", response_model=AdviceResponse)
+    @app.post("/api/advice", response_model=AdviceResponse, **ROUTES["advice"])
     def advice(request: AdviceRequest) -> AdviceResponse:
-        return get_advice(mode=mode, request=request)
+        with use_currency(request.currency):
+            return get_advice(mode=mode, request=request)
 
-    @app.post("/api/predict-delays", response_model=DelayPredictResponse)
+    @app.post("/api/predict-delays", response_model=DelayPredictResponse, **ROUTES["predict_delays"])
     def delay_prediction(request: AdviceRequest) -> DelayPredictResponse:
-        return predict_delays(mode=mode, request=request)
+        with use_currency(request.currency):
+            return predict_delays(mode=mode, request=request)
 
-    @app.post("/api/send-reminder", response_model=ReminderSendResponse)
+    @app.post("/api/send-reminder", response_model=ReminderSendResponse, **ROUTES["send_reminder"])
     def reminder(request: ReminderSendRequest) -> ReminderSendResponse:
         return send_reminder(request)
 
-    @app.post("/api/stress-test", response_model=StressTestResponse)
+    @app.post("/api/stress-test", response_model=StressTestResponse, **ROUTES["stress_test"])
     def stress(request: InsightRequest) -> StressTestResponse:
-        return stress_test(request)
+        with use_currency(request.currency):
+            return stress_test(request)
 
-    @app.post("/api/optimize-payments", response_model=PaymentOptimizationResponse)
+    @app.post("/api/optimize-payments", response_model=PaymentOptimizationResponse, **ROUTES["optimize_payments"])
     def optimize(request: InsightRequest) -> PaymentOptimizationResponse:
-        return optimize_payments(request)
+        with use_currency(request.currency):
+            return optimize_payments(request)
 
-    @app.post("/api/credit-check", response_model=CreditCheckResponse)
+    @app.post("/api/credit-check", response_model=CreditCheckResponse, **ROUTES["credit_check"])
     def credit(request: AdviceRequest) -> CreditCheckResponse:
-        return credit_check(mode=mode, request=request)
+        with use_currency(request.currency):
+            return credit_check(mode=mode, request=request)
 
-    @app.post("/api/ask-cfo", response_model=AskResponse)
+    @app.post("/api/ask-cfo", response_model=AskResponse, **ROUTES["ask_cfo"])
     def ask(request: AskRequest) -> AskResponse:
-        return ask_cfo(mode=mode, request=request)
+        with use_currency(request.currency):
+            return ask_cfo(mode=mode, request=request)
 
-    @app.post("/api/detect-anomalies", response_model=AnomalyDetectResponse)
+    @app.post("/api/detect-anomalies", response_model=AnomalyDetectResponse, **ROUTES["detect_anomalies"])
     def anomalies(request: AnomalyDetectRequest) -> AnomalyDetectResponse:
-        return detect_anomalies(mode=mode, request=request)
+        with use_currency(request.currency):
+            return detect_anomalies(mode=mode, request=request)
 
-    @app.post("/api/compare-options", response_model=CompareOptionsResponse)
+    @app.post("/api/compare-options", response_model=CompareOptionsResponse, **ROUTES["compare_options"])
     def compare_options(request: CompareOptionsRequest) -> CompareOptionsResponse:
-        return compare_financing_options(mode=mode, request=request)
+        with use_currency(request.currency):
+            return compare_financing_options(mode=mode, request=request)
 
     return app
 

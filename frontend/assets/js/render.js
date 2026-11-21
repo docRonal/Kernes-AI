@@ -1,5 +1,5 @@
 import { renderCashflowChart } from "../chart.js";
-import { printDate, printMoney, replayFade } from "./format.js?v=tc6";
+import { printDate, printMoney, replayFade } from "./format.js?v=tc7";
 import { groupTransactionsByDate } from "./proposal.js";
 
 export function renderKpis(state) {

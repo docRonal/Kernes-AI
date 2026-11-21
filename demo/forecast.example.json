@@ -1,4 +1,5 @@
 {
+  "currency": "EUR",
   "transactions": [
     {
       "id": "PAY-001",
