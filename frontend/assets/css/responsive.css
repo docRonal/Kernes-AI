@@ -1,7 +1,14 @@
 /* Tablet & Narrow Laptop (<= 860px) */
 @media (max-width: 860px) {
-  .story-grid {
+  .story-grid,
+  .credit-panel-grid,
+  .whatif-grid,
+  .optimize-list {
     grid-template-columns: 1fr;
+  }
+  .actions-top-row .tab-bar {
+    width: 100%;
+    min-width: 0;
   }
   .hero-stats {
     grid-template-columns: repeat(3, minmax(0, 1fr));

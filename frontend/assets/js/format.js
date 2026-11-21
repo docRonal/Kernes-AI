@@ -25,3 +25,10 @@ export function printDate(isoDate) {
 export function printMoney(minor, currency = "EUR") {
   return `${moneyFormatter.format(Number(minor) / 100)} ${currency}`;
 }
+
+export function replayFade(el) {
+  if (!el) return;
+  el.classList.remove("is-entering");
+  void el.offsetWidth;
+  el.classList.add("is-entering");
+}

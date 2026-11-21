@@ -1,5 +1,5 @@
 import { renderCashflowChart } from "../chart.js";
-import { printDate, printMoney } from "./format.js";
+import { printDate, printMoney, replayFade } from "./format.js?v=tc6";
 import { groupTransactionsByDate } from "./proposal.js";
 
 export function renderKpis(state) {
@@ -29,6 +29,7 @@ export function renderKpis(state) {
   const heroBadge = document.querySelector("#hero-badge");
   const heroTitle = document.querySelector("#hero-title");
   const heroSummary = document.querySelector("#hero-summary");
+  const prevTitle = heroTitle.textContent;
 
   const firstCard = document.querySelector("#kpi-first-card");
   const peakCard = document.querySelector("#kpi-peak-card");
@@ -91,6 +92,11 @@ export function renderKpis(state) {
     peakVal.className = "hero-stat-value";
     peakDate.textContent = `Lowest on ${printDate(lowestDay.date)}`;
   }
+
+  if (heroTitle.textContent !== prevTitle) {
+    replayFade(heroTitle);
+    replayFade(heroSummary);
+  }
 }
 
 export function renderLedgerAndChart(state) {
@@ -143,13 +149,14 @@ export function renderLedgerAndChart(state) {
       scenarioSummaryBox.textContent = summaryText;
     }
     scenarioSummaryBox.hidden = false;
+    replayFade(scenarioSummaryBox);
   } else {
     scenarioSummaryBox.hidden = true;
   }
 }
 
 export function renderProposalPanel(state) {
-  const { forecast, parsedCsv, proposal, simulationDecision, simulationOutcome } = state;
+  const { forecast, proposal, simulationDecision, simulationOutcome } = state;
   const currency = forecast.currency ?? "EUR";
   const money = (amount, unit = currency) => printMoney(amount, unit);
   const noShortfallCard = document.querySelector("#no-shortfall-card");
@@ -157,11 +164,22 @@ export function renderProposalPanel(state) {
   const proposalCard = document.querySelector("#proposal-card");
   const creditNoneNote = document.querySelector("#credit-none-note");
   const draftCard = document.querySelector("#draft-card");
+  const whatifGrid = document.querySelector("#whatif-grid");
+
+  const days = forecast.baseline?.days || [];
+  const startDate = days[0]?.date;
+  const endDate = days[days.length - 1]?.date;
+  const hasIncomingInWindow = (forecast.transactions || []).some(
+    ({ amount_minor, date }) =>
+      amount_minor > 0 && (!startDate || date >= startDate) && (!endDate || date <= endDate),
+  );
+  const showDraft = Boolean(proposal || hasIncomingInWindow);
 
   if (!proposal) {
     assistantCard.hidden = true;
     proposalCard.hidden = true;
-    draftCard.hidden = true;
+    draftCard.hidden = !showDraft;
+    whatifGrid?.classList.toggle("is-single", !showDraft);
     noShortfallCard.hidden = false;
     creditNoneNote.hidden = false;
     return;
@@ -171,7 +189,8 @@ export function renderProposalPanel(state) {
   creditNoneNote.hidden = true;
   assistantCard.hidden = false;
   proposalCard.hidden = false;
-  draftCard.hidden = Boolean(parsedCsv);
+  draftCard.hidden = !showDraft;
+  whatifGrid?.classList.toggle("is-single", !showDraft);
 
   document.querySelector("#proposal-limit-value").textContent = money(proposal.recommendedLimitMinor);
   document.querySelector("#fact-peak-shortfall").textContent =
@@ -248,12 +267,14 @@ export function renderProposalPanel(state) {
       : Math.max(0, proposal.peakDeficit.shortfall_minor - proposal.recommendedLimitMinor);
     outcomeGapValue.textContent = money(peakUncovered);
     outcomeBox.hidden = false;
+    replayFade(outcomeBox);
   } else if (simulationDecision === "rejected") {
     outcomeBox.className = "outcome-box rejected";
     outcomeTitle.textContent = "Preview Rejected — Gap Remains";
     outcomeDetails.textContent = `Without a credit line, you'll still be short on ${printDate(proposal.peakDeficit.date)}. You can test moving a payment earlier in Tab 2.`;
     outcomeGapValue.textContent = money(simulationOutcome?.largest_uncovered?.shortfall_minor ?? proposal.peakDeficit.shortfall_minor);
     outcomeBox.hidden = false;
+    replayFade(outcomeBox);
   } else {
     outcomeBox.hidden = true;
   }
@@ -289,4 +310,47 @@ export function populateIncomingPayments(state, scenarioForm) {
   } else if (startDate) {
     scenarioForm.elements.move_to_date.value = startDate;
   }
+}
+
+export function buildReminderTemplate(state, scenarioForm) {
+  const currency = state.forecast?.currency ?? "EUR";
+  const money = (amount) => printMoney(amount, currency);
+  const days = state.forecast?.baseline?.days || [];
+  const startDate = days[0]?.date;
+  const endDate = days[days.length - 1]?.date;
+  const selectedId = scenarioForm?.elements?.move_transaction_id?.value;
+
+  const incoming = (state.forecast?.transactions || []).filter(
+    ({ amount_minor, date }) =>
+      amount_minor > 0 && (!startDate || date >= startDate) && (!endDate || date <= endDate),
+  );
+  const chosenTx =
+    incoming.find((tx) => tx.id === selectedId) ||
+    incoming.sort((a, b) => b.amount_minor - a.amount_minor)[0] ||
+    null;
+
+  const requestedDateIso =
+    scenarioForm?.elements?.move_to_date?.value ||
+    state.proposal?.firstDeficit?.date ||
+    chosenTx?.date;
+  const requestedDate = requestedDateIso ? printDate(requestedDateIso) : "earlier this week";
+
+  if (!chosenTx) {
+    return {
+      subject: "Payment schedule request",
+      body: `Hello,\n\nCould we arrange an earlier settlement on ${requestedDate} to support our upcoming cash schedule?\n\nThank you very much,\nKERNES CFO`,
+    };
+  }
+
+  const amountText = money(chosenTx.amount_minor);
+  const dueDate = printDate(chosenTx.date);
+  const isSameDate = requestedDateIso === chosenTx.date;
+  const askLine = isSameDate
+    ? `Could we confirm payment of ${chosenTx.label} (${amountText}) for ${dueDate}?`
+    : `Would it be possible to settle ${chosenTx.label} (${amountText}, currently scheduled for ${dueDate}) earlier on ${requestedDate}?`;
+
+  return {
+    subject: `Early payment request: ${chosenTx.label} (${amountText})`,
+    body: `Hello,\n\n${askLine} Settling on that date helps keep our upcoming supplier and payroll schedule smooth.\n\nPlease let us know if that works on your end.\n\nBest regards,\nKERNES CFO`,
+  };
 }

@@ -1,4 +1,4 @@
-import { printDate, printMoney } from "./format.js";
+import { printDate, printMoney, replayFade } from "./format.js?v=tc6";
 
 const ANOMALY_LABELS = {
   duplicate_payment: "Possible duplicate",
@@ -29,11 +29,13 @@ function createEl(tag, className, text = "") {
 }
 
 export function resetInsightsUi() {
+  const grid = document.querySelector("#health-stress-grid");
+  grid?.classList.remove("is-expanded");
+
   const sections = [
     "#anomalies-card",
     "#compare-card",
     "#health-stress-grid",
-    "#optimize-delay-grid",
     "#optimize-card",
     "#delay-predict-card",
   ];
@@ -46,6 +48,8 @@ export function resetInsightsUi() {
     "#ask-error",
     "#delay-result-box",
     "#delay-error",
+    "#credit-factors-toggle",
+    "#optimize-footer",
   ];
   for (const sel of hiddenIds) {
     const el = document.querySelector(sel);
@@ -148,6 +152,7 @@ export function renderCreditCheck(data, currency = "EUR") {
   const scoreBar = document.querySelector("#credit-score-fill");
   const scoreNote = document.querySelector("#credit-score-note");
   const factorsList = document.querySelector("#credit-factors-list");
+  const toggleBtn = document.querySelector("#credit-factors-toggle");
 
   const meta = RISK_META[data.risk] || RISK_META.medium;
   badge.textContent = meta.label;
@@ -161,19 +166,38 @@ export function renderCreditCheck(data, currency = "EUR") {
     data.explanation ||
     `Calculated for a ${printMoney(data.limit_minor, currency)} credit line based on repayment, coverage, gap depth, and client concentration.`;
 
-  factorsList.replaceChildren(
-    ...(data.factors || []).map((f) => {
-      const li = createEl("li", "factor-row");
-      const left = createEl("div", "factor-left");
-      left.append(
-        createEl("span", "factor-name", FACTOR_LABELS[f.name] || f.name),
-        createEl("span", "factor-reason", f.reason),
-      );
-      const pts = createEl("strong", "factor-pts", `+${f.points}`);
-      li.append(left, pts);
-      return li;
-    }),
-  );
+  const factors = data.factors || [];
+  let expanded = false;
+
+  const renderFactorRows = () => {
+    const visibleFactors = expanded ? factors : factors.slice(0, 3);
+    factorsList.replaceChildren(
+      ...visibleFactors.map((f) => {
+        const li = createEl("li", "factor-row");
+        const left = createEl("div", "factor-left");
+        left.append(
+          createEl("span", "factor-name", FACTOR_LABELS[f.name] || f.name),
+          createEl("span", "factor-reason", f.reason),
+        );
+        const pts = createEl("strong", "factor-pts", `+${f.points}`);
+        li.append(left, pts);
+        return li;
+      }),
+    );
+    grid.classList.toggle("is-expanded", expanded);
+    if (factors.length > 3) {
+      toggleBtn.textContent = expanded ? "Show fewer" : `Show all ${factors.length} factors`;
+      toggleBtn.hidden = false;
+    } else {
+      toggleBtn.hidden = true;
+    }
+  };
+
+  toggleBtn.onclick = () => {
+    expanded = !expanded;
+    renderFactorRows();
+  };
+  renderFactorRows();
 
   grid.hidden = false;
 }
@@ -185,6 +209,7 @@ export function renderHealthyCreditScore() {
   const scoreBar = document.querySelector("#credit-score-fill");
   const scoreNote = document.querySelector("#credit-score-note");
   const factorsList = document.querySelector("#credit-factors-list");
+  const toggleBtn = document.querySelector("#credit-factors-toggle");
 
   badge.textContent = "Low risk";
   badge.className = "pill pill-success";
@@ -192,7 +217,29 @@ export function renderHealthyCreditScore() {
   scoreBar.style.width = "100%";
   scoreBar.className = "score-bar-fill score-bar-low";
   scoreNote.textContent = "Your balance stays positive across the entire 14-day window — no credit facility is needed.";
-  factorsList.replaceChildren();
+
+  const healthyRows = [
+    { name: "Cash cushion", reason: "Balance stays positive every day", pts: "+40" },
+    { name: "Credit needed", reason: "No temporary facility required", pts: "+35" },
+    { name: "Shortfall risk", reason: "Zero deficit days projected", pts: "+25" },
+  ];
+  factorsList.replaceChildren(
+    ...healthyRows.map((row) => {
+      const li = createEl("li", "factor-row");
+      const left = createEl("div", "factor-left");
+      left.append(
+        createEl("span", "factor-name", row.name),
+        createEl("span", "factor-reason", row.reason),
+      );
+      const pts = createEl("strong", "factor-pts", row.pts);
+      li.append(left, pts);
+      return li;
+    }),
+  );
+
+  grid.classList.remove("is-expanded");
+  toggleBtn.hidden = true;
+  toggleBtn.onclick = null;
   grid.hidden = false;
 }
 
@@ -259,6 +306,7 @@ export function renderAskAnswer(data, currency = "EUR") {
   meta.textContent = parts.join(" · ");
   meta.hidden = parts.length === 0;
   box.hidden = false;
+  replayFade(box);
 }
 
 export function renderAskError(message) {
@@ -267,27 +315,38 @@ export function renderAskError(message) {
   box.hidden = true;
   errorEl.textContent = message;
   errorEl.hidden = false;
+  replayFade(errorEl);
 }
 
 export function renderOptimizePayments(data, transactions, currency = "EUR", onPreviewCollect = null) {
-  const grid = document.querySelector("#optimize-delay-grid");
   const card = document.querySelector("#optimize-card");
   const list = document.querySelector("#optimize-list");
+  const footer = document.querySelector("#optimize-footer");
+  const toggleBtn = document.querySelector("#optimize-toggle");
 
   const labelById = new Map((transactions || []).map((tx) => [tx.id, tx.label]));
   const actions = data?.actions || [];
+  let expanded = false;
 
-  if (actions.length === 0) {
+  const renderActions = () => {
+    if (actions.length === 0) {
+      list.classList.add("is-single");
+      list.replaceChildren(
+        createEl(
+          "div",
+          "bento-tile insight-empty",
+          "No payment timing moves improve the credit limit in this window.",
+        ),
+      );
+      footer.hidden = true;
+      toggleBtn.onclick = null;
+      return;
+    }
+
+    const visibleActions = expanded ? actions : actions.slice(0, 4);
+    list.classList.toggle("is-single", visibleActions.length === 1);
     list.replaceChildren(
-      createEl(
-        "div",
-        "bento-tile insight-empty",
-        "No payment timing moves improve the credit limit in this window.",
-      ),
-    );
-  } else {
-    list.replaceChildren(
-      ...actions.map((action) => {
+      ...visibleActions.map((action) => {
         const tile = createEl("article", "bento-tile optimize-tile");
         const top = createEl("div", "optimize-top");
         const isCollect = action.kind === "collect_earlier";
@@ -325,14 +384,24 @@ export function renderOptimizePayments(data, transactions, currency = "EUR", onP
         return tile;
       }),
     );
-  }
 
+    if (actions.length > 4) {
+      toggleBtn.textContent = expanded ? "Show fewer" : `Show all ${actions.length} moves`;
+      footer.hidden = false;
+    } else {
+      footer.hidden = true;
+    }
+  };
+
+  toggleBtn.onclick = () => {
+    expanded = !expanded;
+    renderActions();
+  };
+  renderActions();
   card.hidden = false;
-  grid.hidden = false;
 }
 
 export function populateDelayCandidates(forecast, currency = "EUR") {
-  const grid = document.querySelector("#optimize-delay-grid");
   const card = document.querySelector("#delay-predict-card");
   const form = document.querySelector("#delay-form");
   const select = document.querySelector("#delay-tx-select");
@@ -374,7 +443,6 @@ export function populateDelayCandidates(forecast, currency = "EUR") {
   }
 
   card.hidden = false;
-  grid.hidden = false;
 }
 
 export function renderDelayResult(data) {
@@ -404,6 +472,7 @@ export function renderDelayResult(data) {
   metaEl.hidden = metaParts.length === 0;
 
   resultBox.hidden = false;
+  replayFade(resultBox);
 }
 
 export function renderDelayError(message) {
@@ -412,4 +481,5 @@ export function renderDelayError(message) {
   resultBox.hidden = true;
   errorEl.textContent = message;
   errorEl.hidden = false;
+  replayFade(errorEl);
 }
