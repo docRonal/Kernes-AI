@@ -16,3 +16,16 @@ Own `tests/test_smoke.py`, the synthetic demo cases in `demo/`, and `notebooks/`
 ## Starter prompt
 
 > Read AGENTS.md, agents/qa/README.md, and contracts/openapi.json. Work on feat/qa-demo. Prepare the synthetic cases and verify the full workflow through both simulation decisions. Report what passed locally, what passed on the assigned OpenShift environment, and any blockers.
+
+## Latest QA Suite & Handoff Notes
+
+- **Multi-core QA Runner (`scripts/qa_runner.py`)**:
+  - `uv run --locked python scripts/qa_runner.py --local` — shards local `pytest` suites across CPU threads (~13–15 s).
+  - `uv run --locked python scripts/qa_runner.py --remote` — runs `test_remote_deployment_workflow` across all 12 endpoints and 5 synthetic cases on OpenShift.
+  - `uv run --locked python scripts/qa_runner.py --browser` — runs Playwright browser E2E (`tests/test_e2e_browser.py`, `CFO_RUN_BROWSER_E2E=1`).
+- **Expanded QA Coverage (`tests/test_advisory_extras.py`, `tests/test_smoke.py`)**:
+  - Added anomaly-detector, `none_needed` compare-options, factoring fee scaling, and 14-day window validation tests built on `demo/stress_cases/amalfi_duplicate_anomaly_eur.csv` and `demo/no_shortfall_case.csv`.
+  - Fixed `_assert_explanation_grounded` in `tests/test_smoke.py` to use numeric-boundary matching (`_matches_amount_token`) instead of plain substring matching (`'200'` no longer matches `'1,200.00'`).
+- **Frontend Race-Condition Finding (for Ivan — `frontend/assets/app.js`)**:
+  - In `showSetupScreen()` (`frontend/assets/app.js`), when the user clicks `← Change file` (`#change-file-btn`) while `loadInsights()` is still awaiting background `/api/*` responses, `showSetupScreen()` sets `state.forecast = null` and increments `state.adviceRequestId += 1`, but does **not** increment `state.insightsRequestId += 1`. When `Promise.allSettled` in `loadInsights()` resolves afterwards, `reqId === state.insightsRequestId` stays true and `renderOptimizePayments(..., state.forecast.transactions, ...)` throws `TypeError: Cannot read properties of null (reading 'transactions')`.
+  - **Fix**: Add `state.insightsRequestId += 1;` inside `showSetupScreen()` (and guard `if (!state.forecast) return;` after `await Promise.allSettled(...)` in `loadInsights()`).

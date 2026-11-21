@@ -331,20 +331,44 @@ def _multipart_forecast(
     )
 
 
-def _assert_explanation_grounded(explanation: str, expectations: dict) -> None:
+def _matches_amount_token(text_lower: str, token: str) -> bool:
+    escaped = re.escape(token.lower().strip())
+    # Prevent '200' from matching inside '1,200.00', '1200', or '2026'
+    return re.search(rf"(?<![\d,.]){escaped}(?!\d)", text_lower) is not None
+
+
+def _assert_explanation_grounded(explanation: str, expectations: dict, meta: str = "") -> None:
     lower = explanation.lower()
+    suffix = f" [{meta}]" if meta else ""
     for group in expectations["required_amount_groups"]:
-        assert any(token.lower() in lower for token in group), (
-            f"Explanation missing expected amount from {group}: {explanation!r}"
+        assert any(_matches_amount_token(lower, token) for token in group), (
+            f"Explanation missing expected amount from {group}{suffix}: {explanation!r}"
         )
     for group in expectations["required_date_groups"]:
         assert any(token.lower() in lower for token in group), (
-            f"Explanation missing expected date from {group}: {explanation!r}"
+            f"Explanation missing expected date from {group}{suffix}: {explanation!r}"
         )
     assert any(
         re.search(rf"\b{re.escape(token.lower())}\b", lower) or token.lower() in lower
         for token in expectations["any_transaction_tokens"]
-    ), f"Explanation missing expected transaction token: {explanation!r}"
+    ), f"Explanation missing expected transaction token{suffix}: {explanation!r}"
+
+
+def test_explanation_grounding_rejects_substring_amounts():
+    expectations = {
+        "required_amount_groups": [["200"], ["700"]],
+        "required_date_groups": [["november 24"], ["november 26"]],
+        "any_transaction_tokens": ["peak-001"],
+    }
+    with pytest.raises(AssertionError, match="missing expected amount"):
+        _assert_explanation_grounded(
+            "Balance drops on November 24 by EUR 1,200.00 (PEAK-001) and reaches EUR 700.00 on November 26.",
+            expectations,
+        )
+    _assert_explanation_grounded(
+        "Balance drops on November 24 by EUR 200.00 (PEAK-001) and reaches EUR 700.00 on November 26.",
+        expectations,
+    )
 
 
 def _assert_email_draft_valid(email_draft: str | None, expectations: dict | None) -> None:
@@ -461,7 +485,8 @@ def test_remote_deployment_workflow():
                 timeout=150,
             )
             if adv_status == 200:
-                _assert_explanation_grounded(adv_body["explanation"], case["explanation_expectations"])
+                meta = f"case={case['id']} model={adv_body.get('model')} latency_ms={adv_body.get('latency_ms')}"
+                _assert_explanation_grounded(adv_body["explanation"], case["explanation_expectations"], meta=meta)
                 _assert_email_draft_valid(adv_body.get("email_draft"), case.get("email_draft_expectations"))
                 if returns_model:
                     assert isinstance(adv_body.get("model"), str) and adv_body["model"].strip()

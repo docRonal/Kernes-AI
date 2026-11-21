@@ -131,3 +131,78 @@ def test_compare_financing_options_ranks_cheapest_and_live(live_extras):
         assert r_live.json()["model"] == "llama-32-3b-instruct"
     finally:
         srv.shutdown()
+
+
+def _forecast_payload_from_csv(csv_rel_path: str, opening_minor: int, start_date: str) -> dict:
+    client = TestClient(create_app("live"))
+    csv_path = DEMO / csv_rel_path
+    resp = client.post(
+        "/api/forecast",
+        data={"starting_balance_minor": str(opening_minor), "start_date": start_date},
+        files={"file": (csv_path.name, csv_path.read_bytes(), "text/csv")},
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json()
+
+
+def test_stress_duplicate_anomaly_fixture_triggers_detectors():
+    fc = _forecast_payload_from_csv("stress_cases/amalfi_duplicate_anomaly_eur.csv", 500_000, "2025-06-22")
+    demo_client = TestClient(create_app("demo"))
+    resp = demo_client.post(
+        "/api/detect-anomalies",
+        json={"baseline": fc["baseline"], "transactions": fc["transactions"], "currency": fc["currency"]},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["risk_flag"] == "review_recommended"
+    kinds = {f["kind"] for f in body["findings"]}
+    assert {"duplicate_payment", "outlier_expense"} <= kinds
+
+
+def test_detect_anomalies_clean_on_no_shortfall_fixture():
+    fc = _forecast_payload_from_csv("no_shortfall_case.csv", 1_500_000, "2026-11-23")
+    demo_client = TestClient(create_app("demo"))
+    resp = demo_client.post(
+        "/api/detect-anomalies",
+        json={"baseline": fc["baseline"], "transactions": fc["transactions"], "currency": fc["currency"]},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["risk_flag"] == "clean"
+    assert body["findings"] == []
+    assert "No duplicate payments" in body["summary"]
+
+
+def test_compare_options_returns_none_needed_without_shortfall(monkeypatch):
+    monkeypatch.delenv("CFO_MODEL_URL", raising=False)
+    fc = _forecast_payload_from_csv("no_shortfall_case.csv", 1_500_000, "2026-11-23")
+    payload = {"baseline": fc["baseline"], "transactions": fc["transactions"], "currency": fc["currency"]}
+
+    for mode, expected_model in [("demo", "demo-deterministic"), ("live", "deterministic")]:
+        client = TestClient(create_app(mode))
+        resp = client.post("/api/compare-options", json=payload)
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["options"] == []
+        assert data["recommended_option"] == "none_needed"
+        assert data["model"] == expected_model
+
+
+def test_advisory_extras_factoring_fee_and_invalid_window_validation():
+    demo_client = TestClient(create_app("demo"))
+    base = _payload()
+
+    cmp_low = demo_client.post("/api/compare-options", json={**base, "factoring_fee_bps": 100}).json()
+    cmp_high = demo_client.post("/api/compare-options", json={**base, "factoring_fee_bps": 300}).json()
+    fact_low = next(o for o in cmp_low["options"] if o["option_kind"] == "invoice_factoring")
+    fact_high = next(o for o in cmp_high["options"] if o["option_kind"] == "invoice_factoring")
+    assert fact_high["estimated_cost_minor"] == 3 * fact_low["estimated_cost_minor"]
+
+    broken_days = list(base["baseline"]["days"])
+    broken_days[-1] = {**broken_days[-1], "date": "2026-12-20"}
+    broken_payload = {
+        "baseline": {**base["baseline"], "days": broken_days},
+        "transactions": base["transactions"],
+    }
+    assert demo_client.post("/api/detect-anomalies", json=broken_payload).status_code == 422
+    assert demo_client.post("/api/compare-options", json=broken_payload).status_code == 422
