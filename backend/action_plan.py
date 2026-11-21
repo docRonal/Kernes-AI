@@ -28,7 +28,7 @@ from .advice import (
 )
 from .advisory_extras import _validate_window, compare_financing_options, detect_anomalies
 from .forecast import classify_transaction, propose
-from .insights import optimize_payments, stress_test
+from .insights import evaluate_stress, optimize_payments
 from .models import (
     ActionPlanRequest,
     ActionPlanResponse,
@@ -152,7 +152,7 @@ def build_action_plan(*, mode: str, request: ActionPlanRequest) -> ActionPlanRes
         ),
     )
     opt = optimize_payments(insight_req)
-    stress = stress_test(insight_req)
+    stress, stressed_low = evaluate_stress(insight_req)
     comparison = compare_financing_options(
         mode="demo",
         request=CompareOptionsRequest(
@@ -326,16 +326,16 @@ def build_action_plan(*, mode: str, request: ActionPlanRequest) -> ActionPlanRes
         plan_mode = "growth"
         min_day = min(request.baseline.days, key=lambda d: d.balance_minor)
         min_bal = min_day.balance_minor
-        safety_buffer = stress.recommended_limit_minor
-        safe_to_invest = max(0, min_bal - safety_buffer)
+        growth_headroom = max(0, stressed_low)
+        safety_buffer = min_bal - growth_headroom
 
         steps_raw.append(
             ActionPlanStep(
                 step_number=1,
-                title="Keep a stress-tested cash buffer",
+                title="Keep a cash buffer for the tested stresses",
                 detail=(
-                    f"Lowest projected balance is {pln(min_bal)} on {day_name(min_day.date)}, with a "
-                    f"stress-test buffer recommendation of {pln(safety_buffer)}."
+                    f"The baseline low is {pln(min_bal)} on {day_name(min_day.date)}. "
+                    f"The lowest balance in the tested scenarios is {pln(stressed_low)}."
                 ),
                 autonomy_level="analyzed",
                 action_kind="growth_buffer",
@@ -345,23 +345,24 @@ def build_action_plan(*, mode: str, request: ActionPlanRequest) -> ActionPlanRes
         steps_raw.append(
             ActionPlanStep(
                 step_number=1,
-                title="Safe budget for equipment or growth",
+                title="Projected budget under the tested scenarios",
                 detail=(
-                    f"Up to {pln(safe_to_invest)} stays safely available above the stress-tested buffer "
-                    "for equipment purchases or savings."
+                    f"The tested scenarios leave {pln(growth_headroom)} above zero for equipment or savings."
+                    if stressed_low > 0
+                    else "The tested scenarios leave no room for extra spending."
                 ),
                 autonomy_level="recommended",
                 action_kind="growth_buffer",
-                impact_minor=safe_to_invest,
+                impact_minor=growth_headroom,
             )
         )
         if len(steps_raw) > 4:
             steps_raw = steps_raw[:4]
 
-        headline = f"Healthy cash ahead — up to {pln(safe_to_invest)} safe to invest"
+        headline = f"Projected cash headroom under stress: {pln(growth_headroom)}"
         summary = (
-            f"Your cash stays at or above {pln(min_bal)} across the 14-day window with no shortfall. "
-            f"After keeping a {pln(safety_buffer)} stress buffer, up to {pln(safe_to_invest)} is safe for growth."
+            f"Your lowest projected balance is {pln(min_bal)}. Delayed income and higher expenses "
+            f"bring the lowest tested balance to {pln(stressed_low)}."
         )
 
     steps = [step.model_copy(update={"step_number": idx}) for idx, step in enumerate(steps_raw, start=1)]
@@ -394,7 +395,7 @@ def build_action_plan(*, mode: str, request: ActionPlanRequest) -> ActionPlanRes
                 proposal.deepest_shortfall.shortfall_minor,
             }
             if proposal is not None
-            else {min_bal, max(0, min_bal), safe_to_invest}
+            else {min_bal, abs(stressed_low), growth_headroom}
         )
     )
 

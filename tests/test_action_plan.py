@@ -255,7 +255,8 @@ def test_action_plan_growth_mode_and_pln_currency():
     assert growth["mode"] == "growth"
     assert all(s["email_draft"] is None for s in growth["steps"])
     budget_step = next(s for s in growth["steps"] if "budget" in s["title"].lower() or "growth" in s["title"].lower())
-    assert budget_step["impact_minor"] == 900_000
+    # With late inflows and higher expenses, the projected minimum is EUR 1,800.
+    assert budget_step["impact_minor"] == 180_000
 
     pln_fc = _forecast_json(DEMO / "stress_cases" / "amalfi_poland_branch_pln.csv", "1000000", "2025-06-22")
     pln_resp = demo_client.post(

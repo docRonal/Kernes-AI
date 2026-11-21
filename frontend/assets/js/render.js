@@ -1,6 +1,6 @@
-import { renderCashflowChart } from "../chart.js?v=tc10";
+import { renderCashflowChart } from "../chart.js?v=tc22";
 import { printDate, printMoney, replayFade } from "./format.js?v=tc10";
-import { buildForwardForecast, buildStressCurve } from "./predictions.js?v=tc10";
+import { buildForwardForecast, buildStressCurve } from "./predictions.js?v=tc20";
 import { groupTransactionsByDate } from "./proposal.js?v=tc10";
 
 export function renderKpis(state) {
@@ -21,10 +21,13 @@ export function renderKpis(state) {
 
   document.querySelector("#kpi-opening").textContent =
     openingBalanceMinor !== null ? money(openingBalanceMinor) : "—";
-  document.querySelector("#kpi-horizon").textContent =
+  const dateRange =
     firstDay && lastDay
       ? `${printDate(firstDay)} – ${printDate(lastDay)}`
       : `${baseline.days.length} days`;
+  document.querySelector("#kpi-horizon").textContent = state.balanceSourceLabel
+    ? `${dateRange} · ${state.balanceSourceLabel}`
+    : dateRange;
 
   const heroCard = document.querySelector("#hero-card");
   const heroBadge = document.querySelector("#hero-badge");
@@ -120,10 +123,10 @@ export function renderLedgerAndChart(state) {
     : "Your balance stays at or above zero every day. Hover or tap any day for details.";
 
   const forecastDays = state.showForecast
-    ? buildForwardForecast(baseline.days, forecast.transactions, 7).days
+    ? buildForwardForecast(baseline.days, forecast.transactions, 14).days
     : null;
   const stressDays = state.showStress
-    ? buildStressCurve(baseline.days, forecast.transactions)
+    ? buildStressCurve(baseline.days, forecast.transactions, { extraDays: 14 })
     : null;
   const whatIfDays = state.whatIfOverlay?.days ?? null;
   const whatIfLabel = state.whatIfOverlay?.label ?? "What-if";
@@ -334,12 +337,17 @@ export function populateIncomingPayments(state, scenarioForm) {
   document.querySelector("#no-incoming-msg").hidden = incoming.length > 0;
 
   const suggestedDate = state.forecast.earlier_payments?.[0]?.pay_by;
-  if (suggestedDate) {
-    scenarioForm.elements.move_to_date.value = suggestedDate;
-  } else if (state.proposal?.firstDeficit?.date) {
-    scenarioForm.elements.move_to_date.value = state.proposal.firstDeficit.date;
-  } else if (startDate) {
-    scenarioForm.elements.move_to_date.value = startDate;
+  const moveDateInput = scenarioForm.elements.move_to_date;
+  if (moveDateInput) {
+    moveDateInput.min = startDate || "";
+    moveDateInput.max = endDate || "";
+    if (suggestedDate) {
+      moveDateInput.value = suggestedDate;
+    } else if (state.proposal?.firstDeficit?.date) {
+      moveDateInput.value = state.proposal.firstDeficit.date;
+    } else if (startDate) {
+      moveDateInput.value = startDate;
+    }
   }
 }
 

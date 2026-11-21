@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/styles.css?v=tc13">
-  <script type="module" src="/assets/app.js?v=amalfi26"></script>
+  <link rel="stylesheet" href="/assets/styles.css?v=tc22">
+  <script type="module" src="/assets/app.js?v=amalfi-chat"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -27,30 +27,72 @@
         </div>
         <div class="topbar-meta">
           <button type="button" class="btn-topbar" id="change-file-btn" hidden>← Change file</button>
-          <span class="pill pill-health" id="health-pill" title="Server connection">Connecting…</span>
           <span class="pill pill-neutral" id="account-pill">Auto currency</span>
-          <span class="pill pill-status" id="agent-status-pill">Assistant ready</span>
         </div>
       </nav>
     </header>
 
     <main class="container">
-      <!-- SCREEN 1: Centered Editorial Upload / Start Screen -->
+      <!-- SCREEN 1: Quick Context Questions + CSV Upload Start Screen -->
       <section id="setup-screen" class="setup-screen" aria-labelledby="setup-heading">
         <div class="setup-hero">
           <h2 id="setup-heading">Will your business have enough cash ahead?</h2>
           <p class="setup-lead">
-            <strong>Use the Amalfi sample or upload your own bank statement CSV.</strong>
-            We spot days when cash runs low, auto-detect the account currency, explain why in plain English, and let you test safe options before anything is sent or applied for.
+            <strong>Tell us briefly what you do, then use the Amalfi sample or upload your bank CSV.</strong>
+            We show the clear answer first and tuck extra financial analysis underneath until you want it.
           </p>
         </div>
 
         <div class="bento-frame setup-frame">
           <form id="forecast-form" class="setup-form" novalidate>
+            <div class="bento-tile setup-questions-tile">
+              <div class="question-group">
+                <div class="question-label-row">
+                  <label for="business-type-input">What kind of business do you run?</label>
+                  <span class="question-hint">Optional — tap a chip or type</span>
+                </div>
+                <input
+                  id="business-type-input"
+                  name="business_type"
+                  type="text"
+                  value=""
+                  placeholder="e.g. Pizzeria, local retail shop, studio"
+                  maxlength="120"
+                  autocomplete="off"
+                >
+                <div class="prompt-chips" role="group" aria-label="Business type suggestions">
+                  <button type="button" class="prompt-chip" data-question-target="business" data-value="Pizzeria / Restaurant">Pizzeria / Restaurant</button>
+                  <button type="button" class="prompt-chip" data-question-target="business" data-value="Local retail shop">Local retail shop</button>
+                  <button type="button" class="prompt-chip" data-question-target="business" data-value="Freelance / Agency">Freelance / Agency</button>
+                </div>
+              </div>
+
+              <div class="question-group">
+                <div class="question-label-row">
+                  <label for="business-goal-input">What&apos;s your main goal right now?</label>
+                  <span class="question-hint">Optional — shapes your step-by-step plan</span>
+                </div>
+                <input
+                  id="business-goal-input"
+                  name="business_goal"
+                  type="text"
+                  value=""
+                  placeholder="e.g. Avoid running out of cash, save for equipment"
+                  maxlength="240"
+                  autocomplete="off"
+                >
+                <div class="prompt-chips" role="group" aria-label="Main goal suggestions">
+                  <button type="button" class="prompt-chip" data-question-target="goal" data-value="Avoid running out of cash">Avoid running out of cash</button>
+                  <button type="button" class="prompt-chip" data-question-target="goal" data-value="Save to buy equipment / grow">Save to buy equipment / grow</button>
+                  <button type="button" class="prompt-chip" data-question-target="goal" data-value="Spot unexpected costs">Spot unexpected costs</button>
+                </div>
+              </div>
+            </div>
+
             <div class="bento-tile">
               <div class="field-label-row">
                 <label for="csv-file">Your bank export (CSV file)</label>
-                <a class="btn-link" id="download-sample-link" href="/demo/amalfi-history.csv" download="pizzeria-amalfi-bank-statement-2025.csv">Download sample CSV</a>
+                <a class="btn-link" id="download-sample-link" href="/demo/amalfi-history.csv" download="pizzeria-amalfi-bank-statement-2025-v6.csv">Download sample CSV</a>
               </div>
               <div class="file-dropzone" id="file-dropzone">
                 <input id="csv-file" name="file" type="file" accept=".csv,text/csv">
@@ -67,25 +109,6 @@
                   </div>
                   <span class="file-action">Browse</span>
                 </div>
-              </div>
-            </div>
-
-            <div class="setup-fields-row">
-              <div class="bento-tile field">
-                <label for="opening-balance">Opening balance</label>
-                <input id="opening-balance" name="opening_balance" inputmode="decimal" value="33266.35" required>
-              </div>
-
-              <div class="bento-tile field">
-                <label for="start-date">Forecast start date</label>
-                <input id="start-date" name="start_date" type="date" value="2026-01-01" required>
-              </div>
-
-              <div class="bento-tile field">
-                <label for="horizon-select">How far ahead to check</label>
-                <select id="horizon-select" name="horizon">
-                  <option value="14" selected>Next 14 days</option>
-                </select>
               </div>
             </div>
 
@@ -127,9 +150,26 @@
           </div>
           <div class="hero-stats">
             <div class="hero-stat">
-              <span class="hero-stat-label">Opening balance</span>
+              <div class="hero-stat-label-row">
+                <span class="hero-stat-label">Opening balance</span>
+                <button type="button" class="btn-link balance-edit-trigger" id="edit-balance-btn">Edit</button>
+              </div>
               <strong class="hero-stat-value" id="kpi-opening">—</strong>
               <span class="hero-stat-sub" id="kpi-horizon">14 days</span>
+              <form id="inline-balance-form" class="inline-balance-form" hidden novalidate>
+                <input
+                  id="inline-balance-input"
+                  name="opening_balance"
+                  inputmode="decimal"
+                  placeholder="5000.00"
+                  aria-label="Opening cash balance"
+                  required
+                >
+                <div class="inline-balance-actions">
+                  <button type="submit" class="btn btn-primary btn-xs" id="apply-balance-btn">Update</button>
+                  <button type="button" class="btn btn-stone btn-xs" id="cancel-balance-btn">Cancel</button>
+                </div>
+              </form>
             </div>
             <div class="hero-stat" id="kpi-first-card">
               <span class="hero-stat-label">First day money runs short</span>
@@ -157,18 +197,15 @@
             </div>
             <div class="chart-controls">
               <div class="chart-pills-row">
-                <div class="horizon-pills" role="group" aria-label="Days to analyze">
-                  <button type="button" class="horizon-pill is-active" data-horizon="14">14 days</button>
-                </div>
                 <div class="overlay-pills" role="group" aria-label="Chart projections and overlays">
-                  <button type="button" class="overlay-pill is-active" id="toggle-forecast-btn" aria-pressed="true">+7d Forecast</button>
+                  <button type="button" class="overlay-pill is-active" id="toggle-forecast-btn" aria-pressed="true">Project +14d</button>
                   <button type="button" class="overlay-pill" id="toggle-stress-btn" aria-pressed="false">Stress test</button>
                   <button type="button" class="overlay-pill is-clear" id="clear-whatif-overlay-btn" hidden>Clear what-if ×</button>
                 </div>
               </div>
               <div class="chart-legend" aria-label="Chart legend">
                 <span class="legend-item"><i class="dot dot-baseline"></i><span id="legend-baseline-label">Your cash</span></span>
-                <span class="legend-item" id="legend-forecast"><i class="dot dot-forecast"></i>Predicted (+7d)</span>
+                <span class="legend-item" id="legend-forecast"><i class="dot dot-forecast"></i>Extra 14-day projection</span>
                 <span class="legend-item" id="legend-scenario" hidden><i class="dot dot-scenario"></i>If paid earlier</span>
                 <span class="legend-item" id="legend-whatif" hidden><i class="dot dot-whatif"></i><span id="legend-whatif-label">What-if</span></span>
                 <span class="legend-item" id="legend-stress" hidden><i class="dot dot-stress"></i>Stress case</span>
@@ -190,6 +227,7 @@
             </div>
           </div>
           <p class="card-desc">Your balance stays at or above zero for every day in this period, so you don't need a temporary buffer right now.</p>
+          <div id="growth-plan-steps" class="plan-steps-section" hidden></div>
         </section>
 
         <section id="assistant-card" class="card assistant-card" aria-labelledby="assistant-heading" hidden>
@@ -218,6 +256,8 @@
 
           <p id="explanation" class="agent-text" hidden></p>
           <p id="advice-model" class="agent-sub" hidden></p>
+
+          <div id="action-plan-steps" class="plan-steps-section" hidden></div>
 
           <!-- 2-3 Plain-English Bullet Highlights -->
           <div class="why-box">
@@ -367,212 +407,294 @@
           </div>
         </section>
 
-        <!-- 4. Unified What-If Simulator & Late-Payment Predictor -->
-        <section id="ask-cfo-card" class="card" aria-labelledby="ask-heading">
-          <div class="card-header">
+        <!-- Progressive Disclosure: Collapsed Detailed Analysis for Advanced Users -->
+        <section id="advanced-details-section" class="advanced-details-section" aria-labelledby="advanced-details-heading">
+          <div class="advanced-details-header">
             <div>
-              <div class="header-badges">
-                <span class="eyebrow-dot">What-If Simulator</span>
-                <span class="autonomy-badge level-1">Analyzed by agent</span>
+              <span class="eyebrow-dot">Detailed Tools</span>
+              <h2 id="advanced-details-heading">More details &amp; deeper analysis</h2>
+              <p class="card-desc">Kept collapsed so the main view stays calm — expand any panel for full numbers, scenarios, and charts.</p>
+            </div>
+            <button type="button" class="btn btn-stone" id="toggle-all-details-btn">Expand all</button>
+          </div>
+
+          <details class="detail-accordion" id="acc-ask">
+            <summary>
+              <div class="detail-accordion-summary-main">
+                <strong>What-if simulator &amp; Q&amp;A</strong>
+                <span>Ask custom &ldquo;what-if&rdquo; questions or test late customer payments</span>
               </div>
-              <h2 id="ask-heading">What-if simulator &amp; Q&amp;A</h2>
-              <p class="card-desc">Ask a &ldquo;what-if&rdquo; question or test a late customer payment — the chart updates with your simulated curve.</p>
-            </div>
-            <div class="whatif-mode-tabs" role="tablist" aria-label="What-if mode">
-              <button
-                type="button"
-                role="tab"
-                class="whatif-mode-btn is-active"
-                id="whatif-mode-ask"
-                aria-selected="true"
-                aria-controls="whatif-panel-ask"
-              >
-                Ask a question
-              </button>
-              <button
-                type="button"
-                role="tab"
-                class="whatif-mode-btn"
-                id="whatif-mode-delay"
-                aria-selected="false"
-                aria-controls="whatif-panel-delay"
-              >
-                Client pays late
-              </button>
-            </div>
-          </div>
-
-          <div id="whatif-panel-ask" role="tabpanel" aria-labelledby="whatif-mode-ask">
-            <form id="ask-cfo-form" class="ask-form" novalidate>
-              <input
-                id="ask-cfo-input"
-                name="question"
-                type="text"
-                placeholder="e.g. What if payroll grows by 2,000 EUR?"
-                maxlength="500"
-                required
-                aria-label="Ask a question about your cash forecast"
-              >
-              <button type="submit" class="btn btn-primary" id="ask-cfo-btn">Ask →</button>
-            </form>
-
-            <div class="ask-chips" aria-label="Example questions">
-              <button type="button" class="ask-chip" data-question="What is the riskiest day in this forecast?">What is the riskiest day?</button>
-              <button type="button" class="ask-chip" data-question="What if payroll grows by 2,000 EUR?">What if payroll grows by 2,000 EUR?</button>
-              <button type="button" class="ask-chip" data-question="What if the client pays 3 days late?">What if the client pays 3 days late?</button>
-            </div>
-
-            <div id="ask-loading" class="thinking-box" hidden>
-              <span class="spinner" aria-hidden="true"></span>
-              <span>Assistant is checking your question (usually 5–8 seconds)…</span>
-            </div>
-
-            <div id="ask-answer-box" class="ask-answer" hidden>
-              <p id="ask-answer-text"></p>
-              <div id="ask-answer-meta" class="ask-answer-meta" hidden></div>
-            </div>
-            <div id="ask-error" class="inline-alert inline-alert-soft" hidden></div>
-          </div>
-
-          <div id="whatif-panel-delay" role="tabpanel" aria-labelledby="whatif-mode-delay" hidden>
-            <form id="delay-form" class="delay-form" novalidate>
-              <div class="delay-row">
-                <div class="field">
-                  <label for="delay-tx-select">Incoming payment</label>
-                  <select id="delay-tx-select" name="transaction_id" required></select>
-                </div>
-                <div class="field">
-                  <label for="delay-days-input">Days late</label>
-                  <input id="delay-days-input" name="delay_days" type="number" min="1" max="365" value="3" required>
-                </div>
-                <button type="submit" class="btn btn-primary" id="delay-predict-btn">Check late impact →</button>
+              <div class="detail-accordion-summary-meta">
+                <span class="pill pill-neutral" id="acc-ask-pill">Ask or simulate</span>
+                <span class="detail-accordion-chevron" aria-hidden="true"></span>
               </div>
-            </form>
-
-            <p id="delay-empty" class="muted-note" hidden></p>
-
-            <div id="delay-loading" class="thinking-box" hidden>
-              <span class="spinner" aria-hidden="true"></span>
-              <span>Checking what happens if this payment arrives late (usually 5–8 seconds)…</span>
-            </div>
-
-            <div id="delay-result-box" class="delay-result" hidden>
-              <div id="delay-warning-box" class="delay-warning"></div>
-              <p id="delay-explanation" class="agent-text"></p>
-              <div id="delay-meta" class="ask-answer-meta" hidden></div>
-            </div>
-            <div id="delay-error" class="inline-alert inline-alert-soft" hidden></div>
-          </div>
-
-          <div id="whatif-chart-banner" class="whatif-chart-banner" hidden>
-            <span id="whatif-chart-label">Plotted on chart above.</span>
-            <div class="whatif-chart-actions">
-              <button type="button" class="btn-link" id="scroll-to-chart-btn">View on chart ↑</button>
-              <button type="button" class="btn-link" id="clear-whatif-card-btn">Clear</button>
-            </div>
-          </div>
-        </section>
-
-        <!-- 5. Milestone 3: Compare Your Options Side-by-Side -->
-        <section id="compare-card" class="bento-frame" aria-labelledby="compare-heading" hidden>
-          <div class="card-header" style="padding: 18px 18px 0;">
-            <div>
-              <div class="header-badges">
-                <span class="eyebrow-dot">Compare Options</span>
-                <span class="autonomy-badge level-2">Agent recommends</span>
-              </div>
-              <h2 id="compare-heading">Compare ways to cover the dip</h2>
-              <p class="card-desc">See the estimated fee and how much safety buffer each option needs.</p>
-            </div>
-          </div>
-          <div id="compare-grid" class="compare-grid"></div>
-          <p id="compare-explanation" class="compare-explanation" hidden></p>
-        </section>
-
-        <!-- 6. Milestone 4: Cash Health Score & Stress Test -->
-        <div id="health-stress-grid" class="story-grid" hidden>
-          <div class="story-col">
-            <section id="credit-score-card" class="card" aria-labelledby="score-heading">
-              <div class="card-header">
-                <div>
-                  <div class="header-badges">
-                    <span class="eyebrow-dot">Cash Health</span>
-                    <span class="autonomy-badge level-1">Analyzed by agent</span>
+            </summary>
+            <div class="detail-accordion-body">
+              <!-- 4. Unified What-If Simulator & Late-Payment Predictor -->
+              <section id="ask-cfo-card" class="card" aria-labelledby="ask-heading">
+                <div class="card-header">
+                  <div>
+                    <div class="header-badges">
+                      <span class="eyebrow-dot">What-If Simulator</span>
+                      <span class="autonomy-badge level-1">Analyzed by agent</span>
+                    </div>
+                    <h2 id="ask-heading">What-if simulator &amp; Q&amp;A</h2>
+                    <p class="card-desc">Ask a &ldquo;what-if&rdquo; question or test a late customer payment — the chart updates with your simulated curve.</p>
                   </div>
-                  <h2 id="score-heading">How ready you are for a buffer</h2>
-                </div>
-                <span class="pill pill-neutral" id="credit-risk-badge">—</span>
-              </div>
-
-              <div class="score-hero">
-                <strong class="score-number" id="credit-score-value">—</strong>
-                <span class="score-denom">/ 100</span>
-              </div>
-              <div class="score-bar-track" aria-hidden="true">
-                <div class="score-bar-fill score-bar-low" id="credit-score-fill" style="width: 0%"></div>
-              </div>
-              <p class="score-note" id="credit-score-note"></p>
-              <div id="credit-explain-error" class="inline-alert inline-alert-warn" hidden></div>
-              <ul class="factor-list" id="credit-factors-list"></ul>
-              <button type="button" class="btn-list-toggle" id="credit-factors-toggle" hidden></button>
-            </section>
-          </div>
-
-          <div class="story-col">
-            <section id="stress-test-card" class="card" aria-labelledby="stress-heading">
-              <div class="card-header">
-                <div>
-                  <div class="header-badges">
-                    <span class="eyebrow-dot">Stress Test</span>
-                    <span class="autonomy-badge level-1">Analyzed by agent</span>
+                  <div class="whatif-mode-tabs" role="tablist" aria-label="What-if mode">
+                    <button
+                      type="button"
+                      role="tab"
+                      class="whatif-mode-btn is-active"
+                      id="whatif-mode-ask"
+                      aria-selected="true"
+                      aria-controls="whatif-panel-ask"
+                    >
+                      Ask a question
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      class="whatif-mode-btn"
+                      id="whatif-mode-delay"
+                      aria-selected="false"
+                      aria-controls="whatif-panel-delay"
+                    >
+                      Client pays late
+                    </button>
                   </div>
-                  <h2 id="stress-heading">What if things go worse?</h2>
+                </div>
+
+                <div id="whatif-panel-ask" role="tabpanel" aria-labelledby="whatif-mode-ask">
+                  <form id="ask-cfo-form" class="ask-form" novalidate>
+                    <input
+                      id="ask-cfo-input"
+                      name="question"
+                      type="text"
+                      placeholder="e.g. What if payroll grows by 2,000 EUR?"
+                      maxlength="500"
+                      required
+                      aria-label="Ask a question about your cash forecast"
+                    >
+                    <button type="submit" class="btn btn-primary" id="ask-cfo-btn">Ask →</button>
+                  </form>
+
+                  <div class="ask-chips" aria-label="Example questions">
+                    <button type="button" class="ask-chip" data-question="What is the riskiest day in this forecast?">What is the riskiest day?</button>
+                    <button type="button" class="ask-chip" data-question="What if payroll grows by 2,000 EUR?">What if payroll grows by 2,000 EUR?</button>
+                    <button type="button" class="ask-chip" data-question="What if the client pays 3 days late?">What if the client pays 3 days late?</button>
+                  </div>
+
+                  <div id="ask-loading" class="thinking-box" hidden>
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span>Assistant is checking your question (usually 5–8 seconds)…</span>
+                  </div>
+
+                  <div id="ask-answer-box" class="ask-answer" hidden>
+                    <p id="ask-answer-text"></p>
+                    <div id="ask-answer-meta" class="ask-answer-meta" hidden></div>
+                  </div>
+                  <div id="ask-error" class="inline-alert inline-alert-soft" hidden></div>
+                </div>
+
+                <div id="whatif-panel-delay" role="tabpanel" aria-labelledby="whatif-mode-delay" hidden>
+                  <form id="delay-form" class="delay-form" novalidate>
+                    <div class="delay-row">
+                      <div class="field">
+                        <label for="delay-tx-select">Incoming payment</label>
+                        <select id="delay-tx-select" name="transaction_id" required></select>
+                      </div>
+                      <div class="field">
+                        <label for="delay-days-input">Days late</label>
+                        <input id="delay-days-input" name="delay_days" type="number" min="1" max="365" value="3" required>
+                      </div>
+                      <button type="submit" class="btn btn-primary" id="delay-predict-btn">Check late impact →</button>
+                    </div>
+                  </form>
+
+                  <p id="delay-empty" class="muted-note" hidden></p>
+
+                  <div id="delay-loading" class="thinking-box" hidden>
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span>Checking what happens if this payment arrives late (usually 5–8 seconds)…</span>
+                  </div>
+
+                  <div id="delay-result-box" class="delay-result" hidden>
+                    <div id="delay-warning-box" class="delay-warning"></div>
+                    <p id="delay-explanation" class="agent-text"></p>
+                    <div id="delay-meta" class="ask-answer-meta" hidden></div>
+                  </div>
+                  <div id="delay-error" class="inline-alert inline-alert-soft" hidden></div>
+                </div>
+
+                <div id="whatif-chart-banner" class="whatif-chart-banner" hidden>
+                  <span id="whatif-chart-label">Plotted on chart above.</span>
+                  <div class="whatif-chart-actions">
+                    <button type="button" class="btn-link" id="scroll-to-chart-btn">View on chart ↑</button>
+                    <button type="button" class="btn-link" id="clear-whatif-card-btn">Clear</button>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </details>
+
+          <details class="detail-accordion" id="acc-compare" hidden>
+            <summary>
+              <div class="detail-accordion-summary-main">
+                <strong>Compare ways to cover the dip</strong>
+                <span>Side-by-side estimated fees and buffer sizes</span>
+              </div>
+              <div class="detail-accordion-summary-meta">
+                <span class="pill pill-neutral" id="acc-compare-pill">—</span>
+                <span class="detail-accordion-chevron" aria-hidden="true"></span>
+              </div>
+            </summary>
+            <div class="detail-accordion-body">
+              <!-- 5. Milestone 3: Compare Your Options Side-by-Side -->
+              <section id="compare-card" class="bento-frame" aria-labelledby="compare-heading" hidden>
+                <div class="card-header" style="padding: 18px 18px 0;">
+                  <div>
+                    <div class="header-badges">
+                      <span class="eyebrow-dot">Compare Options</span>
+                      <span class="autonomy-badge level-2">Agent recommends</span>
+                    </div>
+                    <h2 id="compare-heading">Compare ways to cover the dip</h2>
+                    <p class="card-desc">See the estimated fee and how much safety buffer each option needs.</p>
+                  </div>
+                </div>
+                <div id="compare-grid" class="compare-grid"></div>
+                <p id="compare-explanation" class="compare-explanation" hidden></p>
+              </section>
+            </div>
+          </details>
+
+          <details class="detail-accordion" id="acc-health" hidden>
+            <summary>
+              <div class="detail-accordion-summary-main">
+                <strong>Cash health score &amp; stress test</strong>
+                <span>Readiness scorecard and worst-case scenario buffer</span>
+              </div>
+              <div class="detail-accordion-summary-meta">
+                <span class="pill pill-neutral" id="acc-health-pill">—</span>
+                <span class="detail-accordion-chevron" aria-hidden="true"></span>
+              </div>
+            </summary>
+            <div class="detail-accordion-body">
+              <!-- 6. Milestone 4: Cash Health Score & Stress Test -->
+              <div id="health-stress-grid" class="story-grid" hidden>
+                <div class="story-col">
+                  <section id="credit-score-card" class="card" aria-labelledby="score-heading">
+                    <div class="card-header">
+                      <div>
+                        <div class="header-badges">
+                          <span class="eyebrow-dot">Cash Health</span>
+                          <span class="autonomy-badge level-1">Analyzed by agent</span>
+                        </div>
+                        <h2 id="score-heading">How ready you are for a buffer</h2>
+                      </div>
+                      <span class="pill pill-neutral" id="credit-risk-badge">—</span>
+                    </div>
+
+                    <div class="score-hero">
+                      <strong class="score-number" id="credit-score-value">—</strong>
+                      <span class="score-denom">/ 100</span>
+                    </div>
+                    <div class="score-bar-track" aria-hidden="true">
+                      <div class="score-bar-fill score-bar-low" id="credit-score-fill" style="width: 0%"></div>
+                    </div>
+                    <p class="score-note" id="credit-score-note"></p>
+                    <div id="credit-explain-error" class="inline-alert inline-alert-warn" hidden></div>
+                    <ul class="factor-list" id="credit-factors-list"></ul>
+                    <button type="button" class="btn-list-toggle" id="credit-factors-toggle" hidden></button>
+                  </section>
+                </div>
+
+                <div class="story-col">
+                  <section id="stress-test-card" class="card" aria-labelledby="stress-heading">
+                    <div class="card-header">
+                      <div>
+                        <div class="header-badges">
+                          <span class="eyebrow-dot">Stress Test</span>
+                          <span class="autonomy-badge level-1">Analyzed by agent</span>
+                        </div>
+                        <h2 id="stress-heading">What if things go worse?</h2>
+                      </div>
+                    </div>
+
+                    <div class="stress-summary-tile">
+                      <span class="stress-summary-label">Buffer with extra safety cushion</span>
+                      <strong class="stress-summary-value" id="stress-rec-limit">—</strong>
+                      <span class="stress-summary-sub" id="stress-buffer-sub"></span>
+                    </div>
+
+                    <ul class="stress-list" id="stress-scenarios-list"></ul>
+                  </section>
                 </div>
               </div>
-
-              <div class="stress-summary-tile">
-                <span class="stress-summary-label">Buffer with extra safety cushion</span>
-                <strong class="stress-summary-value" id="stress-rec-limit">—</strong>
-                <span class="stress-summary-sub" id="stress-buffer-sub"></span>
-              </div>
-
-              <ul class="stress-list" id="stress-scenarios-list"></ul>
-            </section>
-          </div>
-        </div>
-
-        <!-- 6b. Full-Width Smart Payment Moves & Client Payment Delay Risk -->
-        <section id="optimize-card" class="bento-frame" aria-labelledby="optimize-heading" hidden>
-          <div class="card-header" style="padding: 18px 18px 0;">
-            <div>
-              <div class="header-badges">
-                <span class="eyebrow-dot">Payment timing</span>
-                <span class="autonomy-badge level-2">Agent recommends</span>
-              </div>
-              <h2 id="optimize-heading">Smart payment moves</h2>
-              <p class="card-desc">Simple timing changes that reduce how much extra money you need.</p>
             </div>
-          </div>
-          <div id="optimize-list" class="optimize-list"></div>
-          <div class="bento-footer" id="optimize-footer" hidden>
-            <button type="button" class="btn-list-toggle" id="optimize-toggle"></button>
-          </div>
-        </section>
+          </details>
 
-        <!-- 7. Milestone 2: Unusual Payments / Anomaly Alerts -->
-        <section id="anomalies-card" class="bento-frame" aria-labelledby="anomalies-heading" hidden>
-          <div class="card-header" style="padding: 18px 18px 0;">
-            <div>
-              <div class="header-badges">
-                <span class="eyebrow-dot">Double-check</span>
-                <span class="autonomy-badge level-1">Analyzed by agent</span>
+          <details class="detail-accordion" id="acc-optimize" hidden>
+            <summary>
+              <div class="detail-accordion-summary-main">
+                <strong>Smart payment timing moves</strong>
+                <span>Payments whose timing could reduce your cash dip</span>
               </div>
-              <h2 id="anomalies-heading">Payments worth double-checking</h2>
-              <p class="card-desc" id="anomalies-summary"></p>
+              <div class="detail-accordion-summary-meta">
+                <span class="pill pill-neutral" id="acc-optimize-pill">—</span>
+                <span class="detail-accordion-chevron" aria-hidden="true"></span>
+              </div>
+            </summary>
+            <div class="detail-accordion-body">
+              <!-- 6b. Full-Width Smart Payment Moves & Client Payment Delay Risk -->
+              <section id="optimize-card" class="bento-frame" aria-labelledby="optimize-heading" hidden>
+                <div class="card-header" style="padding: 18px 18px 0;">
+                  <div>
+                    <div class="header-badges">
+                      <span class="eyebrow-dot">Payment timing</span>
+                      <span class="autonomy-badge level-2">Agent recommends</span>
+                    </div>
+                    <h2 id="optimize-heading">Smart payment moves</h2>
+                    <p class="card-desc">Simple timing changes that reduce how much extra money you need.</p>
+                  </div>
+                </div>
+                <div id="optimize-list" class="optimize-list"></div>
+                <div class="bento-footer" id="optimize-footer" hidden>
+                  <button type="button" class="btn-list-toggle" id="optimize-toggle"></button>
+                </div>
+              </section>
             </div>
-            <span class="pill pill-neutral" id="anomalies-badge">—</span>
-          </div>
-          <div id="anomalies-list" class="anomalies-list"></div>
+          </details>
+
+          <details class="detail-accordion" id="acc-anomalies" hidden>
+            <summary>
+              <div class="detail-accordion-summary-main">
+                <strong>Payments worth double-checking</strong>
+                <span>Duplicate charges and unusually large payments detected in CSV</span>
+              </div>
+              <div class="detail-accordion-summary-meta">
+                <span class="pill pill-neutral" id="acc-anomalies-pill">—</span>
+                <span class="detail-accordion-chevron" aria-hidden="true"></span>
+              </div>
+            </summary>
+            <div class="detail-accordion-body">
+              <!-- 7. Milestone 2: Unusual Payments / Anomaly Alerts -->
+              <section id="anomalies-card" class="bento-frame" aria-labelledby="anomalies-heading" hidden>
+                <div class="card-header" style="padding: 18px 18px 0;">
+                  <div>
+                    <div class="header-badges">
+                      <span class="eyebrow-dot">Double-check</span>
+                      <span class="autonomy-badge level-1">Analyzed by agent</span>
+                    </div>
+                    <h2 id="anomalies-heading">Payments worth double-checking</h2>
+                    <p class="card-desc" id="anomalies-summary"></p>
+                  </div>
+                  <span class="pill pill-neutral" id="anomalies-badge">—</span>
+                </div>
+                <div id="anomalies-list" class="anomalies-list"></div>
+              </section>
+            </div>
+          </details>
         </section>
       </div>
     </main>

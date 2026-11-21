@@ -76,7 +76,10 @@ export function renderCashflowChart(container, config) {
   if (!baselineDays || baselineDays.length === 0) return;
 
   const hasForecast = Boolean(forecastDays && forecastDays.length > 0);
-  const allDays = hasForecast ? [...baselineDays, ...forecastDays] : baselineDays;
+  const hasFutureStress = Boolean(stressDays && stressDays.length > 0);
+  const futureDays = hasForecast ? forecastDays : hasFutureStress ? stressDays : [];
+  const hasFuture = futureDays.length > 0;
+  const allDays = hasFuture ? [...baselineDays, ...futureDays] : baselineDays;
 
   const width = 760;
   const height = 330;
@@ -138,8 +141,8 @@ export function renderCashflowChart(container, config) {
   defs.append(posGrad, negGrad);
   svg.append(defs);
 
-  // Shaded forecast projection zone on the right
-  if (hasForecast) {
+  // Shaded future projection zone on the right
+  if (hasFuture) {
     const dividerX = xAt(baselineDays.length - 1);
     const zoneW = Math.max(0, pad.left + plotW - dividerX);
     svg.append(
@@ -235,8 +238,8 @@ export function renderCashflowChart(container, config) {
     );
   }
 
-  // Forward projection cone + dashed divider + trend line
-  if (hasForecast) {
+  // Forward projection cone + dashed divider + trend & stress lines
+  if (hasFuture) {
     const lastIdx = baselineDays.length - 1;
     const lastX = xAt(lastIdx);
     const lastY = yAt(baselineDays[lastIdx].balance_minor);
@@ -258,43 +261,48 @@ export function renderCashflowChart(container, config) {
           y: pad.top + 14,
           class: "forecast-divider-label",
         },
-        `Projected +${forecastDays.length}d →`,
+        `Projected +${futureDays.length}d →`,
       ),
     );
 
-    const upperPts = [
-      [lastX, lastY],
-      ...forecastDays.map((d, j) => [xAt(baselineDays.length + j), yAt(d.high_minor)]),
-    ];
-    const lowerPts = [
-      ...forecastDays
-        .map((d, j) => [xAt(baselineDays.length + j), yAt(d.low_minor)])
-        .reverse(),
-      [lastX, lastY],
-    ];
-    const bandPath = [
-      ...upperPts.map(([x, y], idx) => `${idx === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`),
-      ...lowerPts.map(([x, y]) => `L ${x.toFixed(1)} ${y.toFixed(1)}`),
-      "Z",
-    ].join(" ");
-    svg.append(el("path", { d: bandPath, class: "forecast-band" }));
+    if (hasForecast) {
+      const upperPts = [
+        [lastX, lastY],
+        ...forecastDays.map((d, j) => [xAt(baselineDays.length + j), yAt(d.high_minor)]),
+      ];
+      const lowerPts = [
+        ...forecastDays
+          .map((d, j) => [xAt(baselineDays.length + j), yAt(d.low_minor)])
+          .reverse(),
+        [lastX, lastY],
+      ];
+      const bandPath = [
+        ...upperPts.map(([x, y], idx) => `${idx === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`),
+        ...lowerPts.map(([x, y]) => `L ${x.toFixed(1)} ${y.toFixed(1)}`),
+        "Z",
+      ].join(" ");
+      svg.append(el("path", { d: bandPath, class: "forecast-band" }));
 
-    const trendPts = [
-      [lastX, lastY],
-      ...forecastDays.map((d, j) => [xAt(baselineDays.length + j), yAt(d.balance_minor)]),
-    ];
-    const trendD = trendPts
-      .map(([x, y], idx) => `${idx === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`)
-      .join(" ");
-    svg.append(el("path", { d: trendD, fill: "none", class: "line-forecast" }));
-  }
+      const trendPts = [
+        [lastX, lastY],
+        ...forecastDays.map((d, j) => [xAt(baselineDays.length + j), yAt(d.balance_minor)]),
+      ];
+      const trendD = trendPts
+        .map(([x, y], idx) => `${idx === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`)
+        .join(" ");
+      svg.append(el("path", { d: trendD, fill: "none", class: "line-forecast" }));
+    }
 
-  // Stress-test curve (optional)
-  if (stressDays && stressDays.length === baselineDays.length) {
-    const stressD = stressDays
-      .map((d, i) => `${i === 0 ? "M" : "L"} ${xAt(i).toFixed(1)} ${yAt(d.balance_minor).toFixed(1)}`)
-      .join(" ");
-    svg.append(el("path", { d: stressD, fill: "none", class: "line-stress" }));
+    if (hasFutureStress) {
+      const stressPts = [
+        [lastX, lastY],
+        ...stressDays.map((d, j) => [xAt(baselineDays.length + j), yAt(d.balance_minor)]),
+      ];
+      const stressD = stressPts
+        .map(([x, y], idx) => `${idx === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`)
+        .join(" ");
+      svg.append(el("path", { d: stressD, fill: "none", class: "line-stress" }));
+    }
   }
 
   // Baseline area & line
@@ -323,12 +331,30 @@ export function renderCashflowChart(container, config) {
     svg.append(el("path", { d: whatIfD, fill: "none", class: "line-whatif" }));
   }
 
-  // Data points & X axis labels
+  // Data points & X axis labels anchored to the CSV boundaries
   const pointsGroup = el("g", { class: "chart-points" });
   const xLabelsGroup = el("g", { class: "chart-x-labels" });
   const showAllDots = allDays.length <= 45;
-  const labelInterval = Math.max(1, Math.ceil(allDays.length / 7));
-  const includeYear = allDays.length > 90;
+  const includeYear =
+    allDays.length > 90 ||
+    allDays[0].date.slice(0, 4) !== allDays[allDays.length - 1].date.slice(0, 4);
+
+  const baseEndIdx = baselineDays.length - 1;
+  const tickIndices = new Set(hasFuture ? [0, baseEndIdx, allDays.length - 1] : [0, baseEndIdx]);
+  const addMidTicks = (fromIdx, toIdx, count) => {
+    const span = toIdx - fromIdx;
+    if (span < 4) return;
+    for (let k = 1; k <= count; k += 1) {
+      const idx = Math.round(fromIdx + (span * k) / (count + 1));
+      if (idx - fromIdx >= 3 && toIdx - idx >= 3) {
+        tickIndices.add(idx);
+      }
+    }
+  };
+  addMidTicks(0, baseEndIdx, hasFuture ? 2 : 3);
+  if (hasFuture) {
+    addMidTicks(baseEndIdx, allDays.length - 1, 2);
+  }
 
   baselineDays.forEach((day, i) => {
     const x = xAt(i);
@@ -393,6 +419,7 @@ export function renderCashflowChart(container, config) {
     }
   });
 
+  let forecastEndLabelY = null;
   if (hasForecast) {
     forecastDays.forEach((day, j) => {
       const idx = baselineDays.length + j;
@@ -409,13 +436,13 @@ export function renderCashflowChart(container, config) {
         );
       }
       if (j === forecastDays.length - 1) {
-        const endY = Math.max(pad.top + 14, Math.min(pad.top + plotH - 6, y - 10));
+        forecastEndLabelY = Math.max(pad.top + 14, Math.min(pad.top + plotH - 6, y - 10));
         pointsGroup.append(
           el(
             "text",
             {
               x,
-              y: endY,
+              y: forecastEndLabelY,
               "text-anchor": "end",
               class: "chart-callout-forecast",
             },
@@ -426,22 +453,63 @@ export function renderCashflowChart(container, config) {
     });
   }
 
-  allDays.forEach((day, i) => {
-    if (i % labelInterval === 0 || i === allDays.length - 1) {
-      xLabelsGroup.append(
-        el(
-          "text",
-          {
-            x: xAt(i),
-            y: height - 14,
-            "text-anchor": "middle",
-            class: i >= baselineDays.length ? "axis-label axis-label-forecast" : "axis-label",
-          },
-          formatShortDate(day.date, includeYear),
-        ),
-      );
-    }
-  });
+  if (hasFutureStress) {
+    stressDays.forEach((day, j) => {
+      const idx = baselineDays.length + j;
+      const x = xAt(idx);
+      const y = yAt(day.balance_minor);
+      if (showAllDots || j === stressDays.length - 1) {
+        pointsGroup.append(
+          el("circle", {
+            cx: x,
+            cy: y,
+            r: j === stressDays.length - 1 ? 4.2 : 2.8,
+            class: "point-stress",
+          }),
+        );
+      }
+      if (j === stressDays.length - 1) {
+        let stressLabelY = Math.min(pad.top + plotH - 4, Math.max(pad.top + 14, y + 15));
+        if (forecastEndLabelY !== null && Math.abs(stressLabelY - forecastEndLabelY) < 14) {
+          stressLabelY = Math.min(pad.top + plotH - 4, forecastEndLabelY + 15);
+        }
+        pointsGroup.append(
+          el(
+            "text",
+            {
+              x,
+              y: stressLabelY,
+              "text-anchor": "end",
+              class: "chart-callout-stress",
+            },
+            `Stress ${formatCompactMoney(day.balance_minor, currencySymbol)}`,
+          ),
+        );
+      }
+    });
+  }
+
+  for (const i of [...tickIndices].sort((a, b) => a - b)) {
+    const day = allDays[i];
+    if (!day) continue;
+    xLabelsGroup.append(
+      el(
+        "text",
+        {
+          x: xAt(i),
+          y: height - 14,
+          "text-anchor": "middle",
+          class:
+            i === baseEndIdx && hasFuture
+              ? "axis-label axis-label-divider"
+              : i >= baselineDays.length
+                ? "axis-label axis-label-forecast"
+                : "axis-label",
+        },
+        formatShortDate(day.date, includeYear),
+      ),
+    );
+  }
 
   svg.append(pointsGroup, xLabelsGroup);
 
@@ -492,11 +560,24 @@ export function renderCashflowChart(container, config) {
       const lines = [`<div class="tip-date">${formatDate(day.date)}</div>`];
 
       if (isPredicted) {
-        lines.push(
-          `<div class="tip-row"><span>Predicted cash</span><strong class="${day.balance_minor < 0 ? "neg" : ""}">${formatMoney(day.balance_minor)}</strong></div>`,
-          `<div class="tip-row"><span>Confidence range</span><strong>${formatMoney(day.low_minor)} to ${formatMoney(day.high_minor)}</strong></div>`,
-          `<div class="tip-tx"><span>Projected from 14-day trend</span></div>`,
-        );
+        const futureIdx = i - baselineDays.length;
+        if (hasForecast && forecastDays[futureIdx]) {
+          const fDay = forecastDays[futureIdx];
+          lines.push(
+            `<div class="tip-row"><span>Predicted cash</span><strong class="${fDay.balance_minor < 0 ? "neg" : ""}">${formatMoney(fDay.balance_minor)}</strong></div>`,
+            `<div class="tip-row"><span>Confidence range</span><strong>${formatMoney(fDay.low_minor)} to ${formatMoney(fDay.high_minor)}</strong></div>`,
+          );
+        }
+        if (hasFutureStress && stressDays[futureIdx]) {
+          const sDay = stressDays[futureIdx];
+          lines.push(
+            `<div class="tip-row"><span>Stress case</span><strong class="${sDay.balance_minor < 0 ? "neg" : ""}">${formatMoney(sDay.balance_minor)}</strong></div>`,
+          );
+        }
+        const tipNote = hasFutureStress
+          ? "Projected from −15% inflows / +10% outflows"
+          : "Projected from 14-day trend";
+        lines.push(`<div class="tip-tx"><span>${tipNote}</span></div>`);
       } else {
         lines.push(
           `<div class="tip-row"><span>Projected cash</span><strong class="${day.balance_minor < 0 ? "neg" : ""}">${formatMoney(day.balance_minor)}</strong></div>`,
@@ -513,13 +594,6 @@ export function renderCashflowChart(container, config) {
           const wVal = whatIfDays[i].balance_minor;
           lines.push(
             `<div class="tip-row"><span>${escapeText(whatIfLabel)}</span><strong class="${wVal < 0 ? "neg" : "pos"}">${formatMoney(wVal)}</strong></div>`,
-          );
-        }
-
-        if (stressDays && stressDays[i]) {
-          const sVal = stressDays[i].balance_minor;
-          lines.push(
-            `<div class="tip-row"><span>Stress case</span><strong class="${sVal < 0 ? "neg" : ""}">${formatMoney(sVal)}</strong></div>`,
           );
         }
 
