@@ -4,15 +4,15 @@
 
 ## Scope
 
-Own `backend/advice.py` and `tests/test_advice.py`. Follow the [API contract](../../contracts/openapi.json) and coordinate changes to shared routes and models with Andrii. See the [team workflow and tech stack](../../README.md).
+Own `backend/advice.py`, `backend/action_plan.py`, `backend/consultant.py`, `backend/telemetry.py`, and their tests (`tests/test_advice.py`, `tests/test_action_plan.py`, `tests/test_telemetry.py`). Follow [contracts/openapi.json](../../contracts/openapi.json) and coordinate shared schema changes with Andrii, Tsimur, Mikhail, and Yurii via PR. See [README.md](../../README.md).
 
 ## Deliverables
 
-1. Get the endpoint configuration, model name, and authentication method from Mikhail. Verify one request to the open-source or open-weight model served on the team's assigned OpenShift AI environment. Use MaaS if available and the team pursues the bonus.
-2. Implement the `live` advice call with a timeout and validate the response against the agreed contract. Ground the facility explanation in the backend's recommended limit, first and deepest shortfall dates and amounts, and relevant transactions. Keep monetary calculations and simulation decisions in application code. Keep the existing reminder draft available on request.
-3. Keep the saved advice response available in `demo` mode. Handle unavailable or invalid upstream responses with HTTP 503 and exercise the error paths in tests.
-4. Coordinate the explanation request and response in Mikhail's shared contract PR. Share configuration requirements with Mikhail, response fields and error behavior with Timur, and synthetic cases for checking the model's figures with Yuri.
+1. Integrate with OpenShift AI endpoints configured by Mikhail: `kernes-qwen-7b` (vLLM GPU primary) with automatic fallback to `kernes-qwen` (CPU).
+2. Ground all LLM outputs (`POST /api/advice`, `POST /api/action-plan`, `POST /api/ask-cfo`, `POST /api/predict-delays`, `POST /api/credit-check`, `POST /api/detect-anomalies`, `POST /api/compare-options`) in verified backend calculations using `cited_amounts()` with numeric-boundary matching (`_matches_amount_token`). Keep all monetary calculations and simulation decisions in Python.
+3. Support both B2B email draft kinds (`collect_early` for B2B clients before deadline and `defer_supplier` for B2B suppliers/landlord), strictly excluding `retail_non_contactable` and `fixed_mandatory` transactions.
+4. Keep `demo` mode deterministic responses runnable, return HTTP 503 cleanly when upstream models fail (so the UI preserves deterministic numbers), and log only telemetry metadata (never secrets or PII).
 
 ## Starter prompt
 
-> Read AGENTS.md, agents/ai-integration/README.md, and contracts/openapi.json. Work on feat/advice. Implement and test live explanations grounded in the forecast and proposal facts. Report which model and response behavior you verified. Keep credentials out of the report.
+> Read AGENTS.md, agents/ai-integration/README.md, and contracts/openapi.json. Work on a feature branch for PR into main. Maintain grounded live explanations, POST /api/action-plan, and fallback handling on OpenShift AI. Keep credentials out of Git and logs.

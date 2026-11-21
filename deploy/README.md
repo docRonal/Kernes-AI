@@ -72,13 +72,13 @@ Check `/health`, then run the [browser demo](../README.md) with the synthetic CS
 
 ### Check the model inside the cluster
 
-The model service is internal, so call it from a short-lived pod. The answer should name `kernes-qwen` and include a short reply.
+The fallback CPU model service (`kernes-qwen`) and primary GPU vLLM service (`kernes-qwen-7b`) are internal, so call them from a short-lived pod. The answer should name the queried model and include a short reply.
 
 ```sh
 oc -n kernes-ai run model-check --rm -i --restart=Never \
   --image=registry.access.redhat.com/ubi9/ubi-minimal -- \
   curl -sS -m 120 "${CFO_MODEL_URL}" -H 'Content-Type: application/json' \
-  -d '{"model":"kernes-qwen","messages":[{"role":"user","content":"Reply with OK."}],"max_tokens":8}'
+  -d "{\"model\":\"${CFO_MODEL_NAME}\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with OK.\"}],\"max_tokens\":8}"
 ```
 
 ## Deploy the live app
@@ -93,7 +93,7 @@ oc process --local -f deploy/openshift-template.yaml \
 oc -n kernes-ai rollout status deployment/autonomous-cfo
 ```
 
-The Route allows 240 seconds per request and the app waits up to `CFO_MODEL_TIMEOUT` seconds (default 90) for each model answer. The app checks every PLN amount in the explanation against the calculation. It retries once if the explanation misquotes a figure, then returns HTTP 503 and the UI keeps the forecast and proposal on screen.
+The Route allows 240 seconds per request and the app waits up to `CFO_MODEL_TIMEOUT` seconds (default 90) for each model answer. The app checks every monetary amount (multi-currency) in the explanation against the calculation. It retries once if the explanation misquotes a figure, then returns HTTP 503 and the UI keeps the forecast and proposal on screen.
 
 Run the full forecast, live explanation, and both simulated decisions at the deployed URL. Each model call writes one log line with the model name, attempts, and latency, but never the prompt or the token. Save those lines with the commit SHA as evidence of live inference.
 

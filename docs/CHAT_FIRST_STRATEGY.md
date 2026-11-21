@@ -169,27 +169,20 @@ Register `@app.post("/api/action-plan", response_model=ActionPlanResponse)` and 
 
 ---
 
-### 2. Frontend — Chat-First Guided Onboarding + `Advanced CFO` Toggle
+### 2. Frontend — Progressive Disclosure Guided Onboarding & Action Plan (Implemented via PR #20)
 
-#### New `frontend/assets/js/chat_onboarding.js` & `frontend/assets/css/chat.css`
-- **3-Step Guided Chat Thread (`#chat-experience`):**
-  - Renders clean conversational bubbles from **KERNES CFO**:
-    - **Step 1:** *"Hi! I'm your AI CFO assistant. What kind of business do you run?"* + quick chips (`Pizzeria / Restaurant`, `Local Shop`, `Services / Agency`) + text box.
-    - **Step 2:** *"Got it! What's your main goal or biggest worry right now?"* + quick chips (`Avoid running out of cash`, `Save to buy equipment / grow`, `Spot unexpected expenses`) + text box.
-    - **Step 3:** *"Drop your bank statement CSV below — or try Luigi's real Pizzeria Amalfi statement."* + 1-click **"Load Luigi's Pizzeria Amalfi"** button + file dropzone (advanced fields like opening balance / start date tucked under a collapsible *"Adjust starting balance / date"* row).
-  - After Step 3: calls `resolveForecast()` + `requestActionPlan(payload, profile)` and appends:
-    - **Plain-English Diagnosis Bubble** (with autonomy badge `1 · Analyzed by agent` and `kernes-qwen-7b` pill).
-    - **Numbered Action Plan Cards** (2–3 concrete steps with autonomy badges `2 · Agent recommends` / `3 · Your decision needed` / `4 · Simulation only`).
-    - **Inline Action Controls** directly inside the chat:
-      - `[Approve credit line preview]` / `[Reject preview]` (calls existing `simulateDecision()` and posts simulated outcome bubble in chat).
-      - `[Preview client reminder email]` (expands editable draft + `[Simulate send]` right inside chat).
-      - `[Show full CFO dashboard →]` button (switches to Advanced Mode).
-    - **Continuous Follow-Up Input** at the bottom of the chat (wired directly to existing `/api/ask-cfo` + suggested chips tailored to Luigi, e.g., *"What happens if a selected client pays 3 days later?"*, *"What if we delay our biggest supplier payment by 3 days?"* — noting that `/api/ask-cfo` operates on existing payments, not new capex).
+Instead of a separate `#chat-experience` overlay, **Tsimur** implemented this cleanly inside the existing Bento architecture via **Progressive Disclosure**:
 
-#### Modify `frontend/index.html`, `frontend/assets/app.js`, `frontend/assets/js/api.js`
-- Add mode toggle pill in topbar: **`Simple Chat`** (default) | **`Advanced Dashboard`** (`#mode-toggle-btn`).
-- Switching to `Advanced Dashboard` shows the full existing `#results` dashboard (with all 8 cards, Chart overlays, Stress Test, Credit Score, Anomalies, Compare Options) using the exact same `state.forecast` without re-uploading.
-- Switching back to `Simple Chat` returns to Luigi's conversation with simulation state synchronized.
+#### Implemented `frontend/assets/js/action_plan.js` & `frontend/assets/css/progressive.css`
+- **2-Question Guided Setup (`#setup-screen` in `frontend/index.html`):**
+  - **Q1 (`#business-type-input`):** *"What kind of business do you run?"* + quick chips (`Pizzeria / Restaurant`, `Local retail shop`, `Freelance / Agency`) + free text.
+  - **Q2 (`#business-goal-input`):** *"What's your main goal right now?"* + quick chips (`Avoid running out of cash`, `Save to buy equipment / grow`, `Spot unexpected costs`) + free text.
+  - **Q3 (`#csv-file`):** Pre-loaded *Pizzeria Amalfi example (ready to use)* or custom CSV upload → `Check my cash →`.
+- **Simple Action-First Results (`#results`):**
+  - Shows the 4-level autonomy strip, headline verdict + 3 KPI tiles, clean interactive SVG chart, grounded AI briefing, **Tailored Next Steps** rendered by `action_plan.js` (`#action-plan-steps` / `#growth-plan-steps`) with `Draft payment email →` CTAs, and the warm charcoal **Action Decision Card** (`1. Short-term safety buffer` / `2. Get paid earlier`).
+- **Collapsed Advanced Details (`#advanced-details-section`):**
+  - Deeper analytical tools (*What-if simulator & Q&A* + *Client pays late*, *Compare ways to cover the dip*, *Cash health score & stress test*, *Smart payment timing moves*, *Payments worth double-checking*) stay tucked inside collapsible `<details class="detail-accordion">` panels until clicked or expanded via `Expand all`.
+  - Suggested follow-up chips include *"What is the riskiest day?"*, *"What if payroll grows by 2,000 EUR?"*, and *"What if the client pays 3 days late?"* (operating on existing scheduled payments, not new capex).
 
 ---
 
@@ -209,12 +202,12 @@ Register `@app.post("/api/action-plan", response_model=ActionPlanResponse)` and 
 
 | Time Window | Owner | Concrete Deliverable |
 | --- | --- | --- |
-| **Hours 0–3** | **Andrii + Ivan** (`feat/backend` / `feat/advice`) | Implement `Transaction` classification + `UserProfile` / `ActionPlanRequest` / `ActionPlanResponse` in `backend/models.py`, `backend/forecast.py`, `backend/action_plan.py`, wire `POST /api/action-plan` in `backend/main.py`, update `contracts/openapi.json`, add `tests/test_action_plan.py`. |
-| **Hours 0–6** | **Timur** (`feat/frontend`) | Build Chat-First 3-question onboarding (`chat_onboarding.js`, `chat.css`), inline Action Plan cards + Approve/Reject/Reminder actions in chat, and topbar **`Simple Chat` / `Advanced Dashboard`** toggle preserving all existing dashboard cards. |
-| **Hours 6–8** | **Yuri (QA + Lead)** | Integrate PRs into `main`, run full local pytest (`uv run --locked pytest -q`), verify both Simple Chat (Luigi survival + healthy growth) and Advanced Dashboard flows locally in Edge Playwright. |
-| **Hours 8–10** | **Mikhail** (`feat/openshift`) | Rebuild & redeploy OpenShift container from unified `main` (`app-<sha>`), verify `kernes-qwen-7b` handles `POST /api/action-plan` in <6s, update `deploy/EVIDENCE.md`. |
-| **Hours 10–12** | **Yuri (QA + Lead)** | Run live OpenShift remote pytest + Playwright E2E on both modes; fix any UI/copy rough edges. |
-| **Hours 12–16** | **Whole Team** | Freeze code! Finalize `Collabothon_2026_Project_Card_Filled.pdf`, `Kernes_AI_Demo_Script_v1.pdf` (built around **Luigi's 3-minute story**: 3-question chat → instant survival plan → Approve simulation → "What happens if a selected client pays 3 days later?" → 1 click into `Advanced Dashboard` for tech judges), and rehearse 2x live on OpenShift. |
+| **Hours 0–3 (Done — PR #18)** | **Andrii + Ivan** (`feat/backend` / `feat/advice`) | Implemented `Transaction` classification + `UserProfile` / `ActionPlanRequest` / `ActionPlanResponse` in `backend/models.py`, `backend/forecast.py`, `backend/action_plan.py`, wired `POST /api/action-plan` in `backend/main.py`, updated `contracts/openapi.json`, added `tests/test_action_plan.py`. |
+| **Hours 0–6 (Done — PR #20)** | **Tsimur** (`feat/frontend`) | Built Progressive Disclosure 2-question onboarding (`#setup-screen`), Action Plan cards (`frontend/assets/js/action_plan.js`, `frontend/assets/css/progressive.css`), and collapsible `#advanced-details-section` accordions preserving all existing dashboard tools. |
+| **Hours 6–8** | **Yurii (QA + Lead)** | Run full local pytest (`uv run --locked pytest -q`), verify both Simple Action Plan (Luigi survival + healthy growth) and Advanced accordions locally in Edge Playwright. |
+| **Hours 8–10** | **Mikhail** (`feat/openshift`) | Rebuild & redeploy OpenShift container from unified `main` (`app-<sha>`), verify `kernes-qwen-7b` handles `POST /api/action-plan` in <6s, record telemetry evidence. |
+| **Hours 10–12** | **Yurii (QA + Lead)** | Run live OpenShift remote pytest + Playwright E2E on both modes; fix any UI/copy rough edges. |
+| **Hours 12–16** | **Whole Team** | Freeze code! Project Card answers are maintained directly in `README.md` (no `LICENSE` file per Discord rules); rehearse the 5-minute live interactive demo from `docs/DEMO_SCRIPT_5MIN.md` (Luigi's Pizzeria Amalfi scenario + B2B2C Commerzbank business model) 2x live on OpenShift. |
 
 ---
 
@@ -224,8 +217,8 @@ Register `@app.post("/api/action-plan", response_model=ActionPlanResponse)` and 
   > 1) Extend `Transaction` in `backend/models.py` with backward-compatible optional fields (`transaction_type`, `counterparty`, `payment_reference`, `category`, `actionability`) and add a deterministic `classify_transaction()` helper in `backend/forecast.py` (without changing any balance math!) so walk-in card customers (`retail_non_contactable`) and taxes/social security/staff payroll (`fixed_mandatory`) are NEVER suggested for emails or deferral, while B2B client invoices (`email_collect_early`) and B2B suppliers/landlord (`email_defer_supplier`) are explicitly tagged.
   > 2) Implement `POST /api/action-plan` in `backend/action_plan.py` and `backend/main.py`. Compose deterministic outputs from `propose`, `detect_anomalies(mode="demo")`, `optimize_payments` (filtered by `actionability`), `stress_test`, and `compare_financing_options(mode="demo")` into 2–4 structured `ActionPlanStep` items (`mode: "survival"` or `"growth"`), supporting both polite email kinds (`collect_early` for B2B clients before deadline and `defer_supplier` for B2B suppliers/landlord). Call `kernes-qwen-7b` once in `live` mode to tailor `headline`, `summary`, and `email_draft` to `profile.business_type` and `profile.goal`, enforcing `cited_amounts` grounding. Add `tests/test_action_plan.py` and verify `uv run --locked pytest -q`.
 
-- **Frontend Agent (Timur):**
-  > Build a Chat-First Guided Onboarding view (`#chat-experience` in `frontend/index.html`, `frontend/assets/js/chat_onboarding.js`, `frontend/assets/css/chat.css`) as the default entry screen: 3 instant guided questions (business type, main goal/worry, CSV upload or 1-click "Luigi — Pizzeria Amalfi") -> calls `/api/forecast` + `/api/action-plan` -> renders a plain-English diagnosis, 2–3 Action Plan cards with the 4 autonomy badges, inline Approve/Reject simulation & email draft preview, and follow-up Q&A via `/api/ask-cfo`. Add a topbar toggle **`Simple Chat` | `Advanced Dashboard`** that reveals the existing `#results` dashboard intact without re-uploading.
+- **Frontend Agent (Tsimur):**
+  > Maintain the Progressive Disclosure UX (`#setup-screen` 2-question onboarding, `#action-plan-steps` / `#growth-plan-steps` rendered by `frontend/assets/js/action_plan.js` + `frontend/assets/css/progressive.css`, and `#advanced-details-section` collapsible accordions) while keeping simulation-only Approve/Reject controls, editable email drafts, and HTTP 503 resilience intact.
 
 - **Deployment Agent (Mikhail):**
   > After `POST /api/action-plan` and the Chat-First UI merge into `main`, rebuild and redeploy `autonomous-cfo` on OpenShift (`kernes-ai`) keeping `kernes-qwen-7b` (vLLM GPU) primary and `kernes-qwen` fallback. Verify `POST /api/action-plan` latency in `oc logs` and update `deploy/EVIDENCE.md`.

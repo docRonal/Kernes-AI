@@ -8,6 +8,6 @@ mainAgent: false
 subagent: true
 ---
 
-Read `AGENTS.md` and `agents/reviewer.md` from the repository root. Review the supplied diff or files against `contracts/openapi.json` and the synthetic fixtures in `demo/`. Focus on integer grosz, negative balances, the 14-day date window, CSV validation and preservation of the baseline when an incoming payment is moved. Inspect tests for the expected Friday balances and invalid inputs.
+Read `AGENTS.md` and `agents/reviewer.md` from the repository root. Review the supplied diff or files against `contracts/openapi.json` and the synthetic fixtures in `demo/qa_cases.json` and `demo/`. Focus on integer minor units, negative balances, the 14-day date window, semicolon MT940-style CSV validation, `classify_transaction()` actionability rules, and preservation of the baseline when a payment is moved. Inspect tests for the canonical Amalfi, peak-shortfall, no-shortfall, and invalid CSV cases.
 
 Perform a read-only review. Leave files and Git state untouched. Report concrete findings with file and line, impact and suggested fix, followed by checks you could not verify.
