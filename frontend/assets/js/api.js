@@ -83,12 +83,26 @@ export function buildInsightPayload(forecast) {
 
   const transactions = (forecast.transactions || [])
     .slice(0, 5000)
-    .map(({ id, date, amount_minor, label }) => ({
-      id: String(id).replace(/[\x00-\x1f\x7f-\x9f]/g, " ").slice(0, 64),
-      date,
-      amount_minor: Math.trunc(Number(amount_minor)),
-      label: String(label || "Transaction").replace(/[\x00-\x1f\x7f-\x9f]/g, " ").slice(0, 200),
-    }));
+    .map((tx) => {
+      const clean = {
+        id: String(tx.id).replace(/[\x00-\x1f\x7f-\x9f]/g, " ").slice(0, 64),
+        date: tx.date,
+        amount_minor: Math.trunc(Number(tx.amount_minor)),
+        label: String(tx.label || "Transaction").replace(/[\x00-\x1f\x7f-\x9f]/g, " ").slice(0, 200),
+      };
+      for (const key of [
+        "transaction_type",
+        "counterparty",
+        "payment_reference",
+        "category",
+        "actionability",
+      ]) {
+        if (tx[key] != null) {
+          clean[key] = tx[key];
+        }
+      }
+      return clean;
+    });
 
   if (transactions.length === 0) return null;
 
@@ -142,4 +156,15 @@ export function requestPredictDelays(payload, clientDelays) {
 
 export function requestSendReminder({ to_email, subject, body }) {
   return post("/api/send-reminder", { to_email, subject, body });
+}
+
+export function requestActionPlan(payload, profile) {
+  return post("/api/action-plan", {
+    ...payload,
+    profile: {
+      business_type: String(profile?.business_type || "Small business").trim().slice(0, 120) || "Small business",
+      goal: String(profile?.goal || "Keep cash flow healthy").trim().slice(0, 240) || "Keep cash flow healthy",
+      experience_level: profile?.experience_level === "advanced" ? "advanced" : "beginner",
+    },
+  });
 }

@@ -18,7 +18,7 @@ function diffDaysIso(fromIso, toIso) {
  * Project +extraDays beyond the known baseline horizon using daily balance velocity
  * and empirical volatility (confidence cone).
  */
-export function buildForwardForecast(baselineDays, transactions = [], extraDays = 7) {
+export function buildForwardForecast(baselineDays, transactions = [], extraDays = 14) {
   if (!baselineDays || baselineDays.length === 0) {
     return { days: [], meanDailyMinor: 0 };
   }
@@ -61,38 +61,46 @@ export function buildForwardForecast(baselineDays, transactions = [], extraDays 
 }
 
 /**
- * Deterministic combined stress-test curve (inflows delayed + outflows costlier),
- * matching backend/insights.py::stress_test integer rounding.
+ * Project a pessimistic +extraDays future stress scenario starting from the last baseline day,
+ * assuming inflows slow down (-inflowDropPct%) and expenses run higher (+expenseShockPct%).
  */
 export function buildStressCurve(
   baselineDays,
   transactions = [],
-  { delayDays = 5, expenseShockPct = 10 } = {},
+  { extraDays = 14, inflowDropPct = 15, expenseShockPct = 10 } = {},
 ) {
   if (!baselineDays || baselineDays.length === 0) return [];
-  const startDate = baselineDays[0].date;
-  const endDate = baselineDays[baselineDays.length - 1].date;
-  const changes = [];
 
+  const startDate = baselineDays[0].date;
+  const lastDay = baselineDays[baselineDays.length - 1];
+  const spanDays = Math.max(1, baselineDays.length - 1);
+  const meanDailyMinor = (lastDay.balance_minor - baselineDays[0].balance_minor) / spanDays;
+
+  let totalInflows = 0;
+  let totalOutflows = 0;
   for (const t of transactions) {
-    if (t.date < startDate || t.date > endDate) continue;
-    const at = diffDaysIso(startDate, t.date);
-    if (t.amount_minor > 0) {
-      changes.push([at, t.amount_minor, at + delayDays, t.amount_minor]);
-    } else if (t.amount_minor < 0) {
-      const extra = Math.floor((Math.abs(t.amount_minor) * expenseShockPct + 50) / 100);
-      changes.push([at, t.amount_minor, at, t.amount_minor - extra]);
-    }
+    if (t.date < startDate || t.date > lastDay.date) continue;
+    if (t.amount_minor > 0) totalInflows += t.amount_minor;
+    else if (t.amount_minor < 0) totalOutflows += Math.abs(t.amount_minor);
   }
 
-  return baselineDays.map((day, idx) => {
-    let delta = 0;
-    for (const [oldOff, oldAmt, newOff, newAmt] of changes) {
-      if (0 <= oldOff && oldOff <= idx) delta -= oldAmt;
-      if (0 <= newOff && newOff <= idx) delta += newAmt;
-    }
-    return { date: day.date, balance_minor: day.balance_minor + delta };
-  });
+  const avgInPerDay = totalInflows / baselineDays.length;
+  const avgOutPerDay = totalOutflows / baselineDays.length;
+  const stressDailyDelta =
+    avgInPerDay * (1 - inflowDropPct / 100) - avgOutPerDay * (1 + expenseShockPct / 100);
+
+  // Keep stress strictly worse than the base trend so the scenario divergence is always clear.
+  const minWorsening = Math.max(Math.abs(meanDailyMinor) * 0.25, 15_000);
+  const dailyStress = Math.min(stressDailyDelta, meanDailyMinor - minWorsening);
+
+  const days = [];
+  for (let k = 1; k <= extraDays; k += 1) {
+    days.push({
+      date: addDaysIso(lastDay.date, k),
+      balance_minor: Math.round(lastDay.balance_minor + dailyStress * k),
+    });
+  }
+  return days;
 }
 
 /**

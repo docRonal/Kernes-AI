@@ -1,6 +1,5 @@
 import {
   AMALFI_DEFAULT_OPENING_EUR,
-  AMALFI_DEFAULT_START_DATE,
   AMALFI_SAMPLE_CSV,
   AMALFI_SAMPLE_FILENAME,
 } from "./sample-amalfi.js?v=tc11";
@@ -13,14 +12,14 @@ import {
   requestCompareOptions,
   requestCreditCheck,
   requestDecision,
-  requestHealth,
   requestOptimizePayments,
   requestPredictDelays,
   requestSendReminder,
   requestStressTest,
   resolveForecast,
-} from "./js/api.js?v=tc11";
-import { replayFade, toMinor } from "./js/format.js?v=tc11";
+} from "./js/api.js?v=tc16";
+import { renderActionPlan } from "./js/action_plan.js?v=tc16";
+import { printMoney, replayFade, toMinor } from "./js/format.js?v=tc11";
 import {
   populateDelayCandidates,
   renderAnomalies,
@@ -35,7 +34,7 @@ import {
   renderStressTest,
   resetInsightsUi,
 } from "./js/insights.js?v=tc11";
-import { buildWhatIfCurve } from "./js/predictions.js?v=tc11";
+import { buildWhatIfCurve, addDaysIso } from "./js/predictions.js?v=tc20";
 import { readProposal } from "./js/proposal.js?v=tc11";
 import {
   buildReminderTemplate,
@@ -43,23 +42,39 @@ import {
   renderKpis,
   renderLedgerAndChart,
   renderProposalPanel,
-} from "./js/render.js?v=tc11";
+} from "./js/render.js?v=tc22";
+
+const HORIZON_DAYS = 14;
 
 const forecastForm = document.querySelector("#forecast-form");
+const businessTypeInput = document.querySelector("#business-type-input");
+const businessGoalInput = document.querySelector("#business-goal-input");
+const promptChips = document.querySelectorAll(".prompt-chip");
 const scenarioForm = document.querySelector("#scenario-form");
 const fileInput = document.querySelector("#csv-file");
 const fileDropzone = document.querySelector("#file-dropzone");
 const fileNameEl = document.querySelector("#file-name");
 const downloadSampleBtn = document.querySelector("#download-sample-btn");
-const horizonSelect = document.querySelector("#horizon-select");
+const editBalanceBtn = document.querySelector("#edit-balance-btn");
+const inlineBalanceForm = document.querySelector("#inline-balance-form");
+const inlineBalanceInput = document.querySelector("#inline-balance-input");
+const cancelBalanceBtn = document.querySelector("#cancel-balance-btn");
 
 const statusBanner = document.querySelector("#status");
 const resultsStatusBanner = document.querySelector("#results-status");
 const setupScreen = document.querySelector("#setup-screen");
 const resultsSection = document.querySelector("#results");
 const changeFileBtn = document.querySelector("#change-file-btn");
-const healthPill = document.querySelector("#health-pill");
-const agentStatusPill = document.querySelector("#agent-status-pill");
+const toggleAllDetailsBtn = document.querySelector("#toggle-all-details-btn");
+const detailAccordions = Array.from(document.querySelectorAll(".detail-accordion"));
+const accCompare = document.querySelector("#acc-compare");
+const accComparePill = document.querySelector("#acc-compare-pill");
+const accHealth = document.querySelector("#acc-health");
+const accHealthPill = document.querySelector("#acc-health-pill");
+const accOptimize = document.querySelector("#acc-optimize");
+const accOptimizePill = document.querySelector("#acc-optimize-pill");
+const accAnomalies = document.querySelector("#acc-anomalies");
+const accAnomaliesPill = document.querySelector("#acc-anomalies-pill");
 
 const adviceLoading = document.querySelector("#advice-loading");
 const adviceError = document.querySelector("#advice-error");
@@ -67,7 +82,6 @@ const retryAdviceBtn = document.querySelector("#retry-advice-btn");
 const explanationEl = document.querySelector("#explanation");
 const adviceModelEl = document.querySelector("#advice-model");
 
-const horizonPills = document.querySelectorAll(".horizon-pill");
 const toggleForecastBtn = document.querySelector("#toggle-forecast-btn");
 const toggleStressBtn = document.querySelector("#toggle-stress-btn");
 const clearWhatIfOverlayBtn = document.querySelector("#clear-whatif-overlay-btn");
@@ -109,9 +123,15 @@ const copyFeedback = document.querySelector("#copy-feedback");
 
 const state = {
   openingBalanceMinor: null,
-  startDate: AMALFI_DEFAULT_START_DATE,
-  horizonDays: 14,
+  balanceSourceLabel: "",
+  startDate: "",
+  horizonDays: HORIZON_DAYS,
   csvFile: null,
+  profile: {
+    business_type: "",
+    goal: "",
+    experience_level: "beginner",
+  },
   forecast: null,
   proposal: null,
   advice: null,
@@ -135,11 +155,28 @@ function showStatus(message, isError = false) {
   activeBanner.hidden = !message;
 }
 
+function syncDetailToggleControls() {
+  const visible = detailAccordions.filter((acc) => !acc.hidden);
+  const allOpen = visible.length > 0 && visible.every((acc) => acc.open);
+
+  if (toggleAllDetailsBtn) {
+    toggleAllDetailsBtn.textContent = allOpen ? "Collapse all" : "Expand all";
+  }
+}
+
+function setAllAccordions(openBool) {
+  for (const acc of detailAccordions) {
+    acc.open = Boolean(openBool);
+  }
+  syncDetailToggleControls();
+}
+
 function showSetupScreen() {
   state.forecast = null;
+  state.proposal = null;
+  state.advice = null;
   state.adviceRequestId += 1;
   state.insightsRequestId += 1;
-  agentStatusPill.textContent = "Assistant ready";
   setupScreen.hidden = false;
   resultsSection.hidden = true;
   changeFileBtn.hidden = true;
@@ -158,20 +195,10 @@ function setActiveTab(tab) {
   panelWhatIf.hidden = isCredit;
 }
 
-function syncHorizonPills(value) {
-  const strVal = String(value);
-  for (const pill of horizonPills) {
-    const active = pill.dataset.horizon === strVal;
-    pill.classList.toggle("is-active", active);
-    pill.setAttribute("aria-pressed", String(active));
-  }
-}
-
 function renderAll() {
   setupScreen.hidden = true;
   resultsSection.hidden = false;
   changeFileBtn.hidden = false;
-  syncHorizonPills(state.horizonDays);
   renderKpis(state);
   renderLedgerAndChart(state);
   renderProposalPanel(state);
@@ -245,7 +272,6 @@ async function fetchAdvice({ forceDraft = false } = {}) {
   retryAdviceBtn.hidden = true;
   explanationEl.hidden = true;
   adviceModelEl.hidden = true;
-  agentStatusPill.textContent = "Assistant thinking…";
 
   try {
     const data = await requestAdvice(payload);
@@ -265,19 +291,17 @@ async function fetchAdvice({ forceDraft = false } = {}) {
     }
     adviceWrap.hidden = false;
     adviceButton.textContent = "Regenerate draft";
-    agentStatusPill.textContent = "Assistant ready";
+    return data;
   } catch (error) {
-    if (reqId !== state.adviceRequestId) return;
+    if (reqId !== state.adviceRequestId) return null;
     if (error?.status === 422) {
       state.advicePreviewOnly = true;
-      agentStatusPill.textContent = "Preview ready";
       adviceError.className = "inline-alert inline-alert-soft";
       adviceError.textContent =
         "AI explanation is not available for this forecast in preview mode. Your server cash numbers, decision preview, and editable email draft below are ready.";
       adviceError.hidden = false;
       retryAdviceBtn.hidden = true;
     } else {
-      agentStatusPill.textContent = "AI offline";
       adviceError.className = "inline-alert inline-alert-warn";
       const titleEl = document.createElement("strong");
       titleEl.className = "alert-title";
@@ -292,6 +316,7 @@ async function fetchAdvice({ forceDraft = false } = {}) {
     if (forceDraft) {
       applyTemplateDraft({ force: true });
     }
+    return null;
   } finally {
     if (reqId === state.adviceRequestId) {
       adviceLoading.hidden = true;
@@ -299,24 +324,180 @@ async function fetchAdvice({ forceDraft = false } = {}) {
   }
 }
 
-async function runBaselineForecast() {
+function splitSemicolonCsvLine(line) {
+  const cols = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === ";" && !inQuotes) {
+      cols.push(cur.trim());
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  cols.push(cur.trim());
+  return cols;
+}
+
+function parseBankDateIso(raw) {
+  const s = String(raw || "").trim();
+  const dot = /^(\d{2})\.(\d{2})\.(\d{2}|\d{4})$/.exec(s);
+  if (dot) {
+    const day = Number(dot[1]);
+    const month = Number(dot[2]);
+    const year = dot[3].length === 2 ? Number(`20${dot[3]}`) : Number(dot[3]);
+    const dt = new Date(Date.UTC(year, month - 1, day));
+    if (dt.getUTCFullYear() === year && dt.getUTCMonth() === month - 1 && dt.getUTCDate() === day) {
+      return dt.toISOString().slice(0, 10);
+    }
+    return null;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const dt = new Date(`${s}T00:00:00Z`);
+    if (!Number.isNaN(dt.getTime()) && dt.toISOString().slice(0, 10) === s) {
+      return s;
+    }
+  }
+  return null;
+}
+
+function parseBankMinorSafe(raw) {
+  const normalized = String(raw || "")
+    .trim()
+    .replace(/[\s\u00a0]/g, "")
+    .replace(/\.(?=\d{3}(?:,|$))/g, "")
+    .replace(",", ".");
+  if (!/^[+-]?\d+(?:\.\d{1,2})?$/.test(normalized)) return null;
+  try {
+    return BigInt(toMinor(normalized));
+  } catch {
+    return null;
+  }
+}
+
+function extractCsvDefaults(csvText, { isSample = false } = {}) {
+  const lines = String(csvText || "")
+    .replace(/^\uFEFF/, "")
+    .split(/\r?\n/)
+    .filter((line) => line.trim() !== "");
+  const headers = lines.length > 0 ? splitSemicolonCsvLine(lines[0]).map((h) => h.toLowerCase()) : [];
+
+  const idxOf = (...candidates) => {
+    for (const c of candidates) {
+      const idx = headers.indexOf(c);
+      if (idx !== -1) return idx;
+    }
+    return -1;
+  };
+
+  const valDateIdx = idxOf("value date");
+  const bookDateIdx = idxOf("booking date");
+  const amountIdx = idxOf("amount");
+  const balanceIdx = idxOf("balance", "saldo", "closing balance", "running balance");
+
+  const rows = [];
+  let latestDateIso = null;
+
+  for (let i = 1; i < lines.length; i += 1) {
+    const cols = splitSemicolonCsvLine(lines[i]);
+    const iso =
+      (valDateIdx !== -1 ? parseBankDateIso(cols[valDateIdx]) : null) ||
+      (bookDateIdx !== -1 ? parseBankDateIso(cols[bookDateIdx]) : null);
+    if (!iso) continue;
+
+    if (!latestDateIso || iso > latestDateIso) {
+      latestDateIso = iso;
+    }
+    rows.push({
+      iso,
+      amountMinor: amountIdx !== -1 ? parseBankMinorSafe(cols[amountIdx]) : null,
+      balanceMinor: balanceIdx !== -1 ? parseBankMinorSafe(cols[balanceIdx]) : null,
+    });
+  }
+
+  // Anchor the 14-day window so its last day always equals the latest CSV date (chart divider).
+  const startDate = latestDateIso
+    ? addDaysIso(latestDateIso, -(HORIZON_DAYS - 1))
+    : new Date().toISOString().slice(0, 10);
+  const endDate = latestDateIso || addDaysIso(startDate, HORIZON_DAYS - 1);
+
+  let openingBalanceMinor = null;
+  let balanceSourceLabel = "";
+
+  // 1. Prefer an explicit Balance/Saldo column if the bank CSV includes one.
+  const preWindowRows = rows.filter((r) => r.iso < startDate && r.balanceMinor !== null);
+  const windowBalanceRows = rows.filter((r) => r.balanceMinor !== null);
+  if (preWindowRows.length > 0) {
+    preWindowRows.sort((a, b) => (a.iso < b.iso ? -1 : a.iso > b.iso ? 1 : 0));
+    openingBalanceMinor = Number(preWindowRows[preWindowRows.length - 1].balanceMinor);
+    balanceSourceLabel = "From CSV balance";
+  } else if (windowBalanceRows.length > 0) {
+    openingBalanceMinor = Number(windowBalanceRows[0].balanceMinor);
+    balanceSourceLabel = "From CSV balance";
+  } else if (isSample) {
+    // 2. Canonical bundled Amalfi sample synced opening balance.
+    openingBalanceMinor = Number(toMinor(AMALFI_DEFAULT_OPENING_EUR));
+    balanceSourceLabel = "Synced demo balance";
+  } else {
+    // 3. Auto-estimate an opening liquidity cushion (50% of 14-day inflows, rounded to 500.00, min 1,000.00).
+    let inflowsMinor = 0n;
+    for (const r of rows) {
+      if (r.iso >= startDate && r.iso <= endDate && r.amountMinor !== null && r.amountMinor > 0n) {
+        inflowsMinor += r.amountMinor;
+      }
+    }
+    const half = inflowsMinor / 2n;
+    const rounded = ((half + 25_000n) / 50_000n) * 50_000n;
+    const clamped = rounded < 100_000n ? 100_000n : rounded;
+    openingBalanceMinor = Number(clamped);
+    balanceSourceLabel = "Auto-estimated balance";
+  }
+
+  return { startDate, openingBalanceMinor, balanceSourceLabel };
+}
+
+async function runBaselineForecast({ customOpeningMinor = null } = {}) {
   const submitBtn = document.querySelector("#run-forecast-btn");
   submitBtn.disabled = true;
   showStatus("Checking your upcoming cash…");
 
   try {
-    const selectedFile = fileInput.files?.[0] || null;
-    const csvText = selectedFile ? await selectedFile.text() : AMALFI_SAMPLE_CSV;
-    if (selectedFile) {
-      validateCsvUpload(selectedFile, csvText);
-    }
-    state.csvFile =
-      selectedFile || new File([AMALFI_SAMPLE_CSV], AMALFI_SAMPLE_FILENAME, { type: "text/csv" });
+    if (customOpeningMinor !== null && state.csvFile) {
+      state.openingBalanceMinor = customOpeningMinor;
+      state.balanceSourceLabel = "Custom balance";
+    } else {
+      const selectedFile = fileInput.files?.[0] || null;
+      const isSample = !selectedFile;
+      const csvText = selectedFile ? await selectedFile.text() : AMALFI_SAMPLE_CSV;
+      if (selectedFile) {
+        validateCsvUpload(selectedFile, csvText);
+      }
+      state.csvFile =
+        selectedFile || new File([AMALFI_SAMPLE_CSV], AMALFI_SAMPLE_FILENAME, { type: "text/csv" });
 
-    horizonSelect.value = "14";
-    state.openingBalanceMinor = Number(toMinor(forecastForm.elements.opening_balance.value));
-    state.startDate = forecastForm.elements.start_date.value;
-    state.horizonDays = 14;
+      const resolved = extractCsvDefaults(csvText, { isSample });
+      state.openingBalanceMinor = resolved.openingBalanceMinor;
+      state.balanceSourceLabel = resolved.balanceSourceLabel;
+      state.startDate = resolved.startDate;
+    }
+
+    state.profile = {
+      business_type: businessTypeInput?.value.trim() || "",
+      goal: businessGoalInput?.value.trim() || "",
+      experience_level: "beginner",
+    };
+    state.horizonDays = HORIZON_DAYS;
+    if (inlineBalanceForm) inlineBalanceForm.hidden = true;
+    if (editBalanceBtn) editBalanceBtn.hidden = false;
 
     const data = await resolveForecast({
       csvFile: state.csvFile,
@@ -349,15 +530,26 @@ async function runBaselineForecast() {
     populateIncomingPayments(state, scenarioForm);
     applyTemplateDraft({ force: true });
     setActiveTab(state.proposal ? "credit" : "whatif");
+    setAllAccordions(false);
     showStatus("");
     renderAll();
-    loadInsights();
 
-    if (state.proposal) {
-      fetchAdvice({ forceDraft: false });
-    } else {
-      agentStatusPill.textContent = "Assistant ready";
-    }
+    const insightsPromise = loadInsights();
+    const advicePromise = state.proposal
+      ? fetchAdvice({ forceDraft: false })
+      : Promise.resolve(null);
+    const combinedPromise = Promise.all([insightsPromise, advicePromise]).then(([ins, adv]) => ({
+      ...(ins || {}),
+      advice: adv,
+    }));
+    renderActionPlan({
+      state,
+      insightsPromise: combinedPromise,
+      onOpenEmailTab: () => {
+        setActiveTab("whatif");
+        document.querySelector("#actions-heading")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      },
+    });
   } catch (error) {
     showStatus(formatCsvError(error.message), true);
     if (resultsSection.hidden) {
@@ -371,38 +563,9 @@ async function runBaselineForecast() {
 // Return to Step 1 (Upload / Settings)
 changeFileBtn.addEventListener("click", showSetupScreen);
 
-// Live horizon switcher on Step 2 (14 days / 30 days / Whole file)
-for (const pill of horizonPills) {
-  pill.addEventListener("click", () => {
-    const next = pill.dataset.horizon;
-    if (!next || String(state.horizonDays) === next) return;
-    horizonSelect.value = next;
-    runBaselineForecast();
-  });
-}
-
 // Tabs
 tabCredit.addEventListener("click", () => setActiveTab("credit"));
 tabWhatIf.addEventListener("click", () => setActiveTab("whatif"));
-
-// Backend health check (/health)
-async function checkHealth() {
-  try {
-    const data = await requestHealth();
-    if (data?.status === "ok") {
-      healthPill.textContent = "Connected";
-      healthPill.classList.remove("is-down");
-      healthPill.classList.add("is-ok");
-      return;
-    }
-  } catch {
-    // Fall through to offline indicator
-  }
-  healthPill.textContent = "Offline";
-  healthPill.classList.remove("is-ok");
-  healthPill.classList.add("is-down");
-}
-checkHealth();
 
 // Load the backend insight milestones in parallel without blocking the main forecast
 function previewCollectAction(action) {
@@ -418,9 +581,14 @@ function previewCollectAction(action) {
 async function loadInsights() {
   const reqId = ++state.insightsRequestId;
   resetInsightsUi();
+  if (accCompare) accCompare.hidden = true;
+  if (accHealth) accHealth.hidden = true;
+  if (accOptimize) accOptimize.hidden = true;
+  if (accAnomalies) accAnomalies.hidden = true;
+  syncDetailToggleControls();
 
   const payload = buildInsightPayload(state.forecast);
-  if (!payload) return;
+  if (!payload) return null;
 
   const currency = state.forecast.currency ?? "EUR";
   const hasShortfall = Boolean(payload.baseline.first_deficit);
@@ -433,31 +601,66 @@ async function loadInsights() {
     requestOptimizePayments(payload),
   ]);
 
-  if (reqId !== state.insightsRequestId || !state.forecast) return;
+  if (reqId !== state.insightsRequestId || !state.forecast) return null;
 
-  if (anomaliesRes.status === "fulfilled" && anomaliesRes.value) {
-    renderAnomalies(anomaliesRes.value, currency);
+  const anomalies = anomaliesRes.status === "fulfilled" ? anomaliesRes.value : null;
+  const compare = compareRes.status === "fulfilled" ? compareRes.value : null;
+  const stress = stressRes.status === "fulfilled" ? stressRes.value : null;
+  const credit = creditRes.status === "fulfilled" ? creditRes.value : null;
+  const optimize = optimizeRes.status === "fulfilled" ? optimizeRes.value : null;
+
+  if (anomalies) {
+    renderAnomalies(anomalies, currency);
+    if (accAnomalies) accAnomalies.hidden = false;
+    if (accAnomaliesPill) {
+      const count = anomalies.findings?.length || 0;
+      accAnomaliesPill.textContent = count > 0 ? `${count} flagged` : "Looks clean";
+      accAnomaliesPill.className = count > 0 ? "pill pill-warning" : "pill pill-success";
+    }
   }
-  if (compareRes.status === "fulfilled" && compareRes.value) {
-    renderCompareOptions(compareRes.value, currency);
+  if (compare) {
+    renderCompareOptions(compare, currency);
+    if (compare.options?.length > 0 && accCompare) {
+      accCompare.hidden = false;
+      if (accComparePill) {
+        accComparePill.textContent = `${compare.options.length} options`;
+      }
+    }
   }
-  if (stressRes.status === "fulfilled" && stressRes.value) {
-    renderStressTest(stressRes.value, currency);
+  if (stress) {
+    renderStressTest(stress, currency);
   }
   if (!hasShortfall) {
     renderHealthyCreditScore();
-  } else if (creditRes.status === "fulfilled" && creditRes.value) {
-    renderCreditCheck(creditRes.value, currency);
+  } else if (credit) {
+    renderCreditCheck(credit, currency);
   }
-  if (optimizeRes.status === "fulfilled" && optimizeRes.value) {
+  if (!hasShortfall || stress || credit) {
+    if (accHealth) accHealth.hidden = false;
+    if (accHealthPill) {
+      accHealthPill.textContent = !hasShortfall
+        ? "100 / 100 · Low risk"
+        : credit
+          ? `${credit.score} / 100 · ${credit.risk} risk`
+          : `Buffer ${printMoney(stress.recommended_limit_minor, currency)}`;
+    }
+  }
+  if (optimize) {
     renderOptimizePayments(
-      optimizeRes.value,
+      optimize,
       state.forecast.transactions,
       currency,
       previewCollectAction,
     );
+    if (accOptimize) accOptimize.hidden = false;
+    if (accOptimizePill) {
+      const moves = optimize.actions?.length || 0;
+      accOptimizePill.textContent = moves > 0 ? `${moves} moves` : "None needed";
+    }
   }
   populateDelayCandidates(state.forecast, currency);
+  syncDetailToggleControls();
+  return { anomalies, compare, stress, credit, optimize };
 }
 
 function setWhatIfMode(mode) {
@@ -508,15 +711,27 @@ scrollToChartBtn?.addEventListener("click", () => {
 });
 
 // Ask the CFO (Milestone 1)
+async function askCfoCore(question) {
+  const payload = buildInsightPayload(state.forecast);
+  if (!payload) {
+    throw new Error("Questions require at least 14 days in your forecast.");
+  }
+  const data = await requestAskCfo(payload, question);
+  renderAskAnswer(data, state.forecast.currency ?? "EUR");
+  if (data.what_if) {
+    const curveDays = buildWhatIfCurve(state.forecast.baseline.days, state.forecast.transactions, {
+      transactionId: data.what_if.transaction_id,
+      newAmountMinor: data.what_if.new_amount_minor,
+      newDate: data.what_if.new_date,
+    });
+    showWhatIfOverlay("What-if scenario", curveDays);
+  }
+  return data;
+}
+
 async function submitAskQuestion(question) {
   const trimmed = String(question || "").trim();
   if (!trimmed || !state.forecast) return;
-
-  const payload = buildInsightPayload(state.forecast);
-  if (!payload) {
-    renderAskError("Questions require at least 14 days in your forecast.");
-    return;
-  }
 
   askBtn.disabled = true;
   askBtn.textContent = "Checking…";
@@ -524,16 +739,7 @@ async function submitAskQuestion(question) {
   document.querySelector("#ask-answer-box").hidden = true;
   document.querySelector("#ask-error").hidden = true;
   try {
-    const data = await requestAskCfo(payload, trimmed);
-    renderAskAnswer(data, state.forecast.currency ?? "EUR");
-    if (data.what_if) {
-      const curveDays = buildWhatIfCurve(state.forecast.baseline.days, state.forecast.transactions, {
-        transactionId: data.what_if.transaction_id,
-        newAmountMinor: data.what_if.new_amount_minor,
-        newDate: data.what_if.new_date,
-      });
-      showWhatIfOverlay("What-if scenario", curveDays);
-    }
+    await askCfoCore(trimmed);
   } catch (error) {
     renderAskError(
       error.status === 503
@@ -605,7 +811,6 @@ delayForm.addEventListener("submit", async (event) => {
 
 // File upload & drag-and-drop
 fileInput.addEventListener("change", () => {
-  for (const option of horizonSelect.options) option.disabled = false;
   const file = fileInput.files?.[0];
   fileNameEl.textContent = file
     ? `${file.name} (${Math.max(1, Math.round(file.size / 1024))} KB)`
@@ -626,7 +831,7 @@ fileInput.addEventListener("change", () => {
 });
 
 // Download Red Hat sample CSV
-downloadSampleBtn.addEventListener("click", () => {
+function downloadSampleCsv() {
   const blob = new Blob([AMALFI_SAMPLE_CSV], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -636,7 +841,8 @@ downloadSampleBtn.addEventListener("click", () => {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
-});
+}
+downloadSampleBtn.addEventListener("click", downloadSampleCsv);
 
 // Forecast controls
 forecastForm.addEventListener("submit", (event) => {
@@ -683,20 +889,22 @@ const approveButton = document.querySelector("#approve-sim-btn");
 const rejectButton = document.querySelector("#reject-sim-btn");
 
 async function simulateDecision(decision) {
-  if (!state.proposal || !state.forecast) return;
+  if (!state.proposal || !state.forecast) return null;
   const baseline = state.forecast.baseline;
   const decisionBaseline = pickDecisionBaseline(state.forecast);
   approveButton.disabled = true;
   rejectButton.disabled = true;
   try {
     const outcome = await requestDecision({ baseline: decisionBaseline, decision });
-    if (state.forecast?.baseline !== baseline) return;
+    if (state.forecast?.baseline !== baseline) return null;
     state.simulationDecision = outcome.decision;
     state.simulationOutcome = outcome;
     showStatus("");
     renderAll();
+    return outcome;
   } catch (error) {
     if (state.forecast?.baseline === baseline) showStatus(error.message, true);
+    return null;
   } finally {
     approveButton.disabled = false;
     rejectButton.disabled = false;
@@ -795,3 +1003,75 @@ sendReminderBtn.addEventListener("click", async () => {
     sendReminderBtn.textContent = "Simulate send";
   }
 });
+
+// Screen 1 Onboarding Question Chips (never auto-filled)
+function syncPromptChipsFor(target, value) {
+  const clean = String(value || "").trim();
+  for (const chip of promptChips) {
+    if (chip.dataset.questionTarget !== target) continue;
+    const matched = clean !== "" && chip.dataset.value === clean;
+    chip.classList.toggle("is-selected", matched);
+    chip.setAttribute("aria-pressed", String(matched));
+  }
+}
+
+if (businessTypeInput) {
+  businessTypeInput.value = "";
+  businessTypeInput.addEventListener("input", () => syncPromptChipsFor("business", businessTypeInput.value));
+}
+if (businessGoalInput) {
+  businessGoalInput.value = "";
+  businessGoalInput.addEventListener("input", () => syncPromptChipsFor("goal", businessGoalInput.value));
+}
+
+for (const chip of promptChips) {
+  chip.setAttribute("aria-pressed", "false");
+  chip.addEventListener("click", () => {
+    const target = chip.dataset.questionTarget;
+    const val = chip.dataset.value || "";
+    const input = target === "business" ? businessTypeInput : businessGoalInput;
+    if (!input) return;
+    input.value = input.value.trim() === val ? "" : val;
+    syncPromptChipsFor(target, input.value);
+  });
+}
+
+// Screen 2 Inline "Cash today" Editor
+editBalanceBtn?.addEventListener("click", () => {
+  if (!inlineBalanceForm || !inlineBalanceInput) return;
+  const currentMinor = state.openingBalanceMinor ?? 500_000;
+  inlineBalanceInput.value = (currentMinor / 100).toFixed(2);
+  inlineBalanceForm.hidden = false;
+  editBalanceBtn.hidden = true;
+  inlineBalanceInput.focus();
+  inlineBalanceInput.select();
+});
+
+cancelBalanceBtn?.addEventListener("click", () => {
+  if (inlineBalanceForm) inlineBalanceForm.hidden = true;
+  if (editBalanceBtn) editBalanceBtn.hidden = false;
+});
+
+inlineBalanceForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!state.csvFile || !inlineBalanceInput) return;
+  try {
+    const customOpeningMinor = Number(toMinor(inlineBalanceInput.value));
+    await runBaselineForecast({ customOpeningMinor });
+  } catch (error) {
+    showStatus(error.message, true);
+  }
+});
+
+// Screen 2 Progressive Disclosure Accordions
+for (const acc of detailAccordions) {
+  acc.addEventListener("toggle", syncDetailToggleControls);
+}
+
+toggleAllDetailsBtn?.addEventListener("click", () => {
+  const visible = detailAccordions.filter((acc) => !acc.hidden);
+  const allOpen = visible.length > 0 && visible.every((acc) => acc.open);
+  setAllAccordions(!allOpen);
+});
+
+syncDetailToggleControls();
