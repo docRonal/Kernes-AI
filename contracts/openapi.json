@@ -92,7 +92,7 @@
     },
     "/api/advice": {
       "post": {
-        "description": "Explain the baseline credit facility proposal with the model served on OpenShift AI and draft an editable payment reminder. Send the baseline and transactions from the forecast response. The server recalculates the proposal, gives the model only formatted facts, and rejects an answer whose PLN amounts don't match them. Demo mode returns demo/advice.example.json for the bundled baseline.",
+        "description": "Explain the baseline credit facility proposal with the model served on OpenShift AI and draft an editable payment reminder. Send the baseline and transactions from the forecast response. The server recalculates the proposal, gives the model only formatted facts, and rejects an answer whose EUR amounts don't match them. Demo mode returns demo/advice.example.json for the bundled baseline.",
         "requestBody": {
           "required": true,
           "content": {
@@ -476,7 +476,7 @@
           "explanation": {
             "type": "string",
             "minLength": 1,
-            "description": "Model explanation of the proposal. Every PLN amount it cites was checked against the calculated figures, and it cites the proposed limit."
+            "description": "Model explanation of the proposal. Every EUR amount it cites was checked against the calculated figures, and it cites the proposed limit."
           },
           "email_draft": {
             "anyOf": [

@@ -43,12 +43,14 @@ def test_preview_serves_html_assets_and_demo_csv():
     assert styles.status_code == 200
     assert "css/tokens.css" in styles.text
     for asset in (
-        "app.js", "chart.js", "parser.js", "sample-amalfi.js",
-        "js/api.js", "js/format.js", "js/proposal.js", "js/render.js",
-        "css/tokens.css", "css/dashboard.css", "css/forms.css", "css/panels.css", "css/responsive.css",
+        "app.js", "chart.js", "sample-amalfi.js",
+        "js/api.js", "js/format.js", "js/insights.js", "js/proposal.js", "js/render.js",
+        "css/tokens.css", "css/dashboard.css", "css/forms.css", "css/insights.css", "css/panels.css", "css/responsive.css",
     ):
         assert client.get(f"/assets/{asset}").status_code == 200, asset
     assert client.get("/demo/transactions.csv").content == (DEMO / "transactions.csv").read_bytes()
+    assert client.get("/demo/amalfi.csv").status_code == 200
+    assert client.get("/demo/amalfi.csv").content == (DEMO / "pizzeria_amalfi_sample.csv").read_bytes()
     operations = client.get("/openapi.json").json()["paths"]
     assert "multipart/form-data" in operations["/api/forecast"]["post"]["requestBody"]["content"]
 
@@ -220,7 +222,7 @@ def test_live_workflow_all_synthetic_cases(case):
         assert key_scn == move["expected_scenario_minor"]
 
 
-def test_live_rejects_amalfi_semicolon_bank_statement():
+def test_live_parses_amalfi_semicolon_bank_statement():
     amalfi_snippet = (
         '"Account Number";"Booking Date";"Value Date";"Transaction Type";"Payment Reference";'
         '"Beneficiary/Payer";"Counterparty Account";"Bank Code";"Amount";"Currency";"Info"\n'
@@ -229,8 +231,15 @@ def test_live_rejects_amalfi_semicolon_bank_statement():
         '"HELADEFFXXX";"275,35";"EUR";"Transaction booked"\n'
     ).encode("utf-8")
     resp = forecast(TestClient(create_app("live")), BASE_INPUT, amalfi_snippet)
-    assert resp.status_code == 422
-    assert "header" in resp.json()["detail"].lower()
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["transactions"] == [
+        {
+            "id": "TX-0001",
+            "date": "2025-12-31",
+            "amount_minor": 27_535,
+            "label": "Pizzeria Amalfi Customers",
+        }
+    ]
 
 
 # ─── Reusable Remote / OpenShift Deployment Verification ─────────────────────

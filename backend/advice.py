@@ -22,6 +22,7 @@ from pathlib import Path
 from fastapi import HTTPException
 
 from .forecast import horizon, propose
+from .telemetry import log_llm_call
 from .models import (
     AdviceRequest,
     AdviceResponse,
@@ -438,12 +439,12 @@ def call_model(
         raise ModelError("The model endpoint returned an unexpected response.") from exc
 
 
-def _run_attempts(
+def _run_attempts_counted(
     config: ModelConfig,
     facts: Facts,
     messages: list[dict[str, str]],
     started: float,
-) -> tuple[AdviceResponse, str | None]:
+) -> tuple[AdviceResponse, str | None, int]:
     schema = DELAY_OUTPUT_SCHEMA if facts.has_delay_prediction else OUTPUT_SCHEMA
     problem = "no answer"
     for attempt in range(1, ATTEMPTS + 1):
@@ -464,24 +465,58 @@ def _run_attempts(
                     latency_ms=latency,
                 ),
                 delay_warning if facts.has_delay_prediction else None,
+                attempt,
             )
         log.warning("advice model=%s attempt=%d rejected: %s", config.name, attempt, problem)
     raise ModelError(f"The model's explanation didn't match the calculated figures: {problem}.")
 
 
-def _live_advice_with_warning(request: AdviceRequest) -> tuple[AdviceResponse, str | None]:
+def _run_attempts(
+    config: ModelConfig,
+    facts: Facts,
+    messages: list[dict[str, str]],
+    started: float,
+) -> tuple[AdviceResponse, str | None]:
+    response, warning, _attempts = _run_attempts_counted(config, facts, messages, started)
+    return response, warning
+
+
+def _live_advice_with_warning(
+    request: AdviceRequest,
+    *,
+    endpoint: str = "advice",
+) -> tuple[AdviceResponse, str | None]:
     facts = build_facts(request)
     primary = ModelConfig.from_env()
     messages = build_messages(facts)
     started = time.monotonic()
     try:
-        return _run_attempts(primary, facts, messages, started)
+        response, warning, attempts = _run_attempts_counted(primary, facts, messages, started)
+        log_llm_call(
+            endpoint=endpoint,
+            model=response.model,
+            latency_ms=response.latency_ms or 0,
+            status="ok",
+            attempts=attempts,
+            grounded=True,
+            fallback_used=False,
+        )
+        return response, warning
     except ModelError as primary_exc:
         fallback = ModelConfig.fallback_from_env(
             timeout=primary.timeout,
             ssl_context=primary.ssl_context,
         )
         if fallback is None:
+            log_llm_call(
+                endpoint=endpoint,
+                model=primary.name,
+                latency_ms=round((time.monotonic() - started) * 1000),
+                status="error",
+                attempts=ATTEMPTS,
+                grounded=False,
+                fallback_used=False,
+            )
             raise
         log.warning(
             "advice primary model=%s failed (%s); falling back to model=%s",
@@ -489,18 +524,40 @@ def _live_advice_with_warning(request: AdviceRequest) -> tuple[AdviceResponse, s
             primary_exc,
             fallback.name,
         )
-        return _run_attempts(fallback, facts, messages, started)
+        try:
+            response, warning, attempts = _run_attempts_counted(fallback, facts, messages, started)
+            log_llm_call(
+                endpoint=endpoint,
+                model=response.model,
+                latency_ms=response.latency_ms or 0,
+                status="ok",
+                attempts=ATTEMPTS + attempts,
+                grounded=True,
+                fallback_used=True,
+            )
+            return response, warning
+        except ModelError:
+            log_llm_call(
+                endpoint=endpoint,
+                model=fallback.name,
+                latency_ms=round((time.monotonic() - started) * 1000),
+                status="error",
+                attempts=ATTEMPTS * 2,
+                grounded=False,
+                fallback_used=True,
+            )
+            raise
 
 
 def live_advice(request: AdviceRequest) -> AdviceResponse:
-    response, _ = _live_advice_with_warning(request)
+    response, _ = _live_advice_with_warning(request, endpoint="advice")
     return response
 
 
 def predict_delays(*, mode: str, request: AdviceRequest) -> DelayPredictResponse:
     if mode == "live":
         try:
-            response, delay_warning = _live_advice_with_warning(request)
+            response, delay_warning = _live_advice_with_warning(request, endpoint="predict-delays")
         except ModelError as exc:
             log.warning("delay prediction unavailable: %s", exc)
             raise HTTPException(503, f"The AI explanation is unavailable. {exc}") from exc

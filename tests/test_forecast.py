@@ -381,3 +381,71 @@ def test_contract_fields_match_the_models(schema_name, model_name):
     model_schema = getattr(models, model_name).model_json_schema()
     assert set(schema["properties"]) == set(model_schema["properties"])
     assert set(schema["required"]) == set(model_schema["required"])
+
+
+# ─── Server-side Pizzeria Amalfi / German MT940 bank CSV support ─────────────
+
+
+@pytest.mark.parametrize("mode", ["demo", "live"])
+def test_amalfi_semicolon_csv_forecasts_and_decisions_run_on_server(mode):
+    app_client = TestClient(create_app(mode))
+    csv_bytes = (DEMO / "pizzeria_amalfi_sample.csv").read_bytes()
+
+    resp = forecast(app_client, csv_bytes, opening="500000", start="2025-06-22")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["baseline"]["first_deficit"] == {"date": "2025-06-28", "shortfall_minor": 625_000}
+    assert body["proposal"]["deepest_shortfall"] == {"date": "2025-07-03", "shortfall_minor": 824_891}
+    assert body["proposal"]["limit_minor"] == 824_891
+
+    # CHF tranche (-4166.67 CHF @ 1.050 EUR/CHF) converts accurately with Decimal rounding.
+    chf_tx = next(t for t in body["transactions"] if t["date"] == "2025-06-15")
+    assert chf_tx["amount_minor"] == -437_500
+
+    # Earlier payment move and /api/decision work server-side on Amalfi baseline too.
+    moved = forecast(
+        app_client,
+        csv_bytes,
+        opening="500000",
+        start="2025-06-22",
+        move_transaction_id="TX-0005",
+        move_to_date="2025-06-28",
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["scenario"]["days"] != body["baseline"]["days"]
+
+    approved = app_client.post("/api/decision", json={"decision": "approved", "baseline": body["baseline"]})
+    rejected = app_client.post("/api/decision", json={"decision": "rejected", "baseline": body["baseline"]})
+    assert approved.status_code == rejected.status_code == 200
+    assert approved.json()["limit_minor"] == 824_891
+    assert approved.json()["largest_uncovered"] is None
+    assert rejected.json()["largest_uncovered"] == {"date": "2025-07-03", "shortfall_minor": 824_891}
+
+
+def test_full_red_hat_amalfi_dataset_parses_cleanly(client):
+    full_csv = DEMO.parent / "red-hat-examples" / "pizzeria-amalfi-bank-statement-2025-v6.csv"
+    resp = forecast(client, full_csv.read_bytes(), opening="500000", start="2025-06-22")
+    assert resp.status_code == 200, resp.text
+    assert len(resp.json()["transactions"]) == 1125
+
+
+@pytest.mark.parametrize(
+    "bad_csv",
+    [
+        "Account Number;Booking Date\nDE00;01.07.25\n",
+        (
+            '"Account Number";"Booking Date";"Value Date";"Transaction Type";'
+            '"Payment Reference";"Beneficiary/Payer";"Amount";"Currency"\n'
+            '"DE00";"99.99.25";"99.99.25";"TEST";"Ref";"Vendor";"-10,00";"EUR"\n'
+        ),
+        (
+            '"Account Number";"Booking Date";"Value Date";"Transaction Type";'
+            '"Payment Reference";"Beneficiary/Payer";"Amount";"Currency"\n'
+            '"DE00";"01.07.25";"01.07.25";"TEST";"Ref";"Vendor";"-10,00";"USD"\n'
+        ),
+    ],
+    ids=["missing bank columns", "invalid bank date", "unsupported currency"],
+)
+def test_invalid_bank_csv_returns_422(client, bad_csv):
+    resp = forecast(client, bad_csv, opening="500000", start="2025-06-22")
+    assert resp.status_code == 422

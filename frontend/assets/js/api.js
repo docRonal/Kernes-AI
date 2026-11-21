@@ -1,5 +1,3 @@
-import { buildForecastFromRedHat } from "../parser.js?v=tc8";
-
 export function formatCsvError(rawMessage) {
   const msg = String(rawMessage || "").trim();
   if (!msg) {
@@ -9,7 +7,10 @@ export function formatCsvError(rawMessage) {
     return "This CSV doesn't match the expected columns. Upload a bank CSV export (with Booking Date, Amount, Currency) or a CSV with header: id,date,amount_minor,label — or try one of the sample buttons below.";
   }
   if (/missing required columns/i.test(msg)) {
-    return "This bank CSV doesn't have the required columns (Booking Date, Amount, Currency). Export a fresh CSV from your bank or try one of the built-in samples below.";
+    return "This bank CSV doesn't have the required columns (Account Number, Booking Date, Value Date, Transaction Type, Payment Reference, Beneficiary/Payer, Amount, Currency). Export a fresh CSV from your bank or try one of the built-in samples below.";
+  }
+  if (/unsupported currency/i.test(msg)) {
+    return `${msg} Right now EUR and CHF transactions are supported.`;
   }
   if (/Use 12000 EUR|Use the bundled transactions\.csv/i.test(msg)) {
     return "In local preview mode, custom comma CSVs aren't active yet — click 'Try Kernes demo (EUR)' or 'Try Pizzeria Amalfi sample' below to explore.";
@@ -41,25 +42,11 @@ export async function request(path, options) {
 
 export async function resolveForecast({
   csvFile,
-  parsedCsv,
   openingBalanceMinor,
   startDate,
-  horizonDays,
   moveTransactionId = null,
   moveToDate = null,
 }) {
-  // Bank statements are analyzed locally in EUR, including the longer horizons.
-  if (parsedCsv) {
-    return buildForecastFromRedHat({
-      parsed: parsedCsv,
-      startingBalanceMinor: openingBalanceMinor,
-      startDate,
-      horizonDays,
-      moveTransactionId,
-      moveToDate,
-    });
-  }
-
   const formData = new FormData();
   formData.set("file", csvFile, csvFile.name);
   formData.set("starting_balance_minor", String(openingBalanceMinor));

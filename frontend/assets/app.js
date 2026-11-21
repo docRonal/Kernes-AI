@@ -1,11 +1,10 @@
-import { parseRedHatBankCsv } from "./parser.js?v=tc8";
 import {
   AMALFI_DEFAULT_MOVE_DATE,
   AMALFI_DEFAULT_OPENING_EUR,
   AMALFI_DEFAULT_START_DATE,
   AMALFI_SAMPLE_CSV,
   AMALFI_SAMPLE_FILENAME,
-} from "./sample-amalfi.js?v=tc8";
+} from "./sample-amalfi.js?v=tc9";
 import {
   buildInsightPayload,
   formatCsvError,
@@ -22,8 +21,8 @@ import {
   requestSendReminder,
   requestStressTest,
   resolveForecast,
-} from "./js/api.js?v=tc8";
-import { replayFade, toMinor } from "./js/format.js?v=tc8";
+} from "./js/api.js?v=tc9";
+import { replayFade, toMinor } from "./js/format.js?v=tc9";
 import {
   populateDelayCandidates,
   renderAnomalies,
@@ -37,15 +36,15 @@ import {
   renderOptimizePayments,
   renderStressTest,
   resetInsightsUi,
-} from "./js/insights.js?v=tc8";
-import { readProposal } from "./js/proposal.js?v=tc8";
+} from "./js/insights.js?v=tc9";
+import { readProposal } from "./js/proposal.js?v=tc9";
 import {
   buildReminderTemplate,
   populateIncomingPayments,
   renderKpis,
   renderLedgerAndChart,
   renderProposalPanel,
-} from "./js/render.js?v=tc8";
+} from "./js/render.js?v=tc9";
 
 const forecastForm = document.querySelector("#forecast-form");
 const scenarioForm = document.querySelector("#scenario-form");
@@ -107,10 +106,10 @@ const state = {
   startDate: AMALFI_DEFAULT_START_DATE,
   horizonDays: 14,
   csvFile: null,
-  parsedCsv: null,
   forecast: null,
   proposal: null,
   advice: null,
+  advicePreviewOnly: false,
   draftEdited: false,
   adviceRequestId: 0,
   insightsRequestId: 0,
@@ -261,11 +260,12 @@ async function fetchAdvice({ forceDraft = false } = {}) {
     agentStatusPill.textContent = "Assistant ready";
   } catch (error) {
     if (reqId !== state.adviceRequestId) return;
-    if (error?.status === 422 && state.parsedCsv) {
+    if (error?.status === 422) {
+      state.advicePreviewOnly = true;
       agentStatusPill.textContent = "Preview ready";
       adviceError.className = "inline-alert inline-alert-soft";
       adviceError.textContent =
-        "Local preview mode only stores a saved AI write-up for the Kernes sample. Your cash numbers, server decision preview, and editable email draft below are ready.";
+        "Local preview mode only stores a saved AI write-up for the Kernes sample. Your server cash numbers, decision preview, and editable email draft below are ready.";
       adviceError.hidden = false;
       retryAdviceBtn.hidden = true;
     } else {
@@ -307,28 +307,18 @@ async function runBaselineForecast() {
     state.csvFile =
       selectedFile || new File([AMALFI_SAMPLE_CSV], AMALFI_SAMPLE_FILENAME, { type: "text/csv" });
 
-    const header = csvText.trimStart().split(/\r?\n/, 1)[0];
-    state.parsedCsv = header.includes(";") ? parseRedHatBankCsv(csvText) : null;
-    if (!state.parsedCsv) horizonSelect.value = "14";
+    horizonSelect.value = "14";
     state.openingBalanceMinor = Number(toMinor(forecastForm.elements.opening_balance.value));
     state.startDate = forecastForm.elements.start_date.value;
-    state.horizonDays = horizonSelect.value === "all" ? "all" : Number(horizonSelect.value);
+    state.horizonDays = 14;
 
     const data = await resolveForecast({
       csvFile: state.csvFile,
-      parsedCsv: state.parsedCsv,
       openingBalanceMinor: state.openingBalanceMinor,
       startDate: state.startDate,
-      horizonDays: state.horizonDays,
     });
 
     state.forecast = data;
-    for (const option of horizonSelect.options) {
-      option.disabled = !state.parsedCsv && option.value !== "14";
-    }
-    for (const pill of horizonPills) {
-      pill.hidden = !state.parsedCsv && pill.dataset.horizon !== "14";
-    }
     state.adviceRequestId += 1;
     adviceLoading.hidden = true;
     adviceError.hidden = true;
@@ -341,6 +331,7 @@ async function runBaselineForecast() {
     state.simulationDecision = null;
     state.simulationOutcome = null;
     state.advice = null;
+    state.advicePreviewOnly = false;
     state.draftEdited = false;
     adviceWrap.hidden = false;
     adviceButton.textContent = "Regenerate draft";
@@ -630,10 +621,8 @@ scenarioForm.addEventListener("submit", async (event) => {
   try {
     const data = await resolveForecast({
       csvFile: state.csvFile,
-      parsedCsv: state.parsedCsv,
       openingBalanceMinor: state.openingBalanceMinor,
       startDate: state.startDate,
-      horizonDays: state.horizonDays,
       moveTransactionId: scenarioForm.elements.move_transaction_id.value,
       moveToDate: scenarioForm.elements.move_to_date.value,
     });
@@ -709,7 +698,7 @@ adviceButton.addEventListener("click", () => {
   state.draftEdited = false;
   reminderReceipt.hidden = true;
   reminderError.hidden = true;
-  if (state.proposal && (!state.parsedCsv || state.advice)) {
+  if (state.proposal && !state.advicePreviewOnly) {
     fetchAdvice({ forceDraft: true });
     return;
   }

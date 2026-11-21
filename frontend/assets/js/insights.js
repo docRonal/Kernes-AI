@@ -1,4 +1,4 @@
-import { printDate, printMoney, replayFade } from "./format.js?v=tc8";
+import { printDate, printMoney, replayFade } from "./format.js?v=tc9";
 
 const ANOMALY_LABELS = {
   duplicate_payment: "Possible repeat charge",

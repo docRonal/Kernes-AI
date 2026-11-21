@@ -10,18 +10,26 @@ parameters:
     description: demo for fixture checks; live after the forecast and real model client are implemented.
     value: demo
   - name: CFO_MODEL_URL
-    description: Full inference endpoint URL issued for the team.
+    description: Primary OpenShift AI inference endpoint URL (vLLM GPU model by default).
+    value: "http://kernes-qwen-7b-predictor.kernes-ai.svc.cluster.local:8080/v1/chat/completions"
   - name: CFO_MODEL_NAME
-    description: Model identifier expected by that endpoint.
+    description: Primary model identifier expected by CFO_MODEL_URL.
+    value: "kernes-qwen-7b"
   - name: CFO_MODEL_TIMEOUT
-    description: Seconds to wait for one model answer. A CPU model can take tens of seconds.
+    description: Seconds to wait for one model answer. A CPU fallback model can take tens of seconds.
     value: "90"
   - name: CFO_FALLBACK_MODEL_URL
-    description: Optional fallback inference endpoint URL if the primary model fails.
-    value: ""
+    description: Optional fallback inference endpoint URL if the primary GPU model fails.
+    value: "http://kernes-qwen-predictor.kernes-ai.svc.cluster.local:8080/v1/chat/completions"
   - name: CFO_FALLBACK_MODEL_NAME
     description: Optional fallback model identifier.
+    value: "kernes-qwen"
+  - name: MLFLOW_TRACKING_URI
+    description: Optional MLflow tracking server URL for LLM latency and grounding telemetry.
     value: ""
+  - name: MLFLOW_EXPERIMENT_NAME
+    description: MLflow experiment name used when MLFLOW_TRACKING_URI is set.
+    value: "kernes-cfo"
 objects:
   - apiVersion: apps/v1
     kind: Deployment
@@ -56,6 +64,16 @@ objects:
                   value: "${CFO_FALLBACK_MODEL_URL}"
                 - name: CFO_FALLBACK_MODEL_NAME
                   value: "${CFO_FALLBACK_MODEL_NAME}"
+                - name: MLFLOW_TRACKING_URI
+                  value: "${MLFLOW_TRACKING_URI}"
+                - name: MLFLOW_EXPERIMENT_NAME
+                  value: "${MLFLOW_EXPERIMENT_NAME}"
+                - name: MLFLOW_TRACKING_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: autonomous-cfo-model
+                      key: MLFLOW_TRACKING_TOKEN
+                      optional: true
                 - name: CFO_MODEL_TOKEN
                   valueFrom:
                     secretKeyRef:

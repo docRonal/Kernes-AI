@@ -18,6 +18,7 @@ from fastapi import HTTPException
 from .advice import ModelConfig, ModelError, call_model, cited_amounts, day_name, pln
 from .forecast import horizon, propose
 from .insights import optimize_payments
+from .telemetry import log_llm_call
 from .models import (
     AnomalyDetectRequest,
     AnomalyDetectResponse,
@@ -55,7 +56,13 @@ def _validate_window(baseline: Projection) -> list[date]:
     return window
 
 
-def _ask_model(facts: list[str], task: str, allowed_minor: frozenset[int]) -> tuple[str, str, int]:
+def _ask_model(
+    facts: list[str],
+    task: str,
+    allowed_minor: frozenset[int],
+    *,
+    endpoint: str = "advisory-extras",
+) -> tuple[str, str, int]:
     primary = ModelConfig.from_env()
     messages = [
         {"role": "system", "content": _SYSTEM_PROMPT},
@@ -63,7 +70,7 @@ def _ask_model(facts: list[str], task: str, allowed_minor: frozenset[int]) -> tu
     ]
     started = time.monotonic()
 
-    def _attempt(config: ModelConfig) -> tuple[str, str, int]:
+    def _attempt(config: ModelConfig, *, fallback_used: bool) -> tuple[str, str, int]:
         raw = call_model(config, messages, schema=_TEXT_SCHEMA)
         text_val = raw.strip()
         if text_val.startswith("```"):
@@ -80,16 +87,48 @@ def _ask_model(facts: list[str], task: str, allowed_minor: frozenset[int]) -> tu
             raise ModelError(f"Model cited {pln(unknown[0])}, which isn't in the calculated facts.")
         latency = round((time.monotonic() - started) * 1000)
         log.info("advisory_extras model=%s latency_ms=%d status=ok", config.name, latency)
+        log_llm_call(
+            endpoint=endpoint,
+            model=config.name,
+            latency_ms=latency,
+            status="ok",
+            attempts=1,
+            grounded=True,
+            fallback_used=fallback_used,
+        )
         return text, config.name, latency
 
     try:
-        return _attempt(primary)
+        return _attempt(primary, fallback_used=False)
     except ModelError as primary_exc:
         fallback = ModelConfig.fallback_from_env(timeout=primary.timeout, ssl_context=primary.ssl_context)
         if fallback is None:
+            latency = round((time.monotonic() - started) * 1000)
+            log_llm_call(
+                endpoint=endpoint,
+                model=primary.name,
+                latency_ms=latency,
+                status="error",
+                attempts=1,
+                grounded=False,
+                fallback_used=False,
+            )
             raise
         log.warning("advisory_extras primary=%s failed (%s); falling back to %s", primary.name, primary_exc, fallback.name)
-        return _attempt(fallback)
+        try:
+            return _attempt(fallback, fallback_used=True)
+        except ModelError:
+            latency = round((time.monotonic() - started) * 1000)
+            log_llm_call(
+                endpoint=endpoint,
+                model=fallback.name,
+                latency_ms=latency,
+                status="error",
+                attempts=2,
+                grounded=False,
+                fallback_used=True,
+            )
+            raise
 
 
 # ─── 1. Anomaly & Duplicate Payment Detector ─────────────────────────────────
@@ -189,6 +228,7 @@ def detect_anomalies(*, mode: str, request: AnomalyDetectRequest) -> AnomalyDete
                 facts,
                 "Summarize the anomaly scan findings for the business owner before they approve any credit facility.",
                 frozenset(allowed),
+                endpoint="detect-anomalies",
             )
         except ModelError as exc:
             raise HTTPException(503, f"The AI explanation is unavailable. {exc}") from exc
@@ -239,7 +279,7 @@ def compare_financing_options(*, mode: str, request: CompareOptionsRequest) -> C
     # Check invoice factoring / early collection
     tx_by_id = {t.id: t for t in request.transactions}
     opt = optimize_payments(InsightRequest(baseline=request.baseline, transactions=request.transactions))
-    early = next((a for a in opt.actions if a.kind == "collect_early"), None)
+    early = next((a for a in opt.actions if a.kind == "collect_earlier"), None)
     if early is not None:
         early_tx = tx_by_id[early.transaction_id]
         factoring_cost = (early_tx.amount_minor * request.factoring_fee_bps) // 10_000
@@ -296,6 +336,7 @@ def compare_financing_options(*, mode: str, request: CompareOptionsRequest) -> C
                 facts,
                 f"Compare the options and explain why Option 1 ({best.title}) is the most cost-effective choice.",
                 frozenset(allowed),
+                endpoint="compare-options",
             )
         except ModelError as exc:
             raise HTTPException(503, f"The AI explanation is unavailable. {exc}") from exc

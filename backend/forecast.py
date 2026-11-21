@@ -12,6 +12,7 @@ import json
 import re
 from collections import defaultdict
 from datetime import date, timedelta
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
@@ -38,16 +39,32 @@ from .models import (
 
 DEMO_DIR = Path(__file__).resolve().parents[1] / "demo"
 DEMO_FILE = DEMO_DIR / "transactions.csv"
+AMALFI_DEMO_FILE = DEMO_DIR / "pizzeria_amalfi_sample.csv"
 DEMO_START = date(2026, 11, 23)
 DEMO_STARTING_BALANCE_MINOR = 1_200_000
 DEMO_MOVE = ("INV-001", date(2026, 11, 26))
 
 CSV_HEADER = ("id", "date", "amount_minor", "label")
+REQUIRED_BANK_HEADERS = (
+    "Account Number",
+    "Booking Date",
+    "Value Date",
+    "Transaction Type",
+    "Payment Reference",
+    "Beneficiary/Payer",
+    "Amount",
+    "Currency",
+)
 MAX_CSV_BYTES = 1_000_000
 
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+_BANK_DATE_DOT = re.compile(r"^(\d{2})\.(\d{2})\.(\d{2}|\d{4})$")
 _WHOLE_NUMBER = re.compile(r"[+-]?\d{1,15}")
+_GERMAN_AMOUNT = re.compile(r"^([+-]?)(\d+)(?:,(\d{1,2})|\.(\d{1,2}))?$")
+_FX_RATE = re.compile(r"@\s*(\d+(?:[.,]\d+)?)\s*EUR/CHF", re.IGNORECASE)
 _NO_CONTROL = re.compile(NO_CONTROL_CHARACTERS)
+_CONTROL_RUN = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]+")
+_DEFAULT_CHF_TO_EUR = Decimal("1.047")
 
 
 class ForecastInputError(ValueError):
@@ -55,6 +72,118 @@ class ForecastInputError(ValueError):
 
 
 # ─── CSV ─────────────────────────────────────────────────────────────────────
+
+
+def _parse_bank_date(raw: str, line: int) -> date:
+    trimmed = raw.strip()
+    dot_match = _BANK_DATE_DOT.fullmatch(trimmed)
+    if dot_match:
+        day_s, month_s, year_s = dot_match.groups()
+        year = int(f"20{year_s}") if len(year_s) == 2 else int(year_s)
+        try:
+            return date(year, int(month_s), int(day_s))
+        except ValueError as exc:
+            raise ForecastInputError(f"Line {line}: '{trimmed}' is not a real date.") from exc
+    if _ISO_DATE.fullmatch(trimmed):
+        try:
+            return date.fromisoformat(trimmed)
+        except ValueError as exc:
+            raise ForecastInputError(f"Line {line}: '{trimmed}' is not a real date.") from exc
+    raise ForecastInputError(f"Line {line}: unsupported bank date format '{trimmed}'. Expected DD.MM.YY.")
+
+
+def _parse_decimal_amount_minor(raw: str, line: int) -> int:
+    cleaned = re.sub(r"\.(?=\d{3}(?:,|$))", "", raw.strip().replace(" ", "").replace("\u00a0", ""))
+    match = _GERMAN_AMOUNT.fullmatch(cleaned)
+    if not match:
+        raise ForecastInputError(
+            f"Line {line}: invalid amount format '{raw}'. Expected decimal amount like -3800,00 or 457.56."
+        )
+    sign, whole, comma_frac, dot_frac = match.groups()
+    frac = (comma_frac if comma_frac is not None else (dot_frac or "")).ljust(2, "0")
+    minor = int(whole) * 100 + int(frac)
+    return -minor if sign == "-" else minor
+
+
+def _extract_chf_rate(reference: str) -> Decimal:
+    match = _FX_RATE.search(reference or "")
+    if match:
+        try:
+            rate = Decimal(match.group(1).replace(",", "."))
+            if rate > 0:
+                return rate
+        except InvalidOperation:
+            pass
+    return _DEFAULT_CHF_TO_EUR
+
+
+def _clean_text(raw: str, fallback: str, max_len: int) -> str:
+    cleaned = _CONTROL_RUN.sub(" ", raw).strip() or fallback
+    return cleaned[:max_len]
+
+
+def _parse_bank_statement_csv(text: str) -> list[Transaction]:
+    """Parse a German MT940-style semicolon-delimited bank export using integer/Decimal math."""
+    reader = csv.reader(io.StringIO(text, newline=""), delimiter=";")
+    try:
+        header = next(reader, None)
+        columns = [name.strip() for name in header] if header else []
+        col_index = {name: idx for idx, name in enumerate(columns)}
+        missing = [name for name in REQUIRED_BANK_HEADERS if name not in col_index]
+        if missing:
+            raise ForecastInputError(
+                f"The bank CSV is missing required columns: {', '.join(missing)}."
+            )
+
+        def cell(row: list[str], col: str) -> str:
+            idx = col_index[col]
+            return row[idx].strip() if idx < len(row) else ""
+
+        transactions: list[Transaction] = []
+        row_seq = 0
+        for row in reader:
+            line = reader.line_num
+            if not any(item.strip() for item in row):
+                continue
+            if len(row) < len(REQUIRED_BANK_HEADERS):
+                raise ForecastInputError(f"Line {line}: expected at least 8 semicolon-separated values.")
+            if len(transactions) == MAX_TRANSACTIONS:
+                raise ForecastInputError(f"The CSV has more than {MAX_TRANSACTIONS} transactions.")
+            row_seq += 1
+
+            raw_value = cell(row, "Value Date") or cell(row, "Booking Date")
+            tx_date = _parse_bank_date(raw_value, line)
+            currency = (cell(row, "Currency") or "EUR").upper()
+            original_minor = _parse_decimal_amount_minor(cell(row, "Amount"), line)
+
+            if currency == "EUR":
+                amount_minor = original_minor
+            elif currency == "CHF":
+                rate = _extract_chf_rate(cell(row, "Payment Reference"))
+                amount_minor = int((Decimal(original_minor) * rate).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            else:
+                raise ForecastInputError(f"Line {line}: unsupported currency '{currency}'.")
+
+            if abs(amount_minor) > MAX_ABS_MINOR:
+                raise ForecastInputError(f"Line {line}: the amount is out of range.")
+
+            tx_type = cell(row, "Transaction Type") or "TRANSFER"
+            label = _clean_text(cell(row, "Beneficiary/Payer"), tx_type, MAX_LABEL_LENGTH)
+            transactions.append(
+                Transaction(
+                    id=f"TX-{row_seq:04d}",
+                    date=tx_date,
+                    amount_minor=amount_minor,
+                    label=label,
+                )
+            )
+    except csv.Error as exc:
+        raise ForecastInputError(f"Line {reader.line_num}: the CSV can't be read ({exc}).") from exc
+
+    if not transactions:
+        raise ForecastInputError("The CSV has no transactions.")
+    transactions.sort(key=lambda tx: (tx.date, tx.id))
+    return transactions
 
 
 def parse_transactions(raw: bytes) -> list[Transaction]:
@@ -65,6 +194,10 @@ def parse_transactions(raw: bytes) -> list[Transaction]:
         text = raw.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
         raise ForecastInputError("The CSV must use UTF-8 encoding.") from exc
+
+    first_line = next((line for line in text.splitlines() if line.strip()), "")
+    if ";" in first_line:
+        return _parse_bank_statement_csv(text)
 
     reader = csv.reader(io.StringIO(text, newline=""))
     transactions: list[Transaction] = []
@@ -332,6 +465,21 @@ async def get_forecast(
         except ForecastInputError as exc:
             raise HTTPException(422, str(exc)) from exc
 
+    raw = await file.read(MAX_CSV_BYTES + 1)
+    if len(raw) > MAX_CSV_BYTES:
+        raise HTTPException(422, "The CSV is larger than 1 MB.")
+    try:
+        actual = raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(422, "The CSV must use UTF-8 encoding.") from exc
+
+    first_line = next((line for line in actual.splitlines() if line.strip()), "")
+    if ";" in first_line:
+        try:
+            return build_forecast(raw, starting_balance_minor, start_date, move_transaction_id, move_to_date)
+        except ForecastInputError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
     scenario = (move_transaction_id, move_to_date)
     if scenario not in ((None, None), DEMO_MOVE):
         raise HTTPException(422, "Demo scenario: move INV-001 to 2026-11-26.")
@@ -340,11 +488,6 @@ async def get_forecast(
         raise HTTPException(422, "Use 12000 EUR and start date 2026-11-23 in demo mode.")
 
     sample = DEMO_FILE.read_text(encoding="utf-8")
-    raw = await file.read(len(sample.encode("utf-8")) + 32)
-    try:
-        actual = raw.decode("utf-8-sig")
-    except UnicodeDecodeError as exc:
-        raise HTTPException(422, "The CSV must use UTF-8 encoding.") from exc
     if actual.splitlines() != sample.splitlines():
         raise HTTPException(422, "Use the bundled transactions.csv in demo mode.")
 

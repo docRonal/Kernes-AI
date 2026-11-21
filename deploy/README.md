@@ -20,7 +20,7 @@ APP_IMAGE="$(oc -n kernes-ai get istag "autonomous-cfo:${IMAGE_TAG}" \
 
 ## Start the project model
 
-The [model manifest](model.yaml) provides a namespaced KServe runtime and an internal inference service for Qwen2.5 1.5B Instruct. It uses a pinned GGUF revision and a pinned llama.cpp image on CPU. The cluster's existing GPU model stays available independently.
+The [model manifest](model.yaml) provides a namespaced KServe runtime and an internal inference service for Qwen2.5 1.5B Instruct (configured for 8 CPU threads). It uses a pinned GGUF revision and a pinned llama.cpp image on CPU. The cluster's existing GPU model stays available independently.
 
 ```sh
 oc -n kernes-ai apply -f deploy/model.yaml
@@ -83,7 +83,7 @@ oc -n kernes-ai run model-check --rm -i --restart=Never \
 
 ## Deploy the live app
 
-Build the integrated Git commit, then rerun the app deployment with `CFO_MODE=live`. If the selected endpoint requires authentication, create the `autonomous-cfo-model` Secret in the team namespace with key `CFO_MODEL_TOKEN` before the rollout.
+Build the integrated Git commit, then rerun the app deployment with `CFO_MODE=live`. [openshift-template.yaml](openshift-template.yaml) already defaults `CFO_MODEL_URL` to the cluster's `kernes-qwen-7b` vLLM GPU endpoint and `CFO_FALLBACK_MODEL_URL` to the 8-thread `kernes-qwen` CPU service. If your endpoint or MLflow tracking server requires authentication, create the `autonomous-cfo-model` Secret in the team namespace with `CFO_MODEL_TOKEN` (and optional `MLFLOW_TRACKING_TOKEN`) before the rollout, and optionally set `MLFLOW_TRACKING_URI` to record LLM latency and grounding telemetry.
 
 ```sh
 oc process --local -f deploy/openshift-template.yaml \

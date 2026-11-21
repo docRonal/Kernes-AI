@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from .advice import get_advice, predict_delays, send_reminder
 from .advisory_extras import compare_financing_options, detect_anomalies
 from .consultant import ask_cfo, credit_check
-from .forecast import DEMO_FILE, get_decision, get_forecast
+from .forecast import AMALFI_DEMO_FILE, DEMO_FILE, get_decision, get_forecast
 from .insights import optimize_payments, stress_test
 from .models import (
     AdviceRequest,
@@ -55,7 +55,7 @@ def create_app(mode: str | None = None) -> FastAPI:
         raise ValueError("CFO_MODE must be demo or live.")
 
     _log_to_stderr()
-    app = FastAPI(title="Autonomous CFO", version="0.1.0")
+    app = FastAPI(title="KERNES CFO", version="0.1.0")
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIR / "assets"), name="assets")
 
     @app.get("/", include_in_schema=False)
@@ -65,6 +65,14 @@ def create_app(mode: str | None = None) -> FastAPI:
     @app.get("/demo/transactions.csv", include_in_schema=False)
     def sample_csv() -> FileResponse:
         return FileResponse(DEMO_FILE, media_type="text/csv", filename="transactions.csv")
+
+    @app.get("/demo/amalfi.csv", include_in_schema=False)
+    def amalfi_sample_csv() -> FileResponse:
+        return FileResponse(
+            AMALFI_DEMO_FILE,
+            media_type="text/csv",
+            filename="pizzeria-amalfi-sample-2025.csv",
+        )
 
     @app.get("/health")
     def health() -> dict[str, str]:

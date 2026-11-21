@@ -98,7 +98,9 @@ def test_compare_financing_options_ranks_cheapest_and_live(live_extras):
     resp = demo_client.post("/api/compare-options", json=base)
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data["options"]) >= 2
+    assert len(data["options"]) >= 3
+    kinds = {opt["option_kind"] for opt in data["options"]}
+    assert {"credit_facility", "invoice_factoring", "defer_outflow"} <= kinds
     assert data["options"][0]["estimated_cost_minor"] <= data["options"][1]["estimated_cost_minor"]
     assert data["recommended_option"] == data["options"][0]["option_kind"]
 

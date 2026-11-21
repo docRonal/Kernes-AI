@@ -7,6 +7,7 @@ facts into words, and every PLN amount it writes must be one of them.
 import json
 import logging
 import math
+import os
 import re
 import time
 from collections.abc import Callable
@@ -18,6 +19,7 @@ from . import advice
 from .advice import ATTEMPTS, ModelConfig, ModelError, cited_amounts, day_name, pln
 from .forecast import ForecastInputError, propose
 from .insights import credit_scorecard, optimize_payments, stress_test, what_if
+from .telemetry import log_llm_call
 from .models import (
     HORIZON_DAYS,
     MAX_ABS_MINOR,
@@ -67,23 +69,36 @@ def _parse(content: str) -> dict:
     return data
 
 
-def _ask_model(messages: list[dict[str, str]], schema: dict, check: Callable[[dict], str | None]) -> tuple[dict, str]:
+def _ask_model_traced(
+    messages: list[dict[str, str]],
+    schema: dict,
+    check: Callable[[dict], str | None],
+) -> tuple[dict, str, int, bool]:
     """The first answer that passes check: ATTEMPTS tries on the primary model, then on the fallback."""
     primary = ModelConfig.from_env()
     fallback = ModelConfig.fallback_from_env(timeout=primary.timeout, ssl_context=primary.ssl_context)
     problem = "The model gave no answer."
-    for config in [primary, fallback] if fallback else [primary]:
+    attempts_total = 0
+    configs = [primary, fallback] if fallback else [primary]
+    for idx, config in enumerate(configs):
+        fallback_used = idx > 0
         try:
             for attempt in range(1, ATTEMPTS + 1):
+                attempts_total += 1
                 data = _parse(advice.call_model(config, messages, schema=schema))
                 issue = check(data)
                 if issue is None:
-                    return data, config.name
+                    return data, config.name, attempts_total, fallback_used
                 log.warning("model=%s attempt=%d rejected: %s", config.name, attempt, issue)
                 problem = f"The model's answer didn't match the calculated figures: {issue}."
         except ModelError as exc:
             problem = str(exc)
     raise ModelError(problem)
+
+
+def _ask_model(messages: list[dict[str, str]], schema: dict, check: Callable[[dict], str | None]) -> tuple[dict, str]:
+    data, name, _attempts, _fallback_used = _ask_model_traced(messages, schema, check)
+    return data, name
 
 
 def _figures_problem(text: object, allowed: set[int]) -> str | None:
@@ -124,12 +139,30 @@ def credit_check(*, mode: str, request: AdviceRequest) -> CreditCheckResponse:
     ]
     started = time.monotonic()
     try:
-        data, name = _ask_model(messages, EXPLANATION_SCHEMA, check)
+        data, name, attempts_total, fallback_used = _ask_model_traced(messages, EXPLANATION_SCHEMA, check)
     except ModelError as exc:
         log.warning("credit check explanation unavailable: %s", exc)
+        log_llm_call(
+            endpoint="credit-check",
+            model=os.environ.get("CFO_MODEL_NAME", "unconfigured"),
+            latency_ms=round((time.monotonic() - started) * 1000),
+            status="error",
+            attempts=1,
+            grounded=False,
+            fallback_used=False,
+        )
         return result.model_copy(update={"explanation_error": f"The AI explanation is unavailable. {exc}"})
     latency = round((time.monotonic() - started) * 1000)
     log.info("credit-check model=%s latency_ms=%d status=ok", name, latency)
+    log_llm_call(
+        endpoint="credit-check",
+        model=name,
+        latency_ms=latency,
+        status="ok",
+        attempts=attempts_total,
+        grounded=True,
+        fallback_used=fallback_used,
+    )
     return result.model_copy(update={"explanation": data["explanation"].strip(), "model": name, "latency_ms": latency})
 
 
@@ -314,7 +347,7 @@ def ask_cfo(*, mode: str, request: AskRequest) -> AskResponse:
     facts = "\n".join(lines)
     allowed = set(cited_amounts(facts))
     try:
-        data, name = _ask_model(
+        data, name, attempts_total, fallback_used = _ask_model_traced(
             [
                 {"role": "system", "content": ASK_PROMPT},
                 {"role": "user", "content": f"Facts:\n{facts}\n\nQuestion: {request.question}"},
@@ -324,7 +357,25 @@ def ask_cfo(*, mode: str, request: AskRequest) -> AskResponse:
         )
     except ModelError as exc:
         log.warning("ask-cfo unavailable: %s", exc)
+        log_llm_call(
+            endpoint="ask-cfo",
+            model=os.environ.get("CFO_MODEL_NAME", "unconfigured"),
+            latency_ms=round((time.monotonic() - started) * 1000),
+            status="error",
+            attempts=1,
+            grounded=False,
+            fallback_used=False,
+        )
         raise HTTPException(503, f"The AI consultant is unavailable. {exc}") from exc
     latency = round((time.monotonic() - started) * 1000)
     log.info("ask-cfo model=%s latency_ms=%d status=ok", name, latency)
+    log_llm_call(
+        endpoint="ask-cfo",
+        model=name,
+        latency_ms=latency,
+        status="ok",
+        attempts=attempts_total,
+        grounded=True,
+        fallback_used=fallback_used,
+    )
     return AskResponse(answer=data["answer"].strip(), what_if=scenario, model=name, latency_ms=latency)

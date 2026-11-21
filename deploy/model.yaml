@@ -23,7 +23,7 @@ spec:
         - --parallel
         - "1"
         - --threads
-        - "2"
+        - "8"
         - --alias
         - kernes-qwen
         - --model
@@ -80,8 +80,8 @@ spec:
         version: "1"
       resources:
         requests:
-          cpu: "2"
+          cpu: "4"
           memory: 4Gi
         limits:
-          cpu: "2"
-          memory: 4Gi
+          cpu: "8"
+          memory: 6Gi

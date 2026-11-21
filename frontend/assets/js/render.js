@@ -1,6 +1,6 @@
-import { renderCashflowChart } from "../chart.js?v=tc8";
-import { printDate, printMoney, replayFade } from "./format.js?v=tc8";
-import { groupTransactionsByDate } from "./proposal.js?v=tc8";
+import { renderCashflowChart } from "../chart.js?v=tc9";
+import { printDate, printMoney, replayFade } from "./format.js?v=tc9";
+import { groupTransactionsByDate } from "./proposal.js?v=tc9";
 
 export function renderKpis(state) {
   const { forecast, proposal, openingBalanceMinor, simulationDecision } = state;
