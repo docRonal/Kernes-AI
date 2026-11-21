@@ -16,14 +16,17 @@ parameters:
     description: Primary model identifier expected by CFO_MODEL_URL.
     value: "kernes-qwen-7b"
   - name: CFO_MODEL_TIMEOUT
-    description: Seconds to wait for one model answer. A CPU fallback model can take tens of seconds.
-    value: "90"
+    description: Seconds to wait for the primary model answer.
+    value: "30"
   - name: CFO_FALLBACK_MODEL_URL
     description: Optional fallback inference endpoint URL if the primary GPU model fails.
     value: "http://kernes-qwen-predictor.kernes-ai.svc.cluster.local:8080/v1/chat/completions"
   - name: CFO_FALLBACK_MODEL_NAME
     description: Optional fallback model identifier.
     value: "kernes-qwen"
+  - name: CFO_FALLBACK_MODEL_TIMEOUT
+    description: Seconds to wait for the fallback model (CPU models can take 15-40s).
+    value: "60"
   - name: MLFLOW_TRACKING_URI
     description: Optional MLflow tracking server URL for LLM latency and grounding telemetry.
     value: ""
@@ -64,6 +67,8 @@ objects:
                   value: "${CFO_FALLBACK_MODEL_URL}"
                 - name: CFO_FALLBACK_MODEL_NAME
                   value: "${CFO_FALLBACK_MODEL_NAME}"
+                - name: CFO_FALLBACK_MODEL_TIMEOUT
+                  value: "${CFO_FALLBACK_MODEL_TIMEOUT}"
                 - name: MLFLOW_TRACKING_URI
                   value: "${MLFLOW_TRACKING_URI}"
                 - name: MLFLOW_EXPERIMENT_NAME

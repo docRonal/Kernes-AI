@@ -7,7 +7,7 @@ from fastapi import FastAPI, File
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from .advice import get_advice, predict_delays, send_reminder
+from .advice import check_ai_health, get_advice, predict_delays, send_reminder
 from .advisory_extras import compare_financing_options, detect_anomalies
 from .consultant import ask_cfo, credit_check
 from .forecast import AMALFI_DEMO_FILE, DEMO_FILE, get_decision, get_forecast
@@ -77,6 +77,10 @@ def create_app(mode: str | None = None) -> FastAPI:
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/health/ai", description="Reachability of the configured OpenShift AI primary and fallback models.")
+    def health_ai() -> dict:
+        return check_ai_health()
 
     @app.post("/api/forecast", response_model=ForecastResponse)
     async def forecast(request: Annotated[ForecastRequest, File()]) -> ForecastResponse | dict:

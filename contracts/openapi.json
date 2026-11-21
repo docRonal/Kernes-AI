@@ -30,6 +30,27 @@
         }
       }
     },
+    "/health/ai": {
+      "get": {
+        "summary": "Health Ai",
+        "description": "Reachability of the configured OpenShift AI primary and fallback models.",
+        "operationId": "health_ai_health_ai_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Health Ai Health Ai Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/forecast": {
       "post": {
         "description": "Compute 14 end-of-day balances including start_date. Opening balance is before any start_date movement. Sum all dated movements through day 14. Ignore rows outside this window in the projection and return the original CSV rows in transactions. Report the first strictly negative end-of-day balance as a positive shortfall. Both move fields must be supplied together or omitted. If supplied, shift a positive transaction within the window to another date within that window in the scenario only. If omitted, scenario is null. When the baseline goes below zero, proposal is a credit facility with limit_minor = max(0, -min(baseline balances)). deepest_shortfall is the lowest baseline balance; the earliest day wins a tie. relevant_transaction_ids lists the window's rows, by date, up to the day the balance recovers from that deepest gap or the window's end. proposal is null when every baseline balance is zero or above. The scenario never changes the proposal.",
