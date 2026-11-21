@@ -47,6 +47,11 @@ def test_severe_shortfall_eur_flows_through_downstream_endpoints(demo_client, li
     assert live_client.post("/api/optimize-payments", json=payload).status_code == 200
     assert demo_client.post("/api/compare-options", json=payload).status_code == 200
     assert demo_client.post("/api/credit-check", json=payload).status_code == 200
+    ap = demo_client.post("/api/action-plan", json=payload)
+    assert ap.status_code == 200, ap.text
+    ap_body = ap.json()
+    assert ap_body["mode"] == "survival"
+    assert any(s["action_kind"] == "credit_facility" for s in ap_body["steps"])
 
 
 def test_healthy_surplus_eur_has_no_shortfall_or_credit_need(live_client):
@@ -66,6 +71,12 @@ def test_healthy_surplus_eur_has_no_shortfall_or_credit_need(live_client):
     opt = live_client.post("/api/optimize-payments", json=payload)
     assert opt.status_code == 200
     assert opt.json()["proposed_limit_minor"] == 0
+
+    ap = TestClient(create_app("demo")).post("/api/action-plan", json=payload)
+    assert ap.status_code == 200, ap.text
+    ap_body = ap.json()
+    assert ap_body["mode"] == "growth"
+    assert all(s["email_draft"] is None for s in ap_body["steps"])
 
 
 def test_poland_branch_pln_is_autodetected_and_propagated(demo_client, live_client):
@@ -111,6 +122,15 @@ def test_usd_mixed_fx_converts_eur_row_and_detects_usd(demo_client, live_client)
     assert "USD " in advice.json()["explanation"]
     assert "EUR" not in advice.json()["explanation"]
 
+    ap = demo_client.post(
+        "/api/action-plan",
+        json={"baseline": data["baseline"], "transactions": data["transactions"], "currency": "USD"},
+    )
+    assert ap.status_code == 200, ap.text
+    ap_body = ap.json()
+    assert "USD " in ap_body["headline"] or "USD " in ap_body["summary"]
+    assert "EUR" not in ap_body["headline"] and "EUR" not in ap_body["summary"]
+
 
 def test_duplicate_anomaly_eur_flags_duplicate_and_outlier(demo_client, live_client):
     resp = _upload(live_client, "amalfi_duplicate_anomaly_eur.csv", opening="500000")
@@ -128,6 +148,15 @@ def test_duplicate_anomaly_eur_flags_duplicate_and_outlier(demo_client, live_cli
     kinds = {f["kind"] for f in body["findings"]}
     assert "duplicate_payment" in kinds
     assert "outlier_expense" in kinds
+
+    ap = demo_client.post(
+        "/api/action-plan",
+        json={"baseline": data["baseline"], "transactions": data["transactions"], "currency": "EUR"},
+    )
+    assert ap.status_code == 200, ap.text
+    ap_body = ap.json()
+    assert ap_body["mode"] == "survival"
+    assert ap_body["steps"][0]["action_kind"] == "review_anomaly"
 
 
 @pytest.mark.parametrize(
