@@ -124,6 +124,7 @@ class EarlierPayment(BaseModel):
 class ForecastResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     currency: CurrencyCode = "EUR"
+    forecast_basis: Literal["history"] | None = Field(default=None, exclude_if=lambda basis: basis is None)
     transactions: list[Transaction]
     baseline: Projection
     proposal: Proposal | None

@@ -1608,6 +1608,18 @@
                 "type": "null"
               }
             ]
+          },
+          "forecast_basis": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "history"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Basis"
           }
         },
         "additionalProperties": false,

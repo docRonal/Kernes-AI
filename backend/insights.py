@@ -11,6 +11,7 @@ from datetime import timedelta
 
 from .advice import day_name, pln
 from .forecast import ForecastInputError, propose, suggest_earlier_payments
+from .history_forecast import ESTIMATED_ID_PREFIX
 from .models import (
     AdviceRequest,
     CreditCheckResponse,
@@ -124,7 +125,7 @@ def optimize_payments(request: InsightRequest) -> PaymentOptimizationResponse:
         # A bill due after the deepest day can't lift it.
         if t.amount_minor >= 0 or not days[0].date <= t.date <= proposal.deepest_shortfall.date:
             continue
-        if _NOT_POSTPONABLE.search(t.label):
+        if t.id.startswith(ESTIMATED_ID_PREFIX) or _NOT_POSTPONABLE.search(t.label):
             continue
         at = (t.date - days[0].date).days
         best: tuple[int, int] | None = None

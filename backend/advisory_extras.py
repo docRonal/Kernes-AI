@@ -17,6 +17,7 @@ from fastapi import HTTPException
 
 from .advice import ModelConfig, ModelError, call_model, cited_amounts, day_name, pln
 from .forecast import horizon, propose
+from .history_forecast import ESTIMATED_ID_PREFIX
 from .insights import optimize_payments
 from .telemetry import log_llm_call
 from .models import (
@@ -136,8 +137,17 @@ def _ask_model(
 
 def detect_anomalies(*, mode: str, request: AnomalyDetectRequest) -> AnomalyDetectResponse:
     window = _validate_window(request.baseline)
+    recorded = [t for t in request.transactions if not t.id.startswith(ESTIMATED_ID_PREFIX)]
+    if not recorded:
+        return AnomalyDetectResponse(
+            findings=[],
+            risk_flag="clean",
+            summary="Anomaly checks need recorded payments. The forecast window contains estimates.",
+            model="deterministic",
+            latency_ms=None,
+        )
     in_window = sorted(
-        [t for t in request.transactions if window[0] <= t.date <= window[-1]],
+        [t for t in recorded if window[0] <= t.date <= window[-1]],
         key=lambda t: (t.date, t.id),
     )
     findings: list[AnomalyFinding] = []

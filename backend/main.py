@@ -38,7 +38,9 @@ from .models import (
 )
 
 
-FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
+ROOT = Path(__file__).resolve().parents[1]
+FRONTEND_DIR = ROOT / "frontend"
+AMALFI_HISTORY_FILE = ROOT / "red-hat-examples" / "pizzeria-amalfi-bank-statement-2025-v6.csv"
 
 
 def _log_to_stderr() -> None:
@@ -72,6 +74,10 @@ def create_app(mode: str | None = None) -> FastAPI:
             media_type="text/csv",
             filename="pizzeria-amalfi-sample-2025.csv",
         )
+
+    @app.get("/demo/amalfi-history.csv", include_in_schema=False)
+    def amalfi_history_csv() -> FileResponse:
+        return FileResponse(AMALFI_HISTORY_FILE, media_type="text/csv", filename=AMALFI_HISTORY_FILE.name)
 
     @app.get("/health")
     def health() -> dict[str, str]:

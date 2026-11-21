@@ -30,6 +30,10 @@ export function renderKpis(state) {
   const heroBadge = document.querySelector("#hero-badge");
   const heroTitle = document.querySelector("#hero-title");
   const heroSummary = document.querySelector("#hero-summary");
+  const estimatedFromHistory = forecast.forecast_basis === "history";
+  document.querySelector("#forecast-basis").hidden = !estimatedFromHistory;
+  document.querySelector("#legend-baseline-label").textContent =
+    estimatedFromHistory ? "Estimated cash" : "Your cash";
   const prevTitle = heroTitle.textContent;
 
   const firstCard = document.querySelector("#kpi-first-card");
@@ -85,7 +89,7 @@ export function renderKpis(state) {
     heroBadge.textContent = "All good";
     heroBadge.className = "pill pill-success";
     heroTitle.textContent = "Your cash looks healthy";
-    heroSummary.textContent = `Your balance stays at or above zero for all ${baseline.days.length} days. Your lowest projected day is ${money(lowestDay.balance_minor)} on ${printDate(lowestDay.date)}.`;
+    heroSummary.textContent = `Your projected balance stays at or above zero for all ${baseline.days.length} days. Your lowest balance is ${money(lowestDay.balance_minor)} on ${printDate(lowestDay.date)}.`;
 
     firstVal.textContent = "None";
     firstVal.className = "hero-stat-value positive";
@@ -198,7 +202,7 @@ export function renderProposalPanel(state) {
     ({ amount_minor, date }) =>
       amount_minor > 0 && (!startDate || date >= startDate) && (!endDate || date <= endDate),
   );
-  const showDraft = Boolean(proposal || hasIncomingInWindow);
+  const showDraft = forecast.forecast_basis !== "history" && Boolean(proposal || hasIncomingInWindow);
 
   if (!proposal) {
     assistantCard.hidden = true;

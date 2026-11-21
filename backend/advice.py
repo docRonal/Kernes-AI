@@ -24,6 +24,7 @@ from pathlib import Path
 from fastapi import HTTPException
 
 from .forecast import horizon, propose
+from .history_forecast import ESTIMATED_ID_PREFIX
 from .telemetry import log_llm_call
 from .models import (
     AdviceRequest,
@@ -345,7 +346,10 @@ def _same_day_outgoing_totals(transactions: list[Transaction]) -> dict[date, int
 
 def _reminder_target(transactions: list[Transaction], first_gap: date, window: list[date]) -> str | None:
     """The first incoming payment after the gap starts: the one worth asking for early."""
-    late = [t for t in transactions if t.amount_minor > 0 and first_gap < t.date <= window[-1]]
+    late = [
+        t for t in transactions
+        if t.amount_minor > 0 and first_gap < t.date <= window[-1] and not t.id.startswith(ESTIMATED_ID_PREFIX)
+    ]
     if not late:
         return None
     target = min(late, key=lambda t: (t.date, -t.amount_minor))

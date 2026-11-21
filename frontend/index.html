@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/styles.css?v=tc13">
-  <script type="module" src="/assets/app.js?v=tc12"></script>
+  <script type="module" src="/assets/app.js?v=amalfi26"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -40,7 +40,7 @@
         <div class="setup-hero">
           <h2 id="setup-heading">Will your business have enough cash ahead?</h2>
           <p class="setup-lead">
-            <strong>Upload your bank statement CSV (Pizzeria Amalfi standard).</strong>
+            <strong>Use the Amalfi sample or upload your own bank statement CSV.</strong>
             We spot days when cash runs low, auto-detect the account currency, explain why in plain English, and let you test safe options before anything is sent or applied for.
           </p>
         </div>
@@ -50,7 +50,7 @@
             <div class="bento-tile">
               <div class="field-label-row">
                 <label for="csv-file">Your bank export (CSV file)</label>
-                <button type="button" class="btn-link" id="download-sample-btn">Download sample CSV</button>
+                <a class="btn-link" id="download-sample-link" href="/demo/amalfi-history.csv" download="pizzeria-amalfi-bank-statement-2025.csv">Download sample CSV</a>
               </div>
               <div class="file-dropzone" id="file-dropzone">
                 <input id="csv-file" name="file" type="file" accept=".csv,text/csv">
@@ -62,8 +62,8 @@
                     </svg>
                   </span>
                   <div class="file-copy">
-                    <span class="file-name" id="file-name">Pizzeria Amalfi example (ready to use)</span>
-                    <span class="file-hint">Drop your bank export file here, or click Browse</span>
+                    <span class="file-name" id="file-name">Pizzeria Amalfi · Full 2025 statement</span>
+                    <span class="file-hint" id="sample-hint">Defaults to 1–14 January 2026 with the year-end balance of 33,266.35 EUR.</span>
                   </div>
                   <span class="file-action">Browse</span>
                 </div>
@@ -72,13 +72,13 @@
 
             <div class="setup-fields-row">
               <div class="bento-tile field">
-                <label for="opening-balance">Money in your account today</label>
-                <input id="opening-balance" name="opening_balance" inputmode="decimal" value="5000.00" placeholder="5000.00" required>
+                <label for="opening-balance">Opening balance</label>
+                <input id="opening-balance" name="opening_balance" inputmode="decimal" value="33266.35" required>
               </div>
 
               <div class="bento-tile field">
-                <label for="start-date">Start date</label>
-                <input id="start-date" name="start_date" type="date" value="2025-06-22" required>
+                <label for="start-date">Forecast start date</label>
+                <input id="start-date" name="start_date" type="date" value="2026-01-01" required>
               </div>
 
               <div class="bento-tile field">
@@ -91,6 +91,7 @@
 
             <div class="setup-actions">
               <button type="submit" class="btn btn-primary btn-lg" id="run-forecast-btn">Check my cash →</button>
+              <button type="button" class="btn-link" id="use-sample-btn" hidden>Use Amalfi sample</button>
             </div>
           </form>
 
@@ -122,10 +123,11 @@
             </div>
             <h2 class="hero-title" id="hero-title">Checking your cash…</h2>
             <p class="hero-summary" id="hero-summary"></p>
+            <p class="card-desc" id="forecast-basis" hidden>Estimated from past transactions. Forecast dates and amounts are approximate.</p>
           </div>
           <div class="hero-stats">
             <div class="hero-stat">
-              <span class="hero-stat-label">Cash today</span>
+              <span class="hero-stat-label">Opening balance</span>
               <strong class="hero-stat-value" id="kpi-opening">—</strong>
               <span class="hero-stat-sub" id="kpi-horizon">14 days</span>
             </div>
@@ -165,7 +167,7 @@
                 </div>
               </div>
               <div class="chart-legend" aria-label="Chart legend">
-                <span class="legend-item"><i class="dot dot-baseline"></i>Your cash</span>
+                <span class="legend-item"><i class="dot dot-baseline"></i><span id="legend-baseline-label">Your cash</span></span>
                 <span class="legend-item" id="legend-forecast"><i class="dot dot-forecast"></i>Predicted (+7d)</span>
                 <span class="legend-item" id="legend-scenario" hidden><i class="dot dot-scenario"></i>If paid earlier</span>
                 <span class="legend-item" id="legend-whatif" hidden><i class="dot dot-whatif"></i><span id="legend-whatif-label">What-if</span></span>
@@ -315,7 +317,7 @@
                   </div>
                   <div class="field">
                     <label for="move-date-input">What if it arrives on</label>
-                    <input id="move-date-input" name="move_to_date" type="date" value="2025-06-28" required>
+                    <input id="move-date-input" name="move_to_date" type="date" required>
                   </div>
                   <div class="form-actions">
                     <button type="submit" class="btn btn-inverted" id="compare-dates-btn">Preview earlier date</button>

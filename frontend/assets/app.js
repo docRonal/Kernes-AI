@@ -1,12 +1,7 @@
 import {
-  AMALFI_DEFAULT_OPENING_EUR,
-  AMALFI_DEFAULT_START_DATE,
-  AMALFI_SAMPLE_CSV,
-  AMALFI_SAMPLE_FILENAME,
-} from "./sample-amalfi.js?v=tc11";
-import {
   buildInsightPayload,
   formatCsvError,
+  request,
   requestAdvice,
   requestAnomalies,
   requestAskCfo,
@@ -43,14 +38,19 @@ import {
   renderKpis,
   renderLedgerAndChart,
   renderProposalPanel,
-} from "./js/render.js?v=tc11";
+} from "./js/render.js?v=amalfi26";
 
 const forecastForm = document.querySelector("#forecast-form");
 const scenarioForm = document.querySelector("#scenario-form");
 const fileInput = document.querySelector("#csv-file");
 const fileDropzone = document.querySelector("#file-dropzone");
 const fileNameEl = document.querySelector("#file-name");
-const downloadSampleBtn = document.querySelector("#download-sample-btn");
+const sampleFileLabel = fileNameEl.textContent;
+const sampleHint = document.querySelector("#sample-hint");
+const sampleDownloadLink = document.querySelector("#download-sample-link");
+const useSampleBtn = document.querySelector("#use-sample-btn");
+const openingBalanceInput = forecastForm.elements.opening_balance;
+const startDateInput = forecastForm.elements.start_date;
 const horizonSelect = document.querySelector("#horizon-select");
 
 const statusBanner = document.querySelector("#status");
@@ -109,7 +109,7 @@ const copyFeedback = document.querySelector("#copy-feedback");
 
 const state = {
   openingBalanceMinor: null,
-  startDate: AMALFI_DEFAULT_START_DATE,
+  startDate: null,
   horizonDays: 14,
   csvFile: null,
   forecast: null,
@@ -179,6 +179,11 @@ function renderAll() {
 
 function applyTemplateDraft({ force = false } = {}) {
   if (!state.forecast || (!force && state.draftEdited)) return;
+  if (state.forecast.forecast_basis === "history") {
+    reminderSubjectInput.value = "";
+    draftTextarea.value = "";
+    return;
+  }
   const { subject, body } = buildReminderTemplate(state, scenarioForm);
   reminderSubjectInput.value = subject;
   draftTextarea.value = body;
@@ -257,7 +262,7 @@ async function fetchAdvice({ forceDraft = false } = {}) {
     replayFade(explanationEl);
     adviceModelEl.textContent = data.model;
     adviceModelEl.hidden = !data.model;
-    if (data.email_draft && (forceDraft || !state.draftEdited)) {
+    if (state.forecast.forecast_basis !== "history" && data.email_draft && (forceDraft || !state.draftEdited)) {
       draftTextarea.value = data.email_draft;
       draftSourceNote.textContent = "Drafted by AI · editable, sent manually by you";
       replayFade(draftTextarea);
@@ -273,7 +278,7 @@ async function fetchAdvice({ forceDraft = false } = {}) {
       agentStatusPill.textContent = "Preview ready";
       adviceError.className = "inline-alert inline-alert-soft";
       adviceError.textContent =
-        "AI explanation is not available for this forecast in preview mode. Your server cash numbers, decision preview, and editable email draft below are ready.";
+        "AI explanation is not available for this forecast in preview mode. You can still review the projected balances and test a decision.";
       adviceError.hidden = false;
       retryAdviceBtn.hidden = true;
     } else {
@@ -299,32 +304,36 @@ async function fetchAdvice({ forceDraft = false } = {}) {
   }
 }
 
+async function loadForecastFile(selectedFile) {
+  if (selectedFile) {
+    validateCsvUpload(selectedFile, await selectedFile.text());
+    return selectedFile;
+  }
+
+  const response = await request(sampleDownloadLink.href);
+  return new File([await response.blob()], sampleDownloadLink.download, { type: "text/csv" });
+}
+
 async function runBaselineForecast() {
   const submitBtn = document.querySelector("#run-forecast-btn");
   submitBtn.disabled = true;
   showStatus("Checking your upcoming cash…");
 
   try {
-    const selectedFile = fileInput.files?.[0] || null;
-    const csvText = selectedFile ? await selectedFile.text() : AMALFI_SAMPLE_CSV;
-    if (selectedFile) {
-      validateCsvUpload(selectedFile, csvText);
-    }
-    state.csvFile =
-      selectedFile || new File([AMALFI_SAMPLE_CSV], AMALFI_SAMPLE_FILENAME, { type: "text/csv" });
+    const openingBalanceMinor = Number(toMinor(openingBalanceInput.value));
+    const startDate = startDateInput.value;
+    if (!startDate) throw new Error("Choose a forecast start date.");
+
+    const csvFile = await loadForecastFile(fileInput.files?.[0]);
+    const data = await resolveForecast({ csvFile, openingBalanceMinor, startDate });
 
     horizonSelect.value = "14";
-    state.openingBalanceMinor = Number(toMinor(forecastForm.elements.opening_balance.value));
-    state.startDate = forecastForm.elements.start_date.value;
     state.horizonDays = 14;
-
-    const data = await resolveForecast({
-      csvFile: state.csvFile,
-      openingBalanceMinor: state.openingBalanceMinor,
-      startDate: state.startDate,
-    });
-
+    state.csvFile = csvFile;
+    state.openingBalanceMinor = openingBalanceMinor;
+    state.startDate = startDate;
     state.forecast = data;
+    setForecastOverlay(data.forecast_basis !== "history");
     state.adviceRequestId += 1;
     adviceLoading.hidden = true;
     adviceError.hidden = true;
@@ -426,7 +435,7 @@ async function loadInsights() {
   const hasShortfall = Boolean(payload.baseline.first_deficit);
 
   const [anomaliesRes, compareRes, stressRes, creditRes, optimizeRes] = await Promise.allSettled([
-    requestAnomalies(payload),
+    state.forecast.forecast_basis === "history" ? Promise.resolve(null) : requestAnomalies(payload),
     requestCompareOptions(payload),
     requestStressTest(payload),
     hasShortfall ? requestCreditCheck(payload) : Promise.resolve(null),
@@ -487,10 +496,14 @@ function clearWhatIfOverlay() {
 whatIfModeAskBtn?.addEventListener("click", () => setWhatIfMode("ask"));
 whatIfModeDelayBtn?.addEventListener("click", () => setWhatIfMode("delay"));
 
-toggleForecastBtn?.addEventListener("click", () => {
-  state.showForecast = !state.showForecast;
-  toggleForecastBtn.classList.toggle("is-active", state.showForecast);
-  toggleForecastBtn.setAttribute("aria-pressed", String(state.showForecast));
+function setForecastOverlay(enabled) {
+  state.showForecast = enabled;
+  toggleForecastBtn.classList.toggle("is-active", enabled);
+  toggleForecastBtn.setAttribute("aria-pressed", String(enabled));
+}
+
+toggleForecastBtn.addEventListener("click", () => {
+  setForecastOverlay(!state.showForecast);
   if (state.forecast) renderLedgerAndChart(state);
 });
 
@@ -607,9 +620,24 @@ delayForm.addEventListener("submit", async (event) => {
 fileInput.addEventListener("change", () => {
   for (const option of horizonSelect.options) option.disabled = false;
   const file = fileInput.files?.[0];
+  if (file && !sampleHint.hidden) {
+    for (const input of [openingBalanceInput, startDateInput]) {
+      if (input.value === input.defaultValue) input.value = "";
+    }
+  }
+  sampleHint.hidden = Boolean(file);
+  useSampleBtn.hidden = !file;
   fileNameEl.textContent = file
     ? `${file.name} (${Math.max(1, Math.round(file.size / 1024))} KB)`
-    : "Pizzeria Amalfi example (ready to use)";
+    : sampleFileLabel;
+});
+
+useSampleBtn.addEventListener("click", () => {
+  fileInput.value = "";
+  openingBalanceInput.value = openingBalanceInput.defaultValue;
+  startDateInput.value = startDateInput.defaultValue;
+  fileInput.dispatchEvent(new Event("change"));
+  showStatus("");
 });
 
 ["dragenter", "dragover"].forEach((evt) => {
@@ -623,19 +651,6 @@ fileInput.addEventListener("change", () => {
   fileDropzone.addEventListener(evt, () => {
     fileDropzone.classList.remove("is-dragover");
   });
-});
-
-// Download Red Hat sample CSV
-downloadSampleBtn.addEventListener("click", () => {
-  const blob = new Blob([AMALFI_SAMPLE_CSV], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = AMALFI_SAMPLE_FILENAME;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
 });
 
 // Forecast controls

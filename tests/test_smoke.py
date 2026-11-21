@@ -51,7 +51,7 @@ def test_preview_serves_html_assets_and_demo_csv():
     assert styles.status_code == 200
     assert "css/tokens.css" in styles.text
     for asset in (
-        "app.js", "chart.js", "sample-amalfi.js",
+        "app.js", "chart.js",
         "js/api.js", "js/format.js", "js/insights.js", "js/predictions.js", "js/proposal.js", "js/render.js",
         "css/tokens.css", "css/dashboard.css", "css/forms.css", "css/insights.css", "css/panels.css", "css/responsive.css",
     ):
@@ -61,6 +61,29 @@ def test_preview_serves_html_assets_and_demo_csv():
     assert client.get("/demo/amalfi.csv").content == (DEMO / "pizzeria_amalfi_sample.csv").read_bytes()
     operations = client.get("/openapi.json").json()["paths"]
     assert "multipart/form-data" in operations["/api/forecast"]["post"]["requestBody"]["content"]
+
+
+def test_full_statement_forecasts_january_beyond_the_imported_dates():
+    client = TestClient(create_app("live"))
+    statement = client.get("/demo/amalfi-history.csv")
+    assert statement.status_code == 200
+    assert len(statement.content.splitlines()) == 1126
+    response = forecast(client, {"starting_balance_minor": "3326635", "start_date": "2026-01-01"}, statement.content)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    days = result["baseline"]["days"]
+    assert result["forecast_basis"] == "history"
+    assert [row["date"] for row in days] == [f"2026-01-{day:02d}" for day in range(1, 15)]
+    assert len({day["balance_minor"] for day in days}) > 1
+    assert result["transactions"]
+    assert all(days[0]["date"] <= tx["date"] <= days[-1]["date"] for tx in result["transactions"])
+
+    anomalies = client.post(
+        "/api/detect-anomalies",
+        json={key: result[key] for key in ("baseline", "transactions", "currency")},
+    )
+    assert anomalies.status_code == 200, anomalies.text
+    assert anomalies.json()["findings"] == []
 
 
 def test_demo_baseline_scenario_and_draft():

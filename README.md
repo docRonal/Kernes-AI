@@ -4,7 +4,7 @@ Our Autonomous CFO entry for the Red Hat challenge at Collabothon focuses on the
 
 ## Liquidity Agent demo scope
 
-1. The user uploads synthetic upcoming payments and enters an opening balance and start date. The app projects 14 end-of-day cash balances in PLN and identifies the first day below zero.
+1. The user uploads a bank CSV and enters an opening balance and start date. The app projects 14 end-of-day cash balances in the statement currency and identifies the first day below zero. When the start date is after the last transaction in the CSV, the app estimates recurring payments and typical daily movements from the earlier rows.
 2. If the baseline forecast shows a shortfall, the app automatically shows a proposed credit facility. Calculate its limit as `max(0, -min(projected_balances))` over the baseline horizon in integer grosz. Show the first shortfall date and amount, the date and size of the deepest shortfall, and the relevant transactions. Use the earliest date if the deepest shortfall spans multiple days. A baseline that stays at or above zero needs no facility.
 3. The open-source or open-weight model explains why the limit would cover the projected gap, using the forecast figures and relevant transaction facts supplied by the backend. The deterministic calculation supplies the amount. During a model outage, show the forecast and proposal figures with a clear explanation error so the user can still review them.
 4. The user chooses **Approve simulation** or **Reject simulation**. For approval, show the projected uncovered gap after simulated access to the facility limit on each day. For rejection, show the original unfunded gap. Keep the underlying balances intact. Both decisions are simulations and trigger zero real applications, transfers, or messages.
@@ -28,7 +28,7 @@ uv run --locked pytest -q
 
 Edit the HTML, CSS, and JavaScript in `frontend/`, then refresh the browser. FastAPI serves these files directly in local development and in the OpenShift container.
 
-In `demo` mode, the app accepts [demo/transactions.csv](demo/transactions.csv) and returns a saved response. The starter includes two forecast outcomes and a sample model response. The `live` mode is the integration point for live forecasting and calls to OpenShift AI. See the [deployment guide](deploy/README.md).
+The forecast uses the uploaded CSV in both modes. The built-in example uses the full Amalfi statement for 2025. The `demo` mode has a saved explanation for the shortfall fixture, and `live` calls OpenShift AI for explanations. See the [deployment guide](deploy/README.md).
 
 For local configuration, copy `.env.example` to `.env` and add `--env-file .env` immediately after `uv run --locked`. The app starts in `demo` mode by default.
 
@@ -80,9 +80,9 @@ The configurations are in `.codex/agents/`, `.claude/agents/`, and `.agents/agen
 
 ## Verify before the demo
 
-Use at least two synthetic PLN cases on the deployed live app. **Try Kernes demo (PLN)** runs the first case against the API. The Pizzeria Amalfi example uses EUR and runs its forecast and simulation in the browser.
+Start with **Check my cash** on the built-in Amalfi example. This uses the full 2025 statement, with EUR 33,266.35 as the opening balance on 1 January 2026. The projected dates are 1–14 January. The estimates use recurring payments and recent average cash movements. For the separate known-payment example below, use the [26-row Amalfi CSV](demo/pizzeria_amalfi_sample.csv).
 
-1. Upload the starter sample, enter PLN 12,000 as the opening balance, and select November 23, 2026. The baseline reaches **−PLN 5,000** on November 27. It should show a **PLN 5,000** credit facility automatically. Verify that the live OpenShift AI explanation matches the dates, limit, and transactions.
-2. Approve the proposal and verify that the simulated uncovered gap drops to **PLN 0**. Reload the original case, reject the proposal, and verify that the uncovered gap stays **PLN 5,000** on November 27. Verify that the UI makes the simulation status clear in both cases.
-3. Move payment `INV-001` to November 26. Verify that the alternative Friday balance is **PLN 4,000** and the baseline still shows **−PLN 5,000**. Request the editable reminder draft if demonstrating that feature.
-4. Use [the peak-shortfall fixture](demo/credit_peak_case.csv) with a November 23 start date. It starts with PLN 1,000, projects a PLN 1,200 outflow on day 2 and a PLN 500 outflow on day 4, and receives PLN 1,000 on day 7. Verify that the explanation distinguishes the **PLN 200** first shortfall from the **PLN 700** peak shortfall and that the app proposes **PLN 700**. Check a no-shortfall forecast separately and verify that it shows no proposal.
+1. Upload the 26-row sample, enter EUR 5,000 and choose 22 June 2025. The first shortfall is EUR 6,250 on 28 June. The suggested limit covers the deepest gap of EUR 8,248.91 on 3 July.
+2. Preview both credit decisions. Approval covers the full gap, and rejection leaves EUR 8,248.91 uncovered.
+3. Move TX-0005 to 27 June in the earlier-payment scenario. The first shortfall falls to EUR 2,088.36. The original forecast is still available for comparison.
+4. Check [the no-shortfall fixture](demo/no_shortfall_case.csv) and verify that no credit facility is proposed.

@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.forecast import project, propose, suggest_earlier_payments
+from backend.forecast import horizon, project, propose, suggest_earlier_payments
+from backend.history_forecast import estimate_transactions
 from backend.main import create_app
 from backend.models import Deficit, Projection, Transaction
 from tests._csv_helpers import STARTER_AMALFI_CSV, amalfi_csv
@@ -495,3 +496,71 @@ def test_full_red_hat_amalfi_dataset_parses_cleanly(client):
 def test_invalid_bank_csv_returns_422(client, bad_csv):
     resp = forecast(client, bad_csv, opening="500000", start="2025-06-22")
     assert resp.status_code == 422
+
+
+def test_history_forecast_infers_recurrences_and_daily_amounts(client):
+    statement = amalfi_csv(
+        ("2025-01-25", "Rent payment", -28_000, "PLN"),
+        ("2025-02-25", "Rent payment", -28_000, "PLN"),
+        ("2025-03-25", "Rent payment", -28_000, "PLN"),
+        ("2025-03-31", "Client invoice", 7_000, "PLN"),
+        ("2025-04-07", "Client invoice", 7_000, "PLN"),
+        ("2025-04-12", "Equipment repair", -2_800, "PLN"),
+        ("2025-04-13", "Refund", 5_600, "PLN"),
+        ("2025-04-14", "Client invoice", 7_000, "PLN"),
+    )
+    scheduled = forecast(client, statement, opening="0", start="2025-04-14")
+    assert scheduled.status_code == 200, scheduled.text
+    assert "forecast_basis" not in scheduled.json()
+    assert balance_on(scheduled.json()["baseline"], "2025-04-14") == 7_000
+
+    response = forecast(client, statement, opening="0", start="2025-04-15")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["forecast_basis"] == "history"
+    assert body["currency"] == "PLN"
+    assert balance_on(body["baseline"], "2025-04-21") == 7_700
+    assert body["baseline"]["first_deficit"] == {"date": "2025-04-25", "shortfall_minor": 19_900}
+    assert balance_on(body["baseline"], "2025-04-28") == -12_600
+    assert body["proposal"]["limit_minor"] == 19_900
+    assert body["earlier_payments"] == []
+    assert len({tx["id"] for tx in body["transactions"]}) == 31
+    assert all(
+        tx["id"].startswith("FC-")
+        and tx["date"] >= "2025-04-15"
+        and tx["transaction_type"] == "ESTIMATE"
+        and tx["actionability"] in {"retail_non_contactable", "fixed_mandatory"}
+        for tx in body["transactions"]
+    )
+
+    receipt = next(
+        tx for tx in body["transactions"] if tx["date"] == "2025-04-28" and tx["amount_minor"] == 7_000
+    )
+    moved = forecast(
+        client, statement, opening="0", start="2025-04-15",
+        move_transaction_id=receipt["id"], move_to_date="2025-04-25",
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["baseline"] == body["baseline"]
+    assert moved.json()["scenario"]["first_deficit"]["shortfall_minor"] == 12_900
+
+
+def test_history_forecast_dates_stay_inside_calendar():
+    history = [
+        Transaction(id=f"rent-{month}", date=date(9999, month, 20), amount_minor=-200, label="Rent")
+        for month in (9, 10, 11)
+    ] + [
+        Transaction(id=f"sale-{day}", date=date(9999, 12, day), amount_minor=100, label="Weekly sales")
+        for day in (3, 10, 17)
+    ]
+    estimates = estimate_transactions(history, horizon(date(9999, 12, 18)))
+    assert [(row.date, row.amount_minor) for row in estimates] == [
+        (date(9999, 12, 20), -200),
+        (date(9999, 12, 24), 100),
+        (date.max, 100),
+    ]
+
+    earliest = Transaction(id="first", date=date.min, amount_minor=100, label="Sales")
+    estimates = estimate_transactions([earliest], horizon(date(1, 1, 2)))
+    assert len(estimates) == 14
+    assert all(row.amount_minor == 100 for row in estimates)

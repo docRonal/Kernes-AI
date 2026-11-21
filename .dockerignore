@@ -7,5 +7,7 @@
 !frontend/**
 !demo/
 !demo/**
+!red-hat-examples/
+!red-hat-examples/pizzeria-amalfi-bank-statement-2025-v6.csv
 **/__pycache__/
 **/*.py[cod]

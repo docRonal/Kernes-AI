@@ -9,6 +9,7 @@ RUN uv sync --locked --no-dev --no-install-project
 COPY backend/ backend/
 COPY frontend/ frontend/
 COPY demo/ demo/
+COPY red-hat-examples/pizzeria-amalfi-bank-statement-2025-v6.csv red-hat-examples/
 RUN chmod -R a+rX /app
 
 USER 1001

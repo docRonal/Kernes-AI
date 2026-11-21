@@ -1,6 +1,6 @@
 """Liquidity Agent cash forecast.
 
-Every amount is integer grosz (1 PLN = 100). This module has no floats, no
+Every amount is in integer minor currency units. This module has no floats, no
 network and no model calls: the figures the user sees, the proposed credit
 facility and the simulated decision all come from here. The model only explains
 them afterwards.
@@ -17,6 +17,7 @@ from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
 
+from .history_forecast import ESTIMATED_ID_PREFIX, estimate_transactions
 from .models import (
     HORIZON_DAYS,
     MAX_ABS_MINOR,
@@ -376,7 +377,11 @@ def suggest_earlier_payments(
     pay_by = first_gap - timedelta(days=1) if first_gap > days[0].date else days[0].date
     ranked = []
     for transaction in transactions:
-        if transaction.amount_minor <= 0 or not first_gap < transaction.date <= days[-1].date:
+        if (
+            transaction.id.startswith(ESTIMATED_ID_PREFIX)
+            or transaction.amount_minor <= 0
+            or not first_gap < transaction.date <= days[-1].date
+        ):
             continue
         # Paid on pay_by instead of its due date, the money lifts every balance in between.
         lowest = min(
@@ -419,10 +424,20 @@ def build_forecast(
 ) -> ForecastResponse:
     if abs(opening_minor) > MAX_ABS_MINOR:
         raise ForecastInputError("The opening balance is out of range.")
+    if start > date.max - timedelta(days=HORIZON_DAYS - 1):
+        raise ForecastInputError("The start date is too late for a 14-day forecast.")
     if (move_transaction_id is None) != (move_to_date is None):
         raise ForecastInputError("Send both move_transaction_id and move_to_date, or neither.")
 
     transactions, detected_currency = parse_transactions(raw)
+    from_history = start > transactions[-1].date
+    if from_history:
+        try:
+            estimates = estimate_transactions(transactions, horizon(start))
+        except ValueError as exc:
+            raise ForecastInputError(str(exc)) from exc
+        # Old rows still supply context if no movements can be estimated.
+        transactions = estimates or transactions
     baseline = project(transactions, opening_minor, start)
     scenario = None
     if move_transaction_id is not None and move_to_date is not None:
@@ -432,6 +447,7 @@ def build_forecast(
     proposal = propose(baseline, transactions)
     return ForecastResponse(
         currency=detected_currency,
+        forecast_basis="history" if from_history else None,
         transactions=transactions,
         baseline=baseline,
         proposal=proposal,
