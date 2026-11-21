@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/styles.css?v=tc9">
-  <script type="module" src="/assets/app.js?v=tc9"></script>
+  <link rel="stylesheet" href="/assets/styles.css?v=tc10">
+  <script type="module" src="/assets/app.js?v=tc10"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -159,9 +159,17 @@
               <div class="horizon-pills" role="group" aria-label="Days to analyze">
                 <button type="button" class="horizon-pill is-active" data-horizon="14">14 days</button>
               </div>
+              <div class="overlay-pills" role="group" aria-label="Chart projections and overlays">
+                <button type="button" class="overlay-pill is-active" id="toggle-forecast-btn" aria-pressed="true">+7d Forecast</button>
+                <button type="button" class="overlay-pill" id="toggle-stress-btn" aria-pressed="false">Stress test</button>
+                <button type="button" class="overlay-pill is-clear" id="clear-whatif-overlay-btn" hidden>Clear what-if ×</button>
+              </div>
               <div class="chart-legend" aria-label="Chart legend">
                 <span class="legend-item"><i class="dot dot-baseline"></i>Your cash</span>
+                <span class="legend-item" id="legend-forecast"><i class="dot dot-forecast"></i>Predicted (+7d)</span>
                 <span class="legend-item" id="legend-scenario" hidden><i class="dot dot-scenario"></i>If paid earlier</span>
+                <span class="legend-item" id="legend-whatif" hidden><i class="dot dot-whatif"></i><span id="legend-whatif-label">What-if</span></span>
+                <span class="legend-item" id="legend-stress" hidden><i class="dot dot-stress"></i>Stress case</span>
                 <span class="legend-item" id="legend-facility" hidden><i class="dot dot-facility"></i>With safety buffer</span>
               </div>
             </div>
@@ -358,48 +366,110 @@
           </div>
         </section>
 
-        <!-- 4. Milestone 1: Ask the CFO (Plain-English Q&A) -->
+        <!-- 4. Unified What-If Simulator & Late-Payment Predictor -->
         <section id="ask-cfo-card" class="card" aria-labelledby="ask-heading">
           <div class="card-header">
             <div>
               <div class="header-badges">
-                <span class="eyebrow-dot">Ask a question</span>
+                <span class="eyebrow-dot">What-If Simulator</span>
                 <span class="autonomy-badge level-1">Analyzed by agent</span>
               </div>
-              <h2 id="ask-heading">Ask a &ldquo;what-if&rdquo; question in plain English</h2>
-              <p class="card-desc">Ask in everyday language — the assistant recalculates your numbers and explains what changes.</p>
+              <h2 id="ask-heading">What-if simulator &amp; Q&amp;A</h2>
+              <p class="card-desc">Ask a &ldquo;what-if&rdquo; question or test a late customer payment — the chart updates with your simulated curve.</p>
+            </div>
+            <div class="whatif-mode-tabs" role="tablist" aria-label="What-if mode">
+              <button
+                type="button"
+                role="tab"
+                class="whatif-mode-btn is-active"
+                id="whatif-mode-ask"
+                aria-selected="true"
+                aria-controls="whatif-panel-ask"
+              >
+                Ask a question
+              </button>
+              <button
+                type="button"
+                role="tab"
+                class="whatif-mode-btn"
+                id="whatif-mode-delay"
+                aria-selected="false"
+                aria-controls="whatif-panel-delay"
+              >
+                Client pays late
+              </button>
             </div>
           </div>
 
-          <form id="ask-cfo-form" class="ask-form" novalidate>
-            <input
-              id="ask-cfo-input"
-              name="question"
-              type="text"
-              placeholder="e.g. What if payroll grows by 2,000 EUR?"
-              maxlength="500"
-              required
-              aria-label="Ask a question about your cash forecast"
-            >
-            <button type="submit" class="btn btn-primary" id="ask-cfo-btn">Ask →</button>
-          </form>
+          <div id="whatif-panel-ask" role="tabpanel" aria-labelledby="whatif-mode-ask">
+            <form id="ask-cfo-form" class="ask-form" novalidate>
+              <input
+                id="ask-cfo-input"
+                name="question"
+                type="text"
+                placeholder="e.g. What if payroll grows by 2,000 EUR?"
+                maxlength="500"
+                required
+                aria-label="Ask a question about your cash forecast"
+              >
+              <button type="submit" class="btn btn-primary" id="ask-cfo-btn">Ask →</button>
+            </form>
 
-          <div class="ask-chips" aria-label="Example questions">
-            <button type="button" class="ask-chip" data-question="What is the riskiest day in this forecast?">What is the riskiest day?</button>
-            <button type="button" class="ask-chip" data-question="What if payroll grows by 2,000 EUR?">What if payroll grows by 2,000 EUR?</button>
-            <button type="button" class="ask-chip" data-question="What if the client pays 3 days late?">What if the client pays 3 days late?</button>
+            <div class="ask-chips" aria-label="Example questions">
+              <button type="button" class="ask-chip" data-question="What is the riskiest day in this forecast?">What is the riskiest day?</button>
+              <button type="button" class="ask-chip" data-question="What if payroll grows by 2,000 EUR?">What if payroll grows by 2,000 EUR?</button>
+              <button type="button" class="ask-chip" data-question="What if the client pays 3 days late?">What if the client pays 3 days late?</button>
+            </div>
+
+            <div id="ask-loading" class="thinking-box" hidden>
+              <span class="spinner" aria-hidden="true"></span>
+              <span>Assistant is checking your question (usually 5–8 seconds)…</span>
+            </div>
+
+            <div id="ask-answer-box" class="ask-answer" hidden>
+              <p id="ask-answer-text"></p>
+              <div id="ask-answer-meta" class="ask-answer-meta" hidden></div>
+            </div>
+            <div id="ask-error" class="inline-alert inline-alert-soft" hidden></div>
           </div>
 
-          <div id="ask-loading" class="thinking-box" hidden>
-            <span class="spinner" aria-hidden="true"></span>
-            <span>Assistant is checking your question (usually 5–8 seconds)…</span>
+          <div id="whatif-panel-delay" role="tabpanel" aria-labelledby="whatif-mode-delay" hidden>
+            <form id="delay-form" class="delay-form" novalidate>
+              <div class="delay-row">
+                <div class="field">
+                  <label for="delay-tx-select">Incoming payment</label>
+                  <select id="delay-tx-select" name="transaction_id" required></select>
+                </div>
+                <div class="field">
+                  <label for="delay-days-input">Days late</label>
+                  <input id="delay-days-input" name="delay_days" type="number" min="1" max="365" value="3" required>
+                </div>
+                <button type="submit" class="btn btn-primary" id="delay-predict-btn">Check late impact →</button>
+              </div>
+            </form>
+
+            <p id="delay-empty" class="muted-note" hidden></p>
+
+            <div id="delay-loading" class="thinking-box" hidden>
+              <span class="spinner" aria-hidden="true"></span>
+              <span>Checking what happens if this payment arrives late (usually 5–8 seconds)…</span>
+            </div>
+
+            <div id="delay-result-box" class="delay-result" hidden>
+              <div id="delay-warning-box" class="delay-warning"></div>
+              <p id="delay-explanation" class="agent-text"></p>
+              <div id="delay-meta" class="ask-answer-meta" hidden></div>
+            </div>
+            <div id="delay-error" class="inline-alert inline-alert-soft" hidden></div>
           </div>
 
-          <div id="ask-answer-box" class="ask-answer" hidden>
-            <p id="ask-answer-text"></p>
-            <div id="ask-answer-meta" class="ask-answer-meta" hidden></div>
+          <div id="whatif-chart-banner" class="whatif-chart-banner" hidden>
+            <span id="whatif-chart-label">Plotted on chart above.</span>
+            <div class="whatif-chart-actions">
+              <button type="button" class="btn-link" id="scroll-to-chart-btn">View on chart ↑</button>
+              <button type="button" class="btn-link" id="clear-whatif-card-btn">Clear</button>
+            </div>
           </div>
-          <div id="ask-error" class="inline-alert inline-alert-soft" hidden></div>
         </section>
 
         <!-- 5. Milestone 3: Compare Your Options Side-by-Side -->
@@ -486,47 +556,6 @@
           <div class="bento-footer" id="optimize-footer" hidden>
             <button type="button" class="btn-list-toggle" id="optimize-toggle"></button>
           </div>
-        </section>
-
-        <section id="delay-predict-card" class="card" aria-labelledby="delay-heading" hidden>
-          <div class="card-header">
-            <div>
-              <div class="header-badges">
-                <span class="eyebrow-dot">Late payment check</span>
-                <span class="autonomy-badge level-1">Analyzed by agent</span>
-              </div>
-              <h2 id="delay-heading">What if a client pays late?</h2>
-              <p class="card-desc">See what happens to your cash if an expected payment arrives late.</p>
-            </div>
-          </div>
-
-          <form id="delay-form" class="delay-form" novalidate>
-            <div class="delay-row">
-              <div class="field">
-                <label for="delay-tx-select">Incoming payment</label>
-                <select id="delay-tx-select" name="transaction_id" required></select>
-              </div>
-              <div class="field">
-                <label for="delay-days-input">Days late</label>
-                <input id="delay-days-input" name="delay_days" type="number" min="1" max="365" value="3" required>
-              </div>
-              <button type="submit" class="btn btn-primary" id="delay-predict-btn">Check late impact →</button>
-            </div>
-          </form>
-
-          <p id="delay-empty" class="muted-note" hidden></p>
-
-          <div id="delay-loading" class="thinking-box" hidden>
-            <span class="spinner" aria-hidden="true"></span>
-            <span>Checking what happens if this payment arrives late (usually 5–8 seconds)…</span>
-          </div>
-
-          <div id="delay-result-box" class="delay-result" hidden>
-            <div id="delay-warning-box" class="delay-warning"></div>
-            <p id="delay-explanation" class="agent-text"></p>
-            <div id="delay-meta" class="ask-answer-meta" hidden></div>
-          </div>
-          <div id="delay-error" class="inline-alert inline-alert-soft" hidden></div>
         </section>
 
         <!-- 7. Milestone 2: Unusual Payments / Anomaly Alerts -->

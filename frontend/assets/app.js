@@ -4,7 +4,7 @@ import {
   AMALFI_DEFAULT_START_DATE,
   AMALFI_SAMPLE_CSV,
   AMALFI_SAMPLE_FILENAME,
-} from "./sample-amalfi.js?v=tc9";
+} from "./sample-amalfi.js?v=tc10";
 import {
   buildInsightPayload,
   formatCsvError,
@@ -21,8 +21,8 @@ import {
   requestSendReminder,
   requestStressTest,
   resolveForecast,
-} from "./js/api.js?v=tc9";
-import { replayFade, toMinor } from "./js/format.js?v=tc9";
+} from "./js/api.js?v=tc10";
+import { replayFade, toMinor } from "./js/format.js?v=tc10";
 import {
   populateDelayCandidates,
   renderAnomalies,
@@ -36,15 +36,16 @@ import {
   renderOptimizePayments,
   renderStressTest,
   resetInsightsUi,
-} from "./js/insights.js?v=tc9";
-import { readProposal } from "./js/proposal.js?v=tc9";
+} from "./js/insights.js?v=tc10";
+import { buildWhatIfCurve } from "./js/predictions.js?v=tc10";
+import { readProposal } from "./js/proposal.js?v=tc10";
 import {
   buildReminderTemplate,
   populateIncomingPayments,
   renderKpis,
   renderLedgerAndChart,
   renderProposalPanel,
-} from "./js/render.js?v=tc9";
+} from "./js/render.js?v=tc10";
 
 const forecastForm = document.querySelector("#forecast-form");
 const scenarioForm = document.querySelector("#scenario-form");
@@ -71,6 +72,17 @@ const explanationEl = document.querySelector("#explanation");
 const adviceModelEl = document.querySelector("#advice-model");
 
 const horizonPills = document.querySelectorAll(".horizon-pill");
+const toggleForecastBtn = document.querySelector("#toggle-forecast-btn");
+const toggleStressBtn = document.querySelector("#toggle-stress-btn");
+const clearWhatIfOverlayBtn = document.querySelector("#clear-whatif-overlay-btn");
+const whatIfModeAskBtn = document.querySelector("#whatif-mode-ask");
+const whatIfModeDelayBtn = document.querySelector("#whatif-mode-delay");
+const whatIfPanelAsk = document.querySelector("#whatif-panel-ask");
+const whatIfPanelDelay = document.querySelector("#whatif-panel-delay");
+const whatIfChartBanner = document.querySelector("#whatif-chart-banner");
+const whatIfChartLabel = document.querySelector("#whatif-chart-label");
+const scrollToChartBtn = document.querySelector("#scroll-to-chart-btn");
+const clearWhatIfCardBtn = document.querySelector("#clear-whatif-card-btn");
 const askForm = document.querySelector("#ask-cfo-form");
 const askInput = document.querySelector("#ask-cfo-input");
 const askBtn = document.querySelector("#ask-cfo-btn");
@@ -115,6 +127,9 @@ const state = {
   insightsRequestId: 0,
   simulationDecision: null,
   simulationOutcome: null,
+  showForecast: true,
+  showStress: false,
+  whatIfOverlay: null,
 };
 
 function showStatus(message, isError = false) {
@@ -330,6 +345,7 @@ async function runBaselineForecast() {
     state.proposal = readProposal(data);
     state.simulationDecision = null;
     state.simulationOutcome = null;
+    state.whatIfOverlay = null;
     state.advice = null;
     state.advicePreviewOnly = false;
     state.draftEdited = false;
@@ -455,6 +471,53 @@ async function loadInsights() {
   populateDelayCandidates(state.forecast, currency);
 }
 
+function setWhatIfMode(mode) {
+  const isAsk = mode === "ask";
+  whatIfModeAskBtn?.classList.toggle("is-active", isAsk);
+  whatIfModeAskBtn?.setAttribute("aria-selected", String(isAsk));
+  whatIfModeDelayBtn?.classList.toggle("is-active", !isAsk);
+  whatIfModeDelayBtn?.setAttribute("aria-selected", String(!isAsk));
+  if (whatIfPanelAsk) whatIfPanelAsk.hidden = !isAsk;
+  if (whatIfPanelDelay) whatIfPanelDelay.hidden = isAsk;
+}
+
+function showWhatIfOverlay(label, days) {
+  if (!days) return;
+  state.whatIfOverlay = { label, days };
+  if (whatIfChartLabel) whatIfChartLabel.textContent = `${label} plotted on the cash chart above.`;
+  if (whatIfChartBanner) whatIfChartBanner.hidden = false;
+  if (state.forecast) renderLedgerAndChart(state);
+}
+
+function clearWhatIfOverlay() {
+  state.whatIfOverlay = null;
+  if (whatIfChartBanner) whatIfChartBanner.hidden = true;
+  if (state.forecast) renderLedgerAndChart(state);
+}
+
+whatIfModeAskBtn?.addEventListener("click", () => setWhatIfMode("ask"));
+whatIfModeDelayBtn?.addEventListener("click", () => setWhatIfMode("delay"));
+
+toggleForecastBtn?.addEventListener("click", () => {
+  state.showForecast = !state.showForecast;
+  toggleForecastBtn.classList.toggle("is-active", state.showForecast);
+  toggleForecastBtn.setAttribute("aria-pressed", String(state.showForecast));
+  if (state.forecast) renderLedgerAndChart(state);
+});
+
+toggleStressBtn?.addEventListener("click", () => {
+  state.showStress = !state.showStress;
+  toggleStressBtn.classList.toggle("is-active", state.showStress);
+  toggleStressBtn.setAttribute("aria-pressed", String(state.showStress));
+  if (state.forecast) renderLedgerAndChart(state);
+});
+
+clearWhatIfOverlayBtn?.addEventListener("click", clearWhatIfOverlay);
+clearWhatIfCardBtn?.addEventListener("click", clearWhatIfOverlay);
+scrollToChartBtn?.addEventListener("click", () => {
+  document.querySelector("#chart-heading")?.scrollIntoView({ behavior: "smooth", block: "center" });
+});
+
 // Ask the CFO (Milestone 1)
 async function submitAskQuestion(question) {
   const trimmed = String(question || "").trim();
@@ -474,6 +537,14 @@ async function submitAskQuestion(question) {
   try {
     const data = await requestAskCfo(payload, trimmed);
     renderAskAnswer(data, state.forecast.currency ?? "EUR");
+    if (data.what_if) {
+      const curveDays = buildWhatIfCurve(state.forecast.baseline.days, state.forecast.transactions, {
+        transactionId: data.what_if.transaction_id,
+        newAmountMinor: data.what_if.new_amount_minor,
+        newDate: data.what_if.new_date,
+      });
+      showWhatIfOverlay("What-if scenario", curveDays);
+    }
   } catch (error) {
     renderAskError(
       error.status === 503
@@ -511,8 +582,8 @@ delayForm.addEventListener("submit", async (event) => {
   }
 
   const txId = delayTxSelect.value;
-  const days = Number.parseInt(delayDaysInput.value, 10);
-  if (!txId || !Number.isFinite(days) || days < 1 || days > 365) {
+  const delayDays = Number.parseInt(delayDaysInput.value, 10);
+  if (!txId || !Number.isFinite(delayDays) || delayDays < 1 || delayDays > 365) {
     renderDelayError("Enter a delay between 1 and 365 days.");
     return;
   }
@@ -523,8 +594,13 @@ delayForm.addEventListener("submit", async (event) => {
   document.querySelector("#delay-result-box").hidden = true;
   document.querySelector("#delay-error").hidden = true;
   try {
-    const data = await requestPredictDelays(payload, { [txId]: days });
+    const data = await requestPredictDelays(payload, { [txId]: delayDays });
     renderDelayResult(data);
+    const curveDays = buildWhatIfCurve(state.forecast.baseline.days, state.forecast.transactions, {
+      transactionId: txId,
+      delayDays,
+    });
+    showWhatIfOverlay(`If ${txId} +${delayDays}d late`, curveDays);
   } catch (error) {
     renderDelayError(
       error.status === 503

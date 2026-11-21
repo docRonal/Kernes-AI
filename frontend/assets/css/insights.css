@@ -498,3 +498,58 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Unified What-If Simulator mode tabs & chart overlay banner */
+.whatif-mode-tabs {
+  display: inline-flex;
+  background: var(--surface-tile);
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.whatif-mode-btn {
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+
+.whatif-mode-btn:hover:not(.is-active) {
+  color: var(--ink);
+}
+
+.whatif-mode-btn.is-active {
+  background: var(--surface-dark);
+  color: #ffffff;
+}
+
+.whatif-chart-banner {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #fffbeb;
+  color: #92400e;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.whatif-chart-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}

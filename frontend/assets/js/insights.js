@@ -1,4 +1,4 @@
-import { printDate, printMoney, replayFade } from "./format.js?v=tc9";
+import { printDate, printMoney, replayFade } from "./format.js?v=tc10";
 
 const ANOMALY_LABELS = {
   duplicate_payment: "Possible repeat charge",
@@ -37,7 +37,6 @@ export function resetInsightsUi() {
     "#compare-card",
     "#health-stress-grid",
     "#optimize-card",
-    "#delay-predict-card",
   ];
   for (const sel of sections) {
     const el = document.querySelector(sel);
@@ -50,6 +49,7 @@ export function resetInsightsUi() {
     "#delay-loading",
     "#delay-result-box",
     "#delay-error",
+    "#whatif-chart-banner",
     "#credit-explain-error",
     "#credit-factors-toggle",
     "#optimize-footer",
@@ -418,7 +418,6 @@ export function renderOptimizePayments(data, transactions, currency = "EUR", onP
 }
 
 export function populateDelayCandidates(forecast, currency = "EUR") {
-  const card = document.querySelector("#delay-predict-card");
   const form = document.querySelector("#delay-form");
   const select = document.querySelector("#delay-tx-select");
   const emptyEl = document.querySelector("#delay-empty");
@@ -457,8 +456,6 @@ export function populateDelayCandidates(forecast, currency = "EUR") {
       "Late-payment check is available when your forecast dips below zero and has an incoming payment in the next 14 days.";
     emptyEl.hidden = false;
   }
-
-  card.hidden = false;
 }
 
 export function renderDelayResult(data) {

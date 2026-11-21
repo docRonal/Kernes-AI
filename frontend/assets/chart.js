@@ -49,13 +49,18 @@ function formatShortDate(isoDate, includeYear = false) {
 }
 
 /**
- * Render an interactive cash balance SVG chart (supports 14-day, 30-day, or full-year statements).
+ * Render an interactive cash balance SVG chart with optional +7d trend forecast,
+ * stress-test curve, and live what-if / late-payment overlays.
  */
 export function renderCashflowChart(container, config) {
   const {
     baselineDays,
     scenarioDays = null,
     decisionDays = null,
+    forecastDays = null,
+    whatIfDays = null,
+    whatIfLabel = "What-if",
+    stressDays = null,
     transactionsByDate = new Map(),
     firstDeficitDate = null,
     peakDeficitDate = null,
@@ -70,9 +75,12 @@ export function renderCashflowChart(container, config) {
 
   if (!baselineDays || baselineDays.length === 0) return;
 
+  const hasForecast = Boolean(forecastDays && forecastDays.length > 0);
+  const allDays = hasForecast ? [...baselineDays, ...forecastDays] : baselineDays;
+
   const width = 760;
-  const height = 320;
-  const pad = { top: 32, right: 24, bottom: 44, left: 68 };
+  const height = 330;
+  const pad = { top: 34, right: 32, bottom: 44, left: 68 };
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
 
@@ -80,6 +88,17 @@ export function renderCashflowChart(container, config) {
   for (const d of baselineDays) allValues.push(d.balance_minor);
   if (scenarioDays) {
     for (const d of scenarioDays) allValues.push(d.balance_minor);
+  }
+  if (hasForecast) {
+    for (const d of forecastDays) {
+      allValues.push(d.balance_minor, d.low_minor, d.high_minor);
+    }
+  }
+  if (whatIfDays) {
+    for (const d of whatIfDays) allValues.push(d.balance_minor);
+  }
+  if (stressDays) {
+    for (const d of stressDays) allValues.push(d.balance_minor);
   }
   if (simulationDecision === "approved" && facilityLimitMinor > 0) {
     allValues.push(-facilityLimitMinor);
@@ -93,7 +112,7 @@ export function renderCashflowChart(container, config) {
   const yMax = Math.ceil((rawMax + step * 0.35) / step) * step;
 
   const xAt = (idx) =>
-    pad.left + (baselineDays.length === 1 ? plotW / 2 : (idx / (baselineDays.length - 1)) * plotW);
+    pad.left + (allDays.length === 1 ? plotW / 2 : (idx / (allDays.length - 1)) * plotW);
   const yAt = (val) => pad.top + ((yMax - val) / (yMax - yMin)) * plotH;
   const zeroY = yAt(0);
 
@@ -118,6 +137,21 @@ export function renderCashflowChart(container, config) {
   );
   defs.append(posGrad, negGrad);
   svg.append(defs);
+
+  // Shaded forecast projection zone on the right
+  if (hasForecast) {
+    const dividerX = xAt(baselineDays.length - 1);
+    const zoneW = Math.max(0, pad.left + plotW - dividerX);
+    svg.append(
+      el("rect", {
+        x: dividerX,
+        y: pad.top,
+        width: zoneW,
+        height: plotH,
+        class: "forecast-zone",
+      }),
+    );
+  }
 
   // Shaded deficit zone below 0
   if (yMin < 0) {
@@ -201,6 +235,68 @@ export function renderCashflowChart(container, config) {
     );
   }
 
+  // Forward projection cone + dashed divider + trend line
+  if (hasForecast) {
+    const lastIdx = baselineDays.length - 1;
+    const lastX = xAt(lastIdx);
+    const lastY = yAt(baselineDays[lastIdx].balance_minor);
+
+    svg.append(
+      el("line", {
+        x1: lastX,
+        y1: pad.top,
+        x2: lastX,
+        y2: pad.top + plotH,
+        class: "forecast-divider",
+      }),
+    );
+    svg.append(
+      el(
+        "text",
+        {
+          x: Math.min(lastX + 6, pad.left + plotW - 84),
+          y: pad.top + 14,
+          class: "forecast-divider-label",
+        },
+        `Projected +${forecastDays.length}d →`,
+      ),
+    );
+
+    const upperPts = [
+      [lastX, lastY],
+      ...forecastDays.map((d, j) => [xAt(baselineDays.length + j), yAt(d.high_minor)]),
+    ];
+    const lowerPts = [
+      ...forecastDays
+        .map((d, j) => [xAt(baselineDays.length + j), yAt(d.low_minor)])
+        .reverse(),
+      [lastX, lastY],
+    ];
+    const bandPath = [
+      ...upperPts.map(([x, y], idx) => `${idx === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`),
+      ...lowerPts.map(([x, y]) => `L ${x.toFixed(1)} ${y.toFixed(1)}`),
+      "Z",
+    ].join(" ");
+    svg.append(el("path", { d: bandPath, class: "forecast-band" }));
+
+    const trendPts = [
+      [lastX, lastY],
+      ...forecastDays.map((d, j) => [xAt(baselineDays.length + j), yAt(d.balance_minor)]),
+    ];
+    const trendD = trendPts
+      .map(([x, y], idx) => `${idx === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`)
+      .join(" ");
+    svg.append(el("path", { d: trendD, fill: "none", class: "line-forecast" }));
+  }
+
+  // Stress-test curve (optional)
+  if (stressDays && stressDays.length === baselineDays.length) {
+    const stressD = stressDays
+      .map((d, i) => `${i === 0 ? "M" : "L"} ${xAt(i).toFixed(1)} ${yAt(d.balance_minor).toFixed(1)}`)
+      .join(" ");
+    svg.append(el("path", { d: stressD, fill: "none", class: "line-stress" }));
+  }
+
   // Baseline area & line
   const baselinePoints = baselineDays.map((d, i) => [xAt(i), yAt(d.balance_minor)]);
   const baselineLineD = baselinePoints
@@ -211,7 +307,7 @@ export function renderCashflowChart(container, config) {
   svg.append(el("path", { d: areaD, fill: "url(#baseline-pos-grad)" }));
   svg.append(el("path", { d: baselineLineD, fill: "none", class: "line-baseline" }));
 
-  // Scenario (what-if) line
+  // Scenario (if paid earlier) line
   if (scenarioDays && scenarioDays.length === baselineDays.length) {
     const scenarioD = scenarioDays
       .map((d, i) => `${i === 0 ? "M" : "L"} ${xAt(i).toFixed(1)} ${yAt(d.balance_minor).toFixed(1)}`)
@@ -219,12 +315,20 @@ export function renderCashflowChart(container, config) {
     svg.append(el("path", { d: scenarioD, fill: "none", class: "line-scenario" }));
   }
 
+  // What-if / Late-payment overlay line
+  if (whatIfDays && whatIfDays.length === baselineDays.length) {
+    const whatIfD = whatIfDays
+      .map((d, i) => `${i === 0 ? "M" : "L"} ${xAt(i).toFixed(1)} ${yAt(d.balance_minor).toFixed(1)}`)
+      .join(" ");
+    svg.append(el("path", { d: whatIfD, fill: "none", class: "line-whatif" }));
+  }
+
   // Data points & X axis labels
   const pointsGroup = el("g", { class: "chart-points" });
   const xLabelsGroup = el("g", { class: "chart-x-labels" });
-  const showAllDots = baselineDays.length <= 45;
-  const labelInterval = Math.max(1, Math.ceil(baselineDays.length / 7));
-  const includeYear = baselineDays.length > 90;
+  const showAllDots = allDays.length <= 45;
+  const labelInterval = Math.max(1, Math.ceil(allDays.length / 7));
+  const includeYear = allDays.length > 90;
 
   baselineDays.forEach((day, i) => {
     const x = xAt(i);
@@ -247,6 +351,23 @@ export function renderCashflowChart(container, config) {
       );
     }
 
+    if (day.date === peakDeficitDate && day.balance_minor < 0) {
+      const labelY = y + 18 <= pad.top + plotH - 4 ? y + 18 : Math.max(pad.top + 12, y - 12);
+      const anchor = i > allDays.length - 4 ? "end" : i < 2 ? "start" : "middle";
+      pointsGroup.append(
+        el(
+          "text",
+          {
+            x,
+            y: labelY,
+            "text-anchor": anchor,
+            class: "chart-callout-peak",
+          },
+          `Lowest ${formatCompactMoney(day.balance_minor, currencySymbol)}`,
+        ),
+      );
+    }
+
     if (showAllDots && scenarioDays && scenarioDays[i]) {
       const sy = yAt(scenarioDays[i].balance_minor);
       pointsGroup.append(
@@ -259,15 +380,62 @@ export function renderCashflowChart(container, config) {
       );
     }
 
-    if (i % labelInterval === 0 || i === baselineDays.length - 1) {
+    if (showAllDots && whatIfDays && whatIfDays[i]) {
+      const wy = yAt(whatIfDays[i].balance_minor);
+      pointsGroup.append(
+        el("circle", {
+          cx: x,
+          cy: wy,
+          r: 3.5,
+          class: whatIfDays[i].balance_minor < 0 ? "point-deficit" : "point-whatif",
+        }),
+      );
+    }
+  });
+
+  if (hasForecast) {
+    forecastDays.forEach((day, j) => {
+      const idx = baselineDays.length + j;
+      const x = xAt(idx);
+      const y = yAt(day.balance_minor);
+      if (showAllDots || j === forecastDays.length - 1) {
+        pointsGroup.append(
+          el("circle", {
+            cx: x,
+            cy: y,
+            r: j === forecastDays.length - 1 ? 4.2 : 3,
+            class: "point-forecast",
+          }),
+        );
+      }
+      if (j === forecastDays.length - 1) {
+        const endY = Math.max(pad.top + 14, Math.min(pad.top + plotH - 6, y - 10));
+        pointsGroup.append(
+          el(
+            "text",
+            {
+              x,
+              y: endY,
+              "text-anchor": "end",
+              class: "chart-callout-forecast",
+            },
+            `Est. ${formatCompactMoney(day.balance_minor, currencySymbol)}`,
+          ),
+        );
+      }
+    });
+  }
+
+  allDays.forEach((day, i) => {
+    if (i % labelInterval === 0 || i === allDays.length - 1) {
       xLabelsGroup.append(
         el(
           "text",
           {
-            x,
+            x: xAt(i),
             y: height - 14,
             "text-anchor": "middle",
-            class: "axis-label",
+            class: i >= baselineDays.length ? "axis-label axis-label-forecast" : "axis-label",
           },
           formatShortDate(day.date, includeYear),
         ),
@@ -295,13 +463,14 @@ export function renderCashflowChart(container, config) {
   tooltip.className = "chart-tooltip";
   tooltip.hidden = true;
 
-  // Interactive hover columns (sample every step if > 120 days to keep DOM light)
+  // Interactive hover columns across baseline + forecast days
   const hitGroup = el("g", { class: "chart-hits" });
-  const hitStep = baselineDays.length > 120 ? Math.ceil(baselineDays.length / 90) : 1;
-  const colWidth = (plotW / Math.max(1, baselineDays.length - 1)) * hitStep;
+  const hitStep = allDays.length > 120 ? Math.ceil(allDays.length / 90) : 1;
+  const colWidth = (plotW / Math.max(1, allDays.length - 1)) * hitStep;
 
-  for (let i = 0; i < baselineDays.length; i += hitStep) {
-    const day = baselineDays[i];
+  for (let i = 0; i < allDays.length; i += hitStep) {
+    const day = allDays[i];
+    const isPredicted = i >= baselineDays.length;
     const cx = xAt(i);
     const rectX = i === 0 ? pad.left : cx - colWidth / 2;
 
@@ -320,47 +489,70 @@ export function renderCashflowChart(container, config) {
       crosshair.setAttribute("x2", String(cx));
       crosshair.setAttribute("visibility", "visible");
 
-      const lines = [
-        `<div class="tip-date">${formatDate(day.date)}</div>`,
-        `<div class="tip-row"><span>Projected cash</span><strong class="${day.balance_minor < 0 ? "neg" : ""}">${formatMoney(day.balance_minor)}</strong></div>`,
-      ];
+      const lines = [`<div class="tip-date">${formatDate(day.date)}</div>`];
 
-      if (scenarioDays && scenarioDays[i]) {
-        const adj = scenarioDays[i].balance_minor;
+      if (isPredicted) {
         lines.push(
-          `<div class="tip-row"><span>If paid earlier</span><strong class="${adj < 0 ? "neg" : "pos"}">${formatMoney(adj)}</strong></div>`,
+          `<div class="tip-row"><span>Predicted cash</span><strong class="${day.balance_minor < 0 ? "neg" : ""}">${formatMoney(day.balance_minor)}</strong></div>`,
+          `<div class="tip-row"><span>Confidence range</span><strong>${formatMoney(day.low_minor)} to ${formatMoney(day.high_minor)}</strong></div>`,
+          `<div class="tip-tx"><span>Projected from 14-day trend</span></div>`,
         );
-      }
-
-      if (simulationDecision) {
-        const serverDay = decisionByDate.get(day.date);
-        const rawGap = Math.max(0, -day.balance_minor);
-        const uncovered = serverDay
-          ? serverDay.uncovered_minor
-          : simulationDecision === "approved"
-            ? Math.max(0, rawGap - facilityLimitMinor)
-            : rawGap;
-        const statusLabel = simulationDecision === "approved" ? "approved" : "rejected";
+      } else {
         lines.push(
-          `<div class="tip-row"><span>Still short (${statusLabel})</span><strong class="${uncovered > 0 ? "neg" : "pos"}">${formatMoney(uncovered)}</strong></div>`,
+          `<div class="tip-row"><span>Projected cash</span><strong class="${day.balance_minor < 0 ? "neg" : ""}">${formatMoney(day.balance_minor)}</strong></div>`,
         );
-      }
 
-      const dayTxs = transactionsByDate.get(day.date) || [];
-      if (dayTxs.length > 0) {
-        lines.push(`<div class="tip-divider"></div>`);
-        for (const tx of dayTxs.slice(0, 4)) {
-          const sign = tx.amount_minor > 0 ? "+" : "";
-          const fxNote =
-            tx.original_currency && tx.original_currency !== "EUR"
-              ? ` (${tx.original_currency})`
-              : "";
+        if (scenarioDays && scenarioDays[i]) {
+          const adj = scenarioDays[i].balance_minor;
           lines.push(
-            `<div class="tip-tx"><span>${escapeText(tx.label + fxNote)}</span><strong class="${tx.amount_minor < 0 ? "neg" : "pos"}">${sign}${formatMoney(tx.amount_minor)}</strong></div>`,
+            `<div class="tip-row"><span>If paid earlier</span><strong class="${adj < 0 ? "neg" : "pos"}">${formatMoney(adj)}</strong></div>`,
           );
         }
-        if (dayTxs.length > 4) {
-          lines.push(`<div class="tip-tx"><span>+${dayTxs.length - 4} more transactions</span></div>`);
+
+        if (whatIfDays && whatIfDays[i]) {
+          const wVal = whatIfDays[i].balance_minor;
+          lines.push(
+            `<div class="tip-row"><span>${escapeText(whatIfLabel)}</span><strong class="${wVal < 0 ? "neg" : "pos"}">${formatMoney(wVal)}</strong></div>`,
+          );
+        }
+
+        if (stressDays && stressDays[i]) {
+          const sVal = stressDays[i].balance_minor;
+          lines.push(
+            `<div class="tip-row"><span>Stress case</span><strong class="${sVal < 0 ? "neg" : ""}">${formatMoney(sVal)}</strong></div>`,
+          );
+        }
+
+        if (simulationDecision) {
+          const serverDay = decisionByDate.get(day.date);
+          const rawGap = Math.max(0, -day.balance_minor);
+          const uncovered = serverDay
+            ? serverDay.uncovered_minor
+            : simulationDecision === "approved"
+              ? Math.max(0, rawGap - facilityLimitMinor)
+              : rawGap;
+          const statusLabel = simulationDecision === "approved" ? "approved" : "rejected";
+          lines.push(
+            `<div class="tip-row"><span>Still short (${statusLabel})</span><strong class="${uncovered > 0 ? "neg" : "pos"}">${formatMoney(uncovered)}</strong></div>`,
+          );
+        }
+
+        const dayTxs = transactionsByDate.get(day.date) || [];
+        if (dayTxs.length > 0) {
+          lines.push(`<div class="tip-divider"></div>`);
+          for (const tx of dayTxs.slice(0, 4)) {
+            const sign = tx.amount_minor > 0 ? "+" : "";
+            const fxNote =
+              tx.original_currency && tx.original_currency !== "EUR"
+                ? ` (${tx.original_currency})`
+                : "";
+            lines.push(
+              `<div class="tip-tx"><span>${escapeText(tx.label + fxNote)}</span><strong class="${tx.amount_minor < 0 ? "neg" : "pos"}">${sign}${formatMoney(tx.amount_minor)}</strong></div>`,
+            );
+          }
+          if (dayTxs.length > 4) {
+            lines.push(`<div class="tip-tx"><span>+${dayTxs.length - 4} more transactions</span></div>`);
+          }
         }
       }
 

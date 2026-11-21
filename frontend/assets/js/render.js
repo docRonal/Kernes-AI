@@ -1,6 +1,7 @@
-import { renderCashflowChart } from "../chart.js?v=tc9";
-import { printDate, printMoney, replayFade } from "./format.js?v=tc9";
-import { groupTransactionsByDate } from "./proposal.js?v=tc9";
+import { renderCashflowChart } from "../chart.js?v=tc10";
+import { printDate, printMoney, replayFade } from "./format.js?v=tc10";
+import { buildForwardForecast, buildStressCurve } from "./predictions.js?v=tc10";
+import { groupTransactionsByDate } from "./proposal.js?v=tc10";
 
 export function renderKpis(state) {
   const { forecast, proposal, openingBalanceMinor, simulationDecision } = state;
@@ -114,13 +115,33 @@ export function renderLedgerAndChart(state) {
     ? "Red dots mark days below zero. Hover or tap any day to see the payments."
     : "Your balance stays at or above zero every day. Hover or tap any day for details.";
 
+  const forecastDays = state.showForecast
+    ? buildForwardForecast(baseline.days, forecast.transactions, 7).days
+    : null;
+  const stressDays = state.showStress
+    ? buildStressCurve(baseline.days, forecast.transactions)
+    : null;
+  const whatIfDays = state.whatIfOverlay?.days ?? null;
+  const whatIfLabel = state.whatIfOverlay?.label ?? "What-if";
+
+  document.querySelector("#legend-forecast").hidden = !forecastDays;
   document.querySelector("#legend-scenario").hidden = !scenario;
+  document.querySelector("#legend-whatif").hidden = !whatIfDays;
+  const whatIfLegendLabel = document.querySelector("#legend-whatif-label");
+  if (whatIfLegendLabel) whatIfLegendLabel.textContent = whatIfLabel;
+  document.querySelector("#legend-stress").hidden = !stressDays;
   document.querySelector("#legend-facility").hidden = !(simulationDecision === "approved" && proposal);
+  const clearOverlayBtn = document.querySelector("#clear-whatif-overlay-btn");
+  if (clearOverlayBtn) clearOverlayBtn.hidden = !whatIfDays;
 
   renderCashflowChart(document.querySelector("#chart-container"), {
     baselineDays: baseline.days,
     scenarioDays: scenario ? scenario.days : null,
     decisionDays: simulationOutcome?.days ?? null,
+    forecastDays,
+    whatIfDays,
+    whatIfLabel,
+    stressDays,
     transactionsByDate: txByDate,
     firstDeficitDate: proposal?.firstDeficit.date ?? null,
     peakDeficitDate: proposal?.peakDeficit.date ?? null,
