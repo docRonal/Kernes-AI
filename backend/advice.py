@@ -245,6 +245,9 @@ def build_facts(request: AdviceRequest) -> Facts:
     for t in relevant:
         direction = "incoming" if t.amount_minor > 0 else "outgoing"
         lines.append(f"- {day_name(t.date)}: {t.label} ({t.id}), {direction} {pln(abs(t.amount_minor))}.")
+    day_totals = _same_day_outgoing_totals(relevant)
+    for day, total in day_totals.items():
+        lines.append(f"Outgoing payments on {day_name(day)} total {pln(total)}.")
 
     reminder = _reminder_target(request.transactions, first.date, window)
     delay_lines, extra_allowed = _predict_delay_impact(request, window, proposal.limit_minor)
@@ -254,6 +257,7 @@ def build_facts(request: AdviceRequest) -> Facts:
     allowed |= {abs(day.balance_minor) for day in baseline.days}
     allowed |= {abs(t.amount_minor) for t in request.transactions}
     allowed |= extra_allowed
+    allowed |= set(day_totals.values())
     return Facts(
         proposal=proposal,
         lines=lines,
@@ -261,6 +265,15 @@ def build_facts(request: AdviceRequest) -> Facts:
         allowed_minor=frozenset(allowed),
         has_delay_prediction=bool(delay_lines),
     )
+
+
+def _same_day_outgoing_totals(transactions: list[Transaction]) -> dict[date, int]:
+    """Totals for days with several outgoing payments, so the model never has to add them up."""
+    by_day: dict[date, list[int]] = {}
+    for t in transactions:
+        if t.amount_minor < 0:
+            by_day.setdefault(t.date, []).append(-t.amount_minor)
+    return {day: sum(amounts) for day, amounts in sorted(by_day.items()) if len(amounts) > 1}
 
 
 def _reminder_target(transactions: list[Transaction], first_gap: date, window: list[date]) -> str | None:

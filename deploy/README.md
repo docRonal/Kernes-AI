@@ -34,6 +34,27 @@ CFO_MODEL_URL=http://kernes-qwen-predictor.kernes-ai.svc.cluster.local:8080/v1/c
 CFO_MODEL_NAME=kernes-qwen
 ```
 
+## Serve the main model with vLLM on the GPU
+
+The live app uses our own Qwen2.5 7B Instruct, served by vLLM on the cluster's single NVIDIA L4 GPU. The [GPU manifest](model-gpu.yaml) pulls the model from Red Hat's modelcar catalog. The CPU Qwen2.5 1.5B above stays running as the fallback model. Stop any other GPU model first, because the cluster has one GPU. For example, stop the preinstalled Llama example in `my-first-model`.
+
+```sh
+oc -n my-first-model annotate inferenceservice llama-32-3b-instruct serving.kserve.io/stop=true --overwrite
+oc -n kernes-ai apply -f deploy/model-gpu.yaml
+oc -n kernes-ai wait --for=condition=Ready inferenceservice/kernes-qwen-7b --timeout=20m
+```
+
+Point the app at it and keep the CPU model as the fallback.
+
+```sh
+CFO_MODEL_URL=http://kernes-qwen-7b-predictor.kernes-ai.svc.cluster.local:8080/v1/chat/completions
+CFO_MODEL_NAME=kernes-qwen-7b
+CFO_FALLBACK_MODEL_URL=http://kernes-qwen-predictor.kernes-ai.svc.cluster.local:8080/v1/chat/completions
+CFO_FALLBACK_MODEL_NAME=kernes-qwen
+```
+
+Both models appear under the `kernes-ai` project in the OpenShift AI dashboard.
+
 ## Start the app and verify it
 
 The starter uses `demo` mode. It exercises the interface and sample data while the team builds the live forecast, model call, and approval simulation. The app exposes an HTTPS Route.

@@ -324,3 +324,12 @@ def test_send_reminder_is_always_simulated(live, monkeypatch):
     assert response.status_code == 200
     assert response.json()["status"] == "simulated"
     assert response.json()["recipient"] == "billing@acme.example"
+
+
+def test_same_day_payments_come_with_their_total(live):
+    # Qwen 7B summed payroll and rent on its own; the total is now a fact it can quote.
+    total = {**GOOD, "explanation": GOOD["explanation"] + " Payments of PLN 17,000.00 leave on Friday."}
+    client, model = live([total])
+    response = client.post("/api/advice", json=advice_payload(client))
+    assert response.status_code == 200
+    assert "Outgoing payments on Friday, November 27 total PLN 17,000.00." in model.requests[0]["messages"][1]["content"]
