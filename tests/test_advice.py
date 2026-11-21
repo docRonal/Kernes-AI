@@ -333,3 +333,45 @@ def test_same_day_payments_come_with_their_total(live):
     response = client.post("/api/advice", json=advice_payload(client))
     assert response.status_code == 200
     assert "Outgoing payments on Friday, November 27 total EUR 17,000.00." in model.requests[0]["messages"][1]["content"]
+
+
+@pytest.mark.parametrize("currency, symbol", [("PLN", "zł"), ("HUF", "Ft"), ("SEK", "kr")])
+def test_amounts_follow_the_request_currency(live, currency, symbol):
+    answer = {
+        "explanation": (
+            f"The balance falls to -{currency} 5,000.00 on Friday, November 27, a gap of 5,000.00 {symbol}. "
+            f"A credit facility of {currency} 5,000.00 covers it."
+        ),
+        "email_draft": f"Hello, could you pay INV-001 for {currency} 9,000.00 by Thursday, November 26?",
+    }
+    client, model = live([answer])
+    forecast = client.post(
+        "/api/forecast",
+        data={**BASE_INPUT, "currency": currency},
+        files={"file": ("transactions.csv", (DEMO / "transactions.csv").read_bytes(), "text/csv")},
+    )
+    assert forecast.status_code == 200
+    body = forecast.json()
+    assert body["currency"] == currency
+
+    payload = {"baseline": body["baseline"], "transactions": body["transactions"], "currency": currency}
+    response = client.post("/api/advice", json=payload)
+    assert response.status_code == 200
+    prompt = model.requests[0]["messages"][1]["content"]
+    assert f"-{currency} 5,000.00" in prompt
+    assert "EUR" not in prompt
+
+
+def test_a_currency_outside_the_eu_is_refused(live):
+    client, model = live([GOOD])
+    payload = {**advice_payload(client), "currency": "USD"}
+    assert client.post("/api/advice", json=payload).status_code == 422
+    assert model.requests == []
+
+
+def test_currency_does_not_leak_between_requests(live):
+    client, model = live([GOOD])
+    client.post("/api/advice", json={**advice_payload(client), "currency": "CZK"})
+    client.post("/api/advice", json=advice_payload(client))  # no currency: EUR
+    assert "CZK 5,000.00" in model.requests[0]["messages"][1]["content"]
+    assert "EUR 5,000.00" in model.requests[1]["messages"][1]["content"]

@@ -8,6 +8,9 @@ const calendarFormatter = new Intl.DateTimeFormat("en-GB", {
   timeZone: "UTC",
 });
 
+// EU currencies the API accepts. One forecast uses one currency; nothing is converted.
+export const EU_CURRENCIES = ["EUR", "PLN", "CZK", "HUF", "RON", "SEK", "DKK"];
+
 export function toMinor(value) {
   const match = /^(-?)(\d+)(?:[.,](\d{1,2}))?$/.exec(String(value).trim());
   if (!match) {
