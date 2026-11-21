@@ -1,4 +1,4 @@
-id,date,amount_minor,label
-PEAK-001,2026-11-24,-120000,Equipment payment
-PEAK-002,2026-11-26,-50000,Utility bill
-PEAK-003,2026-11-29,100000,Client invoice
+"Account Number";"Booking Date";"Value Date";"Transaction Type";"Payment Reference";"Beneficiary/Payer";"Counterparty Account";"Bank Code";"Amount";"Currency";"Info"
+"DE89370400440532013000";"24.11.26";"24.11.26";"SUPPLIER PAYMENT";"PEAK-001 Equipment payment";"Equipment payment";"DE33500105170011223344";"COBADEFFXXX";"-1200,00";"EUR";"Transaction booked"
+"DE89370400440532013000";"26.11.26";"26.11.26";"UTILITY PAYMENT";"PEAK-002 Utility bill";"Utility bill";"DE44500105170099887766";"HELADEFFXXX";"-500,00";"EUR";"Transaction booked"
+"DE89370400440532013000";"29.11.26";"29.11.26";"INCOMING PAYMENT";"PEAK-003 Client invoice";"Client invoice";"DE62700450500931013781";"COBADEFFBZM";"1000,00";"EUR";"Transaction booked"

@@ -12,24 +12,26 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from backend.forecast import REQUIRED_BANK_HEADERS
 from backend.main import create_app
+from backend.models import SUPPORTED_CURRENCIES
 
 
 DEMO = Path(__file__).resolve().parents[1] / "demo"
 QA_CASES = json.loads((DEMO / "qa_cases.json").read_text(encoding="utf-8"))["cases"]
 BASE_INPUT = {
-    "starting_balance_minor": "1200000",
-    "start_date": "2026-11-23",
+    "starting_balance_minor": "500000",
+    "start_date": "2025-06-22",
 }
-MOVE = {"move_transaction_id": "INV-001", "move_to_date": "2026-11-26"}
+MOVE = {"move_transaction_id": "TX-0005", "move_to_date": "2025-06-28"}
 
 
 def forecast(client, data, csv_bytes=None):
-    incoming = (DEMO / "transactions.csv").read_bytes() if csv_bytes is None else csv_bytes
+    incoming = (DEMO / "pizzeria_amalfi_sample.csv").read_bytes() if csv_bytes is None else csv_bytes
     return client.post(
         "/api/forecast",
         data=data,
-        files={"file": ("transactions.csv", incoming, "text/csv")},
+        files={"file": ("pizzeria_amalfi_sample.csv", incoming, "text/csv")},
     )
 
 
@@ -39,16 +41,22 @@ def test_preview_serves_html_assets_and_demo_csv():
     page = client.get("/")
     assert page.status_code == 200
     assert 'class="app-shell"' in page.text
+    assert "Step 1 of 2" not in page.text
+    assert "Step 2 of 2" not in page.text
+    assert 'id="run-forecast-btn"' in page.text
+    assert 'id="load-sample-btn"' not in page.text
+    assert 'id="load-kernes-sample-btn"' not in page.text
+    assert 'id="currency-select"' not in page.text
     styles = client.get("/assets/styles.css")
     assert styles.status_code == 200
     assert "css/tokens.css" in styles.text
     for asset in (
         "app.js", "chart.js", "sample-amalfi.js",
-        "js/api.js", "js/format.js", "js/insights.js", "js/proposal.js", "js/render.js",
+        "js/api.js", "js/format.js", "js/insights.js", "js/predictions.js", "js/proposal.js", "js/render.js",
         "css/tokens.css", "css/dashboard.css", "css/forms.css", "css/insights.css", "css/panels.css", "css/responsive.css",
     ):
         assert client.get(f"/assets/{asset}").status_code == 200, asset
-    assert client.get("/demo/transactions.csv").content == (DEMO / "transactions.csv").read_bytes()
+    assert client.get("/demo/transactions.csv").status_code == 404
     assert client.get("/demo/amalfi.csv").status_code == 200
     assert client.get("/demo/amalfi.csv").content == (DEMO / "pizzeria_amalfi_sample.csv").read_bytes()
     operations = client.get("/openapi.json").json()["paths"]
@@ -62,30 +70,40 @@ def test_demo_baseline_scenario_and_draft():
     assert baseline.status_code == compared.status_code == 200
     original = baseline.json()
     changed = compared.json()
+    assert original["currency"] == "EUR"
     assert original["scenario"] is None
     assert changed["baseline"] == original["baseline"]
-    assert changed["baseline"]["first_deficit"] == {"date": "2026-11-27", "shortfall_minor": 500_000}
-    assert changed["scenario"]["first_deficit"] is None
-    friday = next(day for day in changed["scenario"]["days"] if day["date"] == "2026-11-27")
-    assert friday["balance_minor"] == 400_000
+    assert changed["baseline"]["first_deficit"] == {"date": "2025-06-28", "shortfall_minor": 625_000}
+    assert changed["scenario"]["first_deficit"] == {"date": "2025-06-28", "shortfall_minor": 208_836}
+    june28 = next(day for day in changed["scenario"]["days"] if day["date"] == "2025-06-28")
+    assert june28["balance_minor"] == -208_836
 
-    payload = {"baseline": original["baseline"], "transactions": original["transactions"]}
+    payload = {"baseline": original["baseline"], "transactions": original["transactions"], "currency": original["currency"]}
     advice = client.post("/api/advice", json=payload)
     assert advice.status_code == 200
-    assert advice.json() == json.loads((DEMO / "advice.example.json").read_text(encoding="utf-8"))
+    adv_body = advice.json()
+    assert "EUR 8,248.91" in adv_body["explanation"]
+    assert adv_body["model"] == "demo-deterministic"
 
-    payload["transactions"] = payload["transactions"][:2]
-    assert client.post("/api/advice", json=payload).status_code == 422
+    healthy = forecast(client, {**BASE_INPUT, "starting_balance_minor": "3000000"}).json()
+    assert client.post(
+        "/api/advice",
+        json={"baseline": healthy["baseline"], "transactions": healthy["transactions"], "currency": healthy["currency"]},
+    ).status_code == 422
 
 
 @pytest.mark.parametrize(
     "data, csv_bytes",
     [
-        ({**BASE_INPUT, "starting_balance_minor": "123"}, None),
-        ({**BASE_INPUT, "move_transaction_id": "INV-001"}, None),
-        ({**BASE_INPUT, **MOVE, "move_to_date": "2026-11-25"}, None),
-        ({**BASE_INPUT, "currency": "EUR"}, None),
-        (BASE_INPUT, b"id,date,amount_minor,label\n"),
+        ({**BASE_INPUT, "starting_balance_minor": "abc"}, None),
+        ({**BASE_INPUT, "move_transaction_id": "TX-0005"}, None),
+        ({**BASE_INPUT, **MOVE, "move_to_date": "2025-06-21"}, None),
+        (BASE_INPUT, b"id,date,amount_minor,label\nA,2026-11-24,-100,Rent\n"),
+        (
+            BASE_INPUT,
+            b'"Account Number";"Booking Date";"Value Date";"Transaction Type";"Payment Reference";"Beneficiary/Payer";"Amount";"Currency"\n'
+            b'"DE00";"24.06.25";"24.06.25";"PAYMENT";"Ref";"Vendor";"-10,00";"XYZ"\n',
+        ),
         (BASE_INPUT, b"\xff"),
     ],
 )
@@ -114,17 +132,22 @@ def test_qa_cases_manifest_and_csv_fixtures():
         csv_path = DEMO / case["csv"]
         assert csv_path.is_file(), f"Missing fixture CSV: {csv_path}"
         text = csv_path.read_text(encoding="utf-8")
-        rows = list(csv.reader(text.splitlines()))
-        assert rows[0] == ["id", "date", "amount_minor", "label"]
-        seen_ids = set()
+        rows = list(csv.reader(text.splitlines(), delimiter=";"))
+        headers = [col.strip() for col in rows[0]]
+        for req_col in REQUIRED_BANK_HEADERS:
+            assert req_col in headers, f"Missing {req_col!r} in {csv_path}"
+        idx = {name: headers.index(name) for name in headers}
+        assert len(rows) > 1
         for row in rows[1:]:
-            assert len(row) == 4
-            tx_id, tx_date, amount_minor, label = row
-            assert tx_id and tx_id not in seen_ids
-            seen_ids.add(tx_id)
-            date.fromisoformat(tx_date)
-            int(amount_minor)
-            assert label.strip()
+            if not any(cell.strip() for cell in row):
+                continue
+            bdate = row[idx["Booking Date"]].strip()
+            assert re.fullmatch(r"\d{2}\.\d{2}\.\d{2}", bdate), bdate
+            amt = row[idx["Amount"]].strip().replace(".", "").replace(",", ".")
+            float(amt)
+            cur = row[idx["Currency"]].strip().upper()
+            assert cur in SUPPORTED_CURRENCIES, f"Unsupported currency {cur!r} in {csv_path}"
+            assert row[idx["Beneficiary/Payer"]].strip()
         assert len(case["expected_baseline_balances"]) == 14
         if case["explanation_expectations"] is not None:
             exp = case["explanation_expectations"]
@@ -141,7 +164,7 @@ def test_demo_proposal_and_decision_simulation():
     baseline_resp = forecast(client, BASE_INPUT)
     assert baseline_resp.status_code == 200
     body = baseline_resp.json()
-    assert body["proposal"]["limit_minor"] == 500_000
+    assert body["proposal"]["limit_minor"] == 824_891
 
     for decision_kind in ("approved", "rejected"):
         decision_resp = client.post(
@@ -352,6 +375,9 @@ def test_remote_deployment_workflow():
     assert status == 200 and "KERNES CFO" in html
 
     status, _ = _http_call(base_url, "/demo/transactions.csv", ssl_ctx=ssl_ctx)
+    assert status == 404
+
+    status, _ = _http_call(base_url, "/demo/amalfi.csv", ssl_ctx=ssl_ctx)
     assert status == 200
 
     status, openapi = _http_call(base_url, "/openapi.json", ssl_ctx=ssl_ctx)
@@ -389,7 +415,13 @@ def test_remote_deployment_workflow():
                     base_url,
                     "/api/advice",
                     method="POST",
-                    body=json.dumps({"baseline": body["baseline"], "transactions": body["transactions"]}).encode("utf-8"),
+                    body=json.dumps(
+                        {
+                            "baseline": body["baseline"],
+                            "transactions": body["transactions"],
+                            "currency": body.get("currency", "EUR"),
+                        }
+                    ).encode("utf-8"),
                     headers={"Content-Type": "application/json"},
                     ssl_ctx=ssl_ctx,
                 )
@@ -411,7 +443,11 @@ def test_remote_deployment_workflow():
                 assert [d["uncovered_minor"] for d in dec_body["days"]] == expected_decision["uncovered_minor"]
 
             advice_req = (
-                {"baseline": body["baseline"], "transactions": body["transactions"]}
+                {
+                    "baseline": body["baseline"],
+                    "transactions": body["transactions"],
+                    "currency": body.get("currency", "EUR"),
+                }
                 if uses_baseline_advice
                 else {"first_deficit": body["baseline"]["first_deficit"], "transactions": body["transactions"]}
             )

@@ -1,0 +1,7 @@
+"Account Number";"Booking Date";"Value Date";"Transaction Type";"Payment Reference";"Beneficiary/Payer";"Counterparty Account";"Bank Code";"Amount";"Currency";"Info"
+"US11CHASUS33000112233445";"23.06.25";"23.06.25";"CARD SETTLEMENT";"Stripe POS USD Settlement 23.06.25";"Amalfi US Pop-Up Kitchen";"US64SVBKUS6S3300958879";"CHASUS33XXX";"4200,00";"USD";"Transaction booked"
+"US11CHASUS33000112233445";"25.06.25";"25.06.25";"SUPPLIER PAYMENT";"Restaurant Depot Weekly Supplies INV-USD-88";"Restaurant Depot LLC";"US64SVBKUS6S3300958879";"BOFAUS3NXXX";"-1650,00";"USD";"Transaction booked"
+"US11CHASUS33000112233445";"27.06.25";"27.06.25";"SUPPLIER PAYMENT";"Imported Truffle Oil IT-774 @ 1.0800 USD/EUR";"Sapori dItalia Export Srl";"IT60X0542811101000000123456";"BPPIITRRXXX";"-1000,00";"EUR";"Transaction booked"
+"US11CHASUS33000112233445";"30.06.25";"30.06.25";"RENT PAYMENT";"SoHo Ghost Kitchen Rent 07/2025";"Manhattan Commercial Realty";"US64SVBKUS6S3300958879";"CITIUS33XXX";"-4800,00";"USD";"Transaction booked"
+"US11CHASUS33000112233445";"02.07.25";"02.07.25";"PAYROLL";"US Kitchen & Delivery Staff Payroll";"Amalfi US Crew";"US64SVBKUS6S3300958879";"CHASUS33XXX";"-3100,00";"USD";"Transaction booked"
+"US11CHASUS33000112233445";"04.07.25";"04.07.25";"INCOMING PAYMENT";"Private Event Catering Deposit INV-US-19";"Midtown Media Corp";"US64SVBKUS6S3300958879";"WFBIUS6SXXX";"3600,00";"USD";"Transaction booked"

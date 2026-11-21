@@ -1,19 +1,16 @@
 export function formatCsvError(rawMessage) {
   const msg = String(rawMessage || "").trim();
   if (!msg) {
-    return "We couldn't read this file. Upload a valid CSV export or try one of the built-in samples below.";
+    return "We couldn't read this file. Upload a valid semicolon-delimited bank CSV (Pizzeria Amalfi standard).";
   }
-  if (/must be the header id,date,amount_minor,label/i.test(msg)) {
-    return "This CSV doesn't match the expected columns. Upload a bank CSV export (with Booking Date, Amount, Currency) or a CSV with header: id,date,amount_minor,label — or try one of the sample buttons below.";
+  if (/unsupported csv format/i.test(msg)) {
+    return msg;
   }
   if (/missing required columns/i.test(msg)) {
-    return "This bank CSV doesn't have the required columns (Account Number, Booking Date, Value Date, Transaction Type, Payment Reference, Beneficiary/Payer, Amount, Currency). Export a fresh CSV from your bank or try one of the built-in samples below.";
+    return msg;
   }
-  if (/unsupported currency/i.test(msg)) {
-    return `${msg} Right now EUR and CHF transactions are supported.`;
-  }
-  if (/Use 12000 EUR|Use the bundled transactions\.csv/i.test(msg)) {
-    return "In local preview mode, custom comma CSVs aren't active yet — click 'Try Kernes demo (EUR)' or 'Try Pizzeria Amalfi sample' below to explore.";
+  if (/missing currency|unsupported or unknown currency|mixed currency/i.test(msg)) {
+    return msg;
   }
   if (/UTF-8/i.test(msg)) {
     return "This file isn't readable plain text (UTF-8 CSV). Export a fresh CSV from your bank or spreadsheet and try again.";
@@ -98,11 +95,12 @@ export function buildInsightPayload(forecast) {
   return {
     baseline: { days, first_deficit },
     transactions,
+    currency: forecast.currency || "EUR",
   };
 }
 
-export function requestAdvice({ baseline, transactions }) {
-  return post("/api/advice", { baseline, transactions });
+export function requestAdvice({ baseline, transactions, currency = "EUR" }) {
+  return post("/api/advice", { baseline, transactions, currency });
 }
 
 export function requestDecision({ baseline, decision }) {

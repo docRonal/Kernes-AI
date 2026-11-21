@@ -1,108 +1,228 @@
 {
   "cases": [
     {
-      "id": "starter",
-      "description": "Starter case: EUR 12,000 opening balance, Friday Payroll + Office rent create a EUR 5,000 shortfall on 2026-11-27 before Client invoice arrives on 2026-11-30.",
-      "csv": "transactions.csv",
-      "starting_balance_minor": 1200000,
-      "start_date": "2026-11-23",
+      "id": "amalfi_sample",
+      "description": "Pizzeria Amalfi canonical bank statement: EUR 5,000 opening balance drops to -EUR 6,250.00 on 2025-06-28 and peaks at -EUR 8,248.91 on 2025-07-03.",
+      "csv": "pizzeria_amalfi_sample.csv",
+      "starting_balance_minor": 500000,
+      "start_date": "2025-06-22",
       "expected_baseline_balances": [
-        1200000,
-        1200000,
-        1200000,
-        1200000,
-        -500000,
-        -500000,
-        -500000,
-        400000,
-        400000,
-        400000,
-        400000,
-        400000,
-        400000,
-        400000
+        500000,
+        500000,
+        500000,
+        500000,
+        500000,
+        235000,
+        -625000,
+        -625000,
+        -625000,
+        -776077,
+        -774984,
+        -824891,
+        -471100,
+        -507907
       ],
       "expected_first_deficit": {
-        "date": "2026-11-27",
-        "shortfall_minor": 500000
+        "date": "2025-06-28",
+        "shortfall_minor": 625000
       },
       "expected_proposal": {
-        "limit_minor": 500000,
+        "limit_minor": 824891,
         "first_shortfall": {
-          "date": "2026-11-27",
-          "shortfall_minor": 500000
+          "date": "2025-06-28",
+          "shortfall_minor": 625000
         },
         "deepest_shortfall": {
-          "date": "2026-11-27",
-          "shortfall_minor": 500000
+          "date": "2025-07-03",
+          "shortfall_minor": 824891
         },
         "relevant_transaction_ids": [
-          "PAY-001",
-          "PAY-002",
-          "INV-001"
+          "TX-0021",
+          "TX-0017",
+          "TX-0018",
+          "TX-0019",
+          "TX-0020",
+          "TX-0013",
+          "TX-0014",
+          "TX-0015",
+          "TX-0016",
+          "TX-0011",
+          "TX-0012",
+          "TX-0008",
+          "TX-0009",
+          "TX-0010",
+          "TX-0004",
+          "TX-0005",
+          "TX-0006",
+          "TX-0007",
+          "TX-0001",
+          "TX-0002",
+          "TX-0003"
         ]
       },
       "expected_decisions": {
         "approved": {
-          "limit_minor": 500000,
+          "limit_minor": 824891,
           "largest_uncovered": null,
-          "facility_used_minor": [0, 0, 0, 0, 500000, 500000, 500000, 0, 0, 0, 0, 0, 0, 0],
-          "uncovered_minor": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          "facility_used_minor": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            625000,
+            625000,
+            625000,
+            776077,
+            774984,
+            824891,
+            471100,
+            507907
+          ],
+          "uncovered_minor": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
         },
         "rejected": {
-          "limit_minor": 500000,
+          "limit_minor": 824891,
           "largest_uncovered": {
-            "date": "2026-11-27",
-            "shortfall_minor": 500000
+            "date": "2025-07-03",
+            "shortfall_minor": 824891
           },
-          "facility_used_minor": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-          "uncovered_minor": [0, 0, 0, 0, 500000, 500000, 500000, 0, 0, 0, 0, 0, 0, 0]
+          "facility_used_minor": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "uncovered_minor": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            625000,
+            625000,
+            625000,
+            776077,
+            774984,
+            824891,
+            471100,
+            507907
+          ]
         }
       },
       "scenario_move": {
-        "move_transaction_id": "INV-001",
-        "move_to_date": "2026-11-26",
-        "expected_first_deficit": null,
-        "expected_key_date": "2026-11-27",
-        "expected_baseline_minor": -500000,
-        "expected_scenario_minor": 400000,
+        "move_transaction_id": "TX-0005",
+        "move_to_date": "2025-06-28",
+        "expected_first_deficit": {
+          "date": "2025-06-28",
+          "shortfall_minor": 208836
+        },
+        "expected_key_date": "2025-06-28",
+        "expected_baseline_minor": -625000,
+        "expected_scenario_minor": -208836,
         "expected_scenario_balances": [
-          1200000,
-          1200000,
-          1200000,
-          2100000,
-          400000,
-          400000,
-          400000,
-          400000,
-          400000,
-          400000,
-          400000,
-          400000,
-          400000,
-          400000
+          500000,
+          500000,
+          500000,
+          500000,
+          500000,
+          235000,
+          -208836,
+          -208836,
+          -208836,
+          -359913,
+          -358820,
+          -408727,
+          -471100,
+          -507907
         ]
       },
       "explanation_expectations": {
         "required_amount_groups": [
-          ["5,000", "5000", "5 000"]
+          [
+            "6,250",
+            "6250"
+          ],
+          [
+            "8,248.91",
+            "8248.91"
+          ]
         ],
         "required_date_groups": [
-          ["2026-11-27", "nov 27", "27 nov", "november 27", "friday"]
+          [
+            "2025-06-28",
+            "june 28",
+            "28 june",
+            "jun 28",
+            "saturday"
+          ],
+          [
+            "2025-07-03",
+            "july 3",
+            "3 july",
+            "jul 3",
+            "thursday"
+          ]
         ],
         "any_transaction_tokens": [
-          "payroll",
-          "pay-001",
-          "office rent",
+          "vincenzo",
+          "yusuf",
+          "rosa",
+          "vanessa",
+          "main street",
           "rent",
-          "pay-002",
-          "inv-001",
-          "client invoice"
+          "commerzbank",
+          "tx-0017",
+          "tx-0013",
+          "tx-0015"
         ]
       },
       "email_draft_expectations": {
-        "any_tokens": ["inv-001", "client invoice", "9,000", "9000", "november 26", "nov 26", "26 nov"],
-        "forbidden_tokens": ["credit facility", "credit line", "overdraft", "shortfall", "deficit"]
+        "any_tokens": [
+          "commerzbank",
+          "tx-0015",
+          "2,624.21",
+          "2624.21",
+          "2,624",
+          "june 27",
+          "27 june",
+          "jun 27",
+          "july 1"
+        ],
+        "forbidden_tokens": [
+          "credit facility",
+          "credit line",
+          "overdraft",
+          "shortfall",
+          "deficit"
+        ]
       }
     },
     {
@@ -142,17 +262,47 @@
           "shortfall_minor": 70000
         },
         "relevant_transaction_ids": [
-          "PEAK-001",
-          "PEAK-002",
-          "PEAK-003"
+          "TX-0001",
+          "TX-0002",
+          "TX-0003"
         ]
       },
       "expected_decisions": {
         "approved": {
           "limit_minor": 70000,
           "largest_uncovered": null,
-          "facility_used_minor": [0, 20000, 20000, 70000, 70000, 70000, 0, 0, 0, 0, 0, 0, 0, 0],
-          "uncovered_minor": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          "facility_used_minor": [
+            0,
+            20000,
+            20000,
+            70000,
+            70000,
+            70000,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "uncovered_minor": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
         },
         "rejected": {
           "limit_minor": 70000,
@@ -160,12 +310,42 @@
             "date": "2026-11-26",
             "shortfall_minor": 70000
           },
-          "facility_used_minor": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-          "uncovered_minor": [0, 20000, 20000, 70000, 70000, 70000, 0, 0, 0, 0, 0, 0, 0, 0]
+          "facility_used_minor": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "uncovered_minor": [
+            0,
+            20000,
+            20000,
+            70000,
+            70000,
+            70000,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
         }
       },
       "scenario_move": {
-        "move_transaction_id": "PEAK-003",
+        "move_transaction_id": "TX-0003",
         "move_to_date": "2026-11-24",
         "expected_first_deficit": null,
         "expected_key_date": "2026-11-24",
@@ -190,25 +370,53 @@
       },
       "explanation_expectations": {
         "required_amount_groups": [
-          ["200"],
-          ["700"]
+          [
+            "200"
+          ],
+          [
+            "700"
+          ]
         ],
         "required_date_groups": [
-          ["2026-11-24", "nov 24", "24 nov", "november 24"],
-          ["2026-11-26", "nov 26", "26 nov", "november 26"]
+          [
+            "2026-11-24",
+            "nov 24",
+            "24 nov",
+            "november 24"
+          ],
+          [
+            "2026-11-26",
+            "nov 26",
+            "26 nov",
+            "november 26"
+          ]
         ],
         "any_transaction_tokens": [
           "equipment",
-          "peak-001",
+          "tx-0001",
           "utility",
-          "peak-002",
+          "tx-0002",
           "client invoice",
-          "peak-003"
+          "tx-0003"
         ]
       },
       "email_draft_expectations": {
-        "any_tokens": ["peak-003", "client invoice", "1,000", "1000", "november 23", "nov 23", "23 nov"],
-        "forbidden_tokens": ["credit facility", "credit line", "overdraft", "shortfall", "deficit"]
+        "any_tokens": [
+          "tx-0003",
+          "client invoice",
+          "1,000",
+          "1000",
+          "november 23",
+          "nov 23",
+          "23 nov"
+        ],
+        "forbidden_tokens": [
+          "credit facility",
+          "credit line",
+          "overdraft",
+          "shortfall",
+          "deficit"
+        ]
       }
     },
     {

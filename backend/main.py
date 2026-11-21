@@ -7,10 +7,10 @@ from fastapi import FastAPI, File
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from .advice import check_ai_health, get_advice, predict_delays, send_reminder
+from .advice import check_ai_health, get_advice, predict_delays, send_reminder, use_currency
 from .advisory_extras import compare_financing_options, detect_anomalies
 from .consultant import ask_cfo, credit_check
-from .forecast import AMALFI_DEMO_FILE, DEMO_FILE, get_decision, get_forecast
+from .forecast import AMALFI_DEMO_FILE, get_decision, get_forecast
 from .insights import optimize_payments, stress_test
 from .models import (
     AdviceRequest,
@@ -62,10 +62,6 @@ def create_app(mode: str | None = None) -> FastAPI:
     def index() -> FileResponse:
         return FileResponse(FRONTEND_DIR / "index.html", media_type="text/html")
 
-    @app.get("/demo/transactions.csv", include_in_schema=False)
-    def sample_csv() -> FileResponse:
-        return FileResponse(DEMO_FILE, media_type="text/csv", filename="transactions.csv")
-
     @app.get("/demo/amalfi.csv", include_in_schema=False)
     def amalfi_sample_csv() -> FileResponse:
         return FileResponse(
@@ -99,11 +95,13 @@ def create_app(mode: str | None = None) -> FastAPI:
 
     @app.post("/api/advice", response_model=AdviceResponse)
     def advice(request: AdviceRequest) -> AdviceResponse:
-        return get_advice(mode=mode, request=request)
+        with use_currency(request.currency):
+            return get_advice(mode=mode, request=request)
 
     @app.post("/api/predict-delays", response_model=DelayPredictResponse)
     def delay_prediction(request: AdviceRequest) -> DelayPredictResponse:
-        return predict_delays(mode=mode, request=request)
+        with use_currency(request.currency):
+            return predict_delays(mode=mode, request=request)
 
     @app.post("/api/send-reminder", response_model=ReminderSendResponse)
     def reminder(request: ReminderSendRequest) -> ReminderSendResponse:
@@ -111,27 +109,33 @@ def create_app(mode: str | None = None) -> FastAPI:
 
     @app.post("/api/stress-test", response_model=StressTestResponse)
     def stress(request: InsightRequest) -> StressTestResponse:
-        return stress_test(request)
+        with use_currency(request.currency):
+            return stress_test(request)
 
     @app.post("/api/optimize-payments", response_model=PaymentOptimizationResponse)
     def optimize(request: InsightRequest) -> PaymentOptimizationResponse:
-        return optimize_payments(request)
+        with use_currency(request.currency):
+            return optimize_payments(request)
 
     @app.post("/api/credit-check", response_model=CreditCheckResponse)
     def credit(request: AdviceRequest) -> CreditCheckResponse:
-        return credit_check(mode=mode, request=request)
+        with use_currency(request.currency):
+            return credit_check(mode=mode, request=request)
 
     @app.post("/api/ask-cfo", response_model=AskResponse)
     def ask(request: AskRequest) -> AskResponse:
-        return ask_cfo(mode=mode, request=request)
+        with use_currency(request.currency):
+            return ask_cfo(mode=mode, request=request)
 
     @app.post("/api/detect-anomalies", response_model=AnomalyDetectResponse)
     def anomalies(request: AnomalyDetectRequest) -> AnomalyDetectResponse:
-        return detect_anomalies(mode=mode, request=request)
+        with use_currency(request.currency):
+            return detect_anomalies(mode=mode, request=request)
 
     @app.post("/api/compare-options", response_model=CompareOptionsResponse)
     def compare_options(request: CompareOptionsRequest) -> CompareOptionsResponse:
-        return compare_financing_options(mode=mode, request=request)
+        with use_currency(request.currency):
+            return compare_financing_options(mode=mode, request=request)
 
     return app
 

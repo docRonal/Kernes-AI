@@ -1,4 +1,4 @@
-id,date,amount_minor,label
-SAFE-001,2026-11-24,-400000,Supplier payment
-SAFE-002,2026-11-26,600000,Retainer invoice
-SAFE-003,2026-11-30,-800000,Payroll
+"Account Number";"Booking Date";"Value Date";"Transaction Type";"Payment Reference";"Beneficiary/Payer";"Counterparty Account";"Bank Code";"Amount";"Currency";"Info"
+"DE89370400440532013000";"24.11.26";"24.11.26";"SUPPLIER PAYMENT";"SAFE-001 Supplier payment";"Supplier payment";"DE33500105170011223344";"COBADEFFXXX";"-4000,00";"EUR";"Transaction booked"
+"DE89370400440532013000";"26.11.26";"26.11.26";"INCOMING PAYMENT";"SAFE-002 Retainer invoice";"Retainer invoice";"DE62700450500931013781";"COBADEFFBZM";"6000,00";"EUR";"Transaction booked"
+"DE89370400440532013000";"30.11.26";"30.11.26";"PAYROLL";"SAFE-003 Payroll";"Payroll";"DE00000000000000000000";"HELADEFFXXX";"-8000,00";"EUR";"Transaction booked"

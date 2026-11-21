@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from backend.advice import cited_amounts
 from backend.main import create_app
+from tests._csv_helpers import STARTER_AMALFI_CSV
 
 
 DEMO = Path(__file__).resolve().parents[1] / "demo"
@@ -16,10 +17,10 @@ BASE_INPUT = {"starting_balance_minor": "1200000", "start_date": "2026-11-23"}
 
 GOOD = {
     "explanation": (
-        "Your balance drops to -EUR 5,000.00 on Friday, November 27, when Payroll (PAY-001) and Office rent "
-        "(PAY-002) go out before the Client invoice (INV-001) arrives. A credit facility of EUR 5,000.00 covers it."
+        "Your balance drops to -EUR 5,000.00 on Friday, November 27, when Payroll (TX-0001) and Office rent "
+        "(TX-0002) go out before the Client invoice (TX-0003) arrives. A credit facility of EUR 5,000.00 covers it."
     ),
-    "email_draft": "Hello, could you pay INV-001 for EUR 9,000.00 by Thursday, November 26? The finance team",
+    "email_draft": "Hello, could you pay TX-0003 for EUR 9,000.00 by Thursday, November 26? The finance team",
 }
 WRONG_FIGURE = {**GOOD, "explanation": "You are EUR 5,500.00 short on Friday. A facility of EUR 5,000.00 covers it."}
 NO_LIMIT = {**GOOD, "explanation": "Payroll and rent leave before the client pays, so the balance dips on Friday."}
@@ -81,15 +82,19 @@ def live(monkeypatch):
         model.close()
 
 
-def advice_payload(client, csv_name="transactions.csv", opening="1200000"):
+def advice_payload(client, csv_name=None, opening="1200000"):
+    if csv_name is None:
+        file_tuple = ("statement.csv", STARTER_AMALFI_CSV, "text/csv")
+    else:
+        file_tuple = (csv_name, (DEMO / csv_name).read_bytes(), "text/csv")
     response = client.post(
         "/api/forecast",
         data={**BASE_INPUT, "starting_balance_minor": opening},
-        files={"file": (csv_name, (DEMO / csv_name).read_bytes(), "text/csv")},
+        files={"file": file_tuple},
     )
     assert response.status_code == 200
     body = response.json()
-    return {"baseline": body["baseline"], "transactions": body["transactions"]}
+    return {"baseline": body["baseline"], "transactions": body["transactions"], "currency": body["currency"]}
 
 
 def test_live_advice_grounds_the_model_in_calculated_facts(live):
@@ -106,7 +111,7 @@ def test_live_advice_grounds_the_model_in_calculated_facts(live):
     sent = model.requests[0]
     assert sent["model"] == "kernes-qwen"
     prompt = sent["messages"][1]["content"]
-    for fact in ("-EUR 5,000.00", "Friday, November 27", "EUR 11,000.00", "PAY-002", "INV-001", "Thursday, November 26"):
+    for fact in ("-EUR 5,000.00", "Friday, November 27", "EUR 11,000.00", "TX-0002", "TX-0003", "Thursday, November 26"):
         assert fact in prompt
     assert model.headers[0]["Authorization"] == "Bearer secret-token"
     assert "secret-token" not in prompt
@@ -210,7 +215,7 @@ def test_no_shortfall_has_nothing_to_explain(live):
 def test_no_reminder_without_a_later_incoming_payment(live):
     client, model = live([GOOD])
     payload = advice_payload(client)
-    payload["transactions"] = [t for t in payload["transactions"] if t["id"] != "INV-001"]
+    payload["transactions"] = [t for t in payload["transactions"] if t["id"] != "TX-0003"]
     payload["baseline"]["days"] = [
         {**day, "balance_minor": day["balance_minor"] - (900_000 if day["date"] >= "2026-11-30" else 0)}
         for day in payload["baseline"]["days"]
@@ -223,7 +228,7 @@ def test_no_reminder_without_a_later_incoming_payment(live):
 
 def test_reminder_drops_invented_fees_and_facility_mentions(live):
     draft = (
-        "Hello,\n\nPlease pay INV-001 for EUR 9,000.00 by Thursday, November 26. This avoids late fees. "
+        "Hello,\n\nPlease pay TX-0003 for EUR 9,000.00 by Thursday, November 26. This avoids late fees. "
         "It aligns with the credit facility limit of EUR 5,000.00. It covers our shortfall and overdraft. "
         "Thank you.\n\nKind regards,\nThe finance team"
     )
@@ -231,7 +236,7 @@ def test_reminder_drops_invented_fees_and_facility_mentions(live):
     response = client.post("/api/advice", json=advice_payload(client))
     assert response.status_code == 200
     assert response.json()["email_draft"] == (
-        "Hello,\n\nPlease pay INV-001 for EUR 9,000.00 by Thursday, November 26. Thank you.\n\n"
+        "Hello,\n\nPlease pay TX-0003 for EUR 9,000.00 by Thursday, November 26. Thank you.\n\n"
         "Kind regards,\nThe finance team"
     )
 
@@ -290,14 +295,14 @@ def test_client_delay_prediction_warns_owner_with_calculated_shift(live):
             {
                 **GOOD,
                 "delay_warning": (
-                    "Client invoice INV-001 for EUR 9,000.00 was previously delayed by 2 days, "
+                    "Client invoice TX-0003 for EUR 9,000.00 was previously delayed by 2 days, "
                     "shifting expected receipt to Wednesday, December 2; the deepest gap remains EUR 5,000.00."
                 ),
             }
         ]
     )
     payload = advice_payload(client)
-    payload["client_delays"] = {"INV-001": 2}
+    payload["client_delays"] = {"TX-0003": 2}
 
     response = client.post("/api/predict-delays", json=payload)
     assert response.status_code == 200

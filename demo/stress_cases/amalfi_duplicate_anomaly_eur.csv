@@ -1,0 +1,8 @@
+"Account Number";"Booking Date";"Value Date";"Transaction Type";"Payment Reference";"Beneficiary/Payer";"Counterparty Account";"Bank Code";"Amount";"Currency";"Info"
+"DE89370400440532013000";"23.06.25";"23.06.25";"CARD SETTLEMENT (DEBIT)";"Daily Card Revenue Settlement 23.06.25";"Pizzeria Amalfi Customers";"DE92500500000959561143";"COBADEFFXXX";"680,00";"EUR";"Transaction booked"
+"DE89370400440532013000";"24.06.25";"24.06.25";"GIRO CARD PAYMENT";"Wholesale Market Produce Purchase 24.06.25";"Central Wholesale Market";"DE92500500000959561143";"COBADEFFXXX";"-240,00";"EUR";"Transaction booked"
+"DE89370400440532013000";"25.06.25";"25.06.25";"SUPPLIER PAYMENT";"Invoice AS-5501 Mozzarella & San Marzano";"Asimex Wholesale Ltd";"DE92500500000959561143";"COBADEFFXXX";"-1850,00";"EUR";"Transaction booked"
+"DE89370400440532013000";"25.06.25";"25.06.25";"SUPPLIER PAYMENT";"Invoice AS-5501 Mozzarella & San Marzano";"Asimex Wholesale Ltd";"DE92500500000959561143";"COBADEFFXXX";"-1850,00";"EUR";"Transaction booked"
+"DE89370400440532013000";"28.06.25";"28.06.25";"CARD SETTLEMENT (DEBIT)";"Daily Card Revenue Settlement 28.06.25";"Pizzeria Amalfi Customers";"DE92500500000959561143";"COBADEFFXXX";"710,00";"EUR";"Transaction booked"
+"DE89370400440532013000";"30.06.25";"30.06.25";"EQUIPMENT EMERGENCY";"Wood-Fired Pizza Oven Replacement Motor";"Kitchen Oven Replacement Ltd";"DE92500500000959561143";"COBADEFFXXX";"-12500,00";"EUR";"Transaction booked"
+"DE89370400440532013000";"03.07.25";"03.07.25";"CARD SETTLEMENT (DEBIT)";"Daily Card Revenue Settlement 03.07.25";"Pizzeria Amalfi Customers";"DE92500500000959561143";"COBADEFFXXX";"650,00";"EUR";"Transaction booked"

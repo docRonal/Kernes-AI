@@ -25,6 +25,13 @@ MAX_DELAY_DAYS = 365
 # Line breaks and other control characters would let a label add fake lines to the model prompt.
 NO_CONTROL_CHARACTERS = r"^[^\x00-\x1f\x7f-\x9f\u2028\u2029]*$"
 
+SUPPORTED_CURRENCIES = frozenset(
+    {"EUR", "PLN", "CHF", "USD", "GBP", "CZK", "SEK", "DKK", "HUF", "RON", "BGN", "NOK"}
+)
+CurrencyCode = Literal[
+    "EUR", "PLN", "CHF", "USD", "GBP", "CZK", "SEK", "DKK", "HUF", "RON", "BGN", "NOK"
+]
+
 
 class ForecastRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -90,6 +97,7 @@ class EarlierPayment(BaseModel):
 
 class ForecastResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    currency: CurrencyCode = "EUR"
     transactions: list[Transaction]
     baseline: Projection
     proposal: Proposal | None
@@ -107,6 +115,7 @@ class AdviceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     baseline: Projection
     transactions: list[Transaction] = Field(min_length=1, max_length=MAX_TRANSACTIONS)
+    currency: CurrencyCode = "EUR"
     # Larger delays would move a payment date past the end of the calendar.
     client_delays: dict[str, Annotated[int, Field(ge=0, le=MAX_DELAY_DAYS)]] | None = None
 
@@ -177,6 +186,7 @@ class InsightRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     baseline: Projection
     transactions: list[Transaction] = Field(min_length=1, max_length=MAX_TRANSACTIONS)
+    currency: CurrencyCode = "EUR"
 
 
 class StressScenario(BaseModel):
@@ -271,6 +281,7 @@ class AnomalyDetectRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     baseline: Projection
     transactions: list[Transaction] = Field(min_length=1)
+    currency: CurrencyCode = "EUR"
 
 
 class AnomalyDetectResponse(BaseModel):
@@ -295,6 +306,7 @@ class CompareOptionsRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     baseline: Projection
     transactions: list[Transaction] = Field(min_length=1)
+    currency: CurrencyCode = "EUR"
     annual_rate_bps: NonNegativeInt = Field(default=1200, le=10000)
     factoring_fee_bps: NonNegativeInt = Field(default=150, le=5000)
 

@@ -1,0 +1,7 @@
+"Account Number";"Booking Date";"Value Date";"Transaction Type";"Payment Reference";"Beneficiary/Payer";"Counterparty Account";"Bank Code";"Amount";"Currency";"Info"
+"PL27114020040000300201355387";"23.06.25";"23.06.25";"CARD SETTLEMENT (DEBIT)";"Rozliczenie terminali Polcard 23.06.25";"Pizzeria Amalfi Warszawa Klient";"PL61109010140000071219812874";"WBKPPLPPXXX";"6400,00";"PLN";"Transaction booked"
+"PL27114020040000300201355387";"25.06.25";"25.06.25";"SUPPLIER PAYMENT";"Faktura FV-901/25 Maka i Pomidory";"Makro Cash & Carry Polska";"PL10105000861000009031521001";"INGBPLPWXXX";"-4200,00";"PLN";"Transaction booked"
+"PL27114020040000300201355387";"27.06.25";"27.06.25";"PAYROLL";"Wyplata wynagrodzen czerwiec 2025";"Pracownicy Amalfi Warszawa";"PL00000000000000000000000000";"BREXPLPWXXX";"-9500,00";"PLN";"Transaction booked"
+"PL27114020040000300201355387";"01.07.25";"01.07.25";"RENT PAYMENT";"Czynsz lokal Warszawa Mokotow 07/2025";"Mokotow Property Sp. z o.o.";"PL44124010371111001099887766";"PKOPPLPWXXX";"-11000,00";"PLN";"Transaction booked"
+"PL27114020040000300201355387";"02.07.25";"02.07.25";"INCOMING PAYMENT";"Faktura Catering Biznesowy INV-PL-12";"Warsaw Tech Park Sp. z o.o.";"PL55102010260000140201112233";"BPKOPLPWXXX";"14500,00";"PLN";"Transaction booked"
+"PL27114020040000300201355387";"04.07.25";"04.07.25";"TAX PAYMENT";"Skladki ZUS i zaliczka PIT 06/2025";"ZUS Warszawa";"PL83101010230000261395100000";"NBPLPLPWXXX";"-3200,00";"PLN";"Transaction booked"

@@ -147,7 +147,8 @@ export function renderLedgerAndChart(state) {
     peakDeficitDate: proposal?.peakDeficit.date ?? null,
     facilityLimitMinor: simulationOutcome?.limit_minor ?? proposal?.recommendedLimitMinor ?? 0,
     simulationDecision,
-    currencySymbol: currency === "EUR" ? "€" : "PLN ",
+    currencySymbol:
+      currency === "EUR" ? "€" : currency === "USD" ? "$" : currency === "GBP" ? "£" : `${currency} `,
     formatMoney: money,
     formatDate: printDate,
   });

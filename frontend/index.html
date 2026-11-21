@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/styles.css?v=tc10">
-  <script type="module" src="/assets/app.js?v=tc10"></script>
+  <link rel="stylesheet" href="/assets/styles.css?v=tc11">
+  <script type="module" src="/assets/app.js?v=tc11"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -28,7 +28,7 @@
         <div class="topbar-meta">
           <button type="button" class="btn-topbar" id="change-file-btn" hidden>← Change file</button>
           <span class="pill pill-health" id="health-pill" title="Server connection">Connecting…</span>
-          <span class="pill pill-neutral" id="account-pill">EUR Account</span>
+          <span class="pill pill-neutral" id="account-pill">Auto currency</span>
           <span class="pill pill-status" id="agent-status-pill">Assistant ready</span>
         </div>
       </nav>
@@ -40,8 +40,8 @@
         <div class="setup-hero">
           <h2 id="setup-heading">Will your business have enough cash ahead?</h2>
           <p class="setup-lead">
-            <strong>Upload your bank export or try a sample.</strong>
-            We spot days when cash runs low, explain why in plain English, and let you test safe options before anything is sent or applied for.
+            <strong>Upload your bank statement CSV (Pizzeria Amalfi standard).</strong>
+            We spot days when cash runs low, auto-detect the account currency, explain why in plain English, and let you test safe options before anything is sent or applied for.
           </p>
         </div>
 
@@ -91,8 +91,6 @@
 
             <div class="setup-actions">
               <button type="submit" class="btn btn-primary btn-lg" id="run-forecast-btn">Check my cash →</button>
-              <button type="button" class="btn btn-stone" id="load-sample-btn">Try Pizzeria Amalfi sample</button>
-              <button type="button" class="btn btn-stone" id="load-kernes-sample-btn">Try Kernes demo (EUR)</button>
             </div>
           </form>
 
@@ -236,7 +234,6 @@
             <div class="card-header compact-header">
               <div>
                 <div class="header-badges">
-                  <span class="eyebrow-dark">Step 2 of 2</span>
                   <span class="autonomy-badge level-3-dark">Your decision needed</span>
                 </div>
                 <h2 id="actions-heading">How do you want to handle this?</h2>

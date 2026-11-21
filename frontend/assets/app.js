@@ -1,14 +1,12 @@
 import {
-  AMALFI_DEFAULT_MOVE_DATE,
   AMALFI_DEFAULT_OPENING_EUR,
   AMALFI_DEFAULT_START_DATE,
   AMALFI_SAMPLE_CSV,
   AMALFI_SAMPLE_FILENAME,
-} from "./sample-amalfi.js?v=tc10";
+} from "./sample-amalfi.js?v=tc11";
 import {
   buildInsightPayload,
   formatCsvError,
-  request,
   requestAdvice,
   requestAnomalies,
   requestAskCfo,
@@ -21,8 +19,8 @@ import {
   requestSendReminder,
   requestStressTest,
   resolveForecast,
-} from "./js/api.js?v=tc10";
-import { replayFade, toMinor } from "./js/format.js?v=tc10";
+} from "./js/api.js?v=tc11";
+import { replayFade, toMinor } from "./js/format.js?v=tc11";
 import {
   populateDelayCandidates,
   renderAnomalies,
@@ -36,24 +34,22 @@ import {
   renderOptimizePayments,
   renderStressTest,
   resetInsightsUi,
-} from "./js/insights.js?v=tc10";
-import { buildWhatIfCurve } from "./js/predictions.js?v=tc10";
-import { readProposal } from "./js/proposal.js?v=tc10";
+} from "./js/insights.js?v=tc11";
+import { buildWhatIfCurve } from "./js/predictions.js?v=tc11";
+import { readProposal } from "./js/proposal.js?v=tc11";
 import {
   buildReminderTemplate,
   populateIncomingPayments,
   renderKpis,
   renderLedgerAndChart,
   renderProposalPanel,
-} from "./js/render.js?v=tc10";
+} from "./js/render.js?v=tc11";
 
 const forecastForm = document.querySelector("#forecast-form");
 const scenarioForm = document.querySelector("#scenario-form");
 const fileInput = document.querySelector("#csv-file");
 const fileDropzone = document.querySelector("#file-dropzone");
 const fileNameEl = document.querySelector("#file-name");
-const loadSampleBtn = document.querySelector("#load-sample-btn");
-const loadKernesSampleBtn = document.querySelector("#load-kernes-sample-btn");
 const downloadSampleBtn = document.querySelector("#download-sample-btn");
 const horizonSelect = document.querySelector("#horizon-select");
 
@@ -110,8 +106,6 @@ const reminderReceipt = document.querySelector("#reminder-receipt");
 const reminderError = document.querySelector("#reminder-error");
 const copyDraftBtn = document.querySelector("#copy-draft-btn");
 const copyFeedback = document.querySelector("#copy-feedback");
-
-let selectedSample = null;
 
 const state = {
   openingBalanceMinor: null,
@@ -203,7 +197,7 @@ function validateCsvUpload(file, text) {
     );
   }
   if (!text || !text.trim()) {
-    throw new Error("This file is empty. Choose a CSV with transactions or try one of the sample buttons below.");
+    throw new Error("This file is empty. Choose a semicolon-delimited bank CSV file.");
   }
   if (/\x00/.test(text)) {
     throw new Error(
@@ -212,11 +206,9 @@ function validateCsvUpload(file, text) {
   }
   const firstLine = text.replace(/^\uFEFF/, "").trimStart().split(/\r?\n/, 1)[0] || "";
   if (!firstLine.includes(";")) {
-    const cols = firstLine.split(",").map((col) => col.trim().replace(/^"|"$/g, "")).sort();
-    const expected = ["amount_minor", "date", "id", "label"];
-    if (cols.length !== expected.length || cols.some((col, i) => col !== expected[i])) {
-      throw new Error("The first line must be the header id,date,amount_minor,label.");
-    }
+    throw new Error(
+      "Unsupported CSV format. Upload a semicolon-delimited bank statement CSV (Pizzeria Amalfi standard).",
+    );
   }
 }
 
@@ -280,7 +272,7 @@ async function fetchAdvice({ forceDraft = false } = {}) {
       agentStatusPill.textContent = "Preview ready";
       adviceError.className = "inline-alert inline-alert-soft";
       adviceError.textContent =
-        "Local preview mode only stores a saved AI write-up for the Kernes sample. Your server cash numbers, decision preview, and editable email draft below are ready.";
+        "AI explanation is not available for this forecast in preview mode. Your server cash numbers, decision preview, and editable email draft below are ready.";
       adviceError.hidden = false;
       retryAdviceBtn.hidden = true;
     } else {
@@ -309,12 +301,10 @@ async function fetchAdvice({ forceDraft = false } = {}) {
 async function runBaselineForecast() {
   const submitBtn = document.querySelector("#run-forecast-btn");
   submitBtn.disabled = true;
-  loadSampleBtn.disabled = true;
-  loadKernesSampleBtn.disabled = true;
   showStatus("Checking your upcoming cash…");
 
   try {
-    const selectedFile = fileInput.files?.[0] || selectedSample;
+    const selectedFile = fileInput.files?.[0] || null;
     const csvText = selectedFile ? await selectedFile.text() : AMALFI_SAMPLE_CSV;
     if (selectedFile) {
       validateCsvUpload(selectedFile, csvText);
@@ -374,8 +364,6 @@ async function runBaselineForecast() {
     }
   } finally {
     submitBtn.disabled = false;
-    loadSampleBtn.disabled = false;
-    loadKernesSampleBtn.disabled = false;
   }
 }
 
@@ -616,7 +604,6 @@ delayForm.addEventListener("submit", async (event) => {
 
 // File upload & drag-and-drop
 fileInput.addEventListener("change", () => {
-  selectedSample = null;
   for (const option of horizonSelect.options) option.disabled = false;
   const file = fileInput.files?.[0];
   fileNameEl.textContent = file
@@ -650,39 +637,10 @@ downloadSampleBtn.addEventListener("click", () => {
   URL.revokeObjectURL(url);
 });
 
-// Forecast & sample controls
+// Forecast controls
 forecastForm.addEventListener("submit", (event) => {
   event.preventDefault();
   runBaselineForecast();
-});
-
-loadSampleBtn.addEventListener("click", () => {
-  selectedSample = null;
-  fileInput.value = "";
-  fileNameEl.textContent = "Pizzeria Amalfi example (ready to use)";
-  forecastForm.elements.opening_balance.value = AMALFI_DEFAULT_OPENING_EUR;
-  forecastForm.elements.start_date.value = AMALFI_DEFAULT_START_DATE;
-  horizonSelect.value = "14";
-  scenarioForm.elements.move_to_date.value = AMALFI_DEFAULT_MOVE_DATE;
-  runBaselineForecast();
-});
-
-loadKernesSampleBtn.addEventListener("click", async () => {
-  loadKernesSampleBtn.disabled = true;
-  try {
-    const response = await request("/demo/transactions.csv");
-    selectedSample = new File([await response.blob()], "transactions.csv", { type: "text/csv" });
-    fileInput.value = "";
-    fileNameEl.textContent = "Kernes demo (EUR)";
-    forecastForm.elements.opening_balance.value = "12000.00";
-    forecastForm.elements.start_date.value = "2026-11-23";
-    horizonSelect.value = "14";
-    await runBaselineForecast();
-  } catch (error) {
-    showStatus(error.message, true);
-  } finally {
-    loadKernesSampleBtn.disabled = false;
-  }
 });
 
 // What-if scenario comparison

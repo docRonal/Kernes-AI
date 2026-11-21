@@ -1,90 +1,90 @@
 {
   "decision": "approved",
   "simulated": true,
-  "limit_minor": 500000,
+  "limit_minor": 824891,
   "days": [
     {
-      "date": "2026-11-23",
-      "balance_minor": 1200000,
+      "date": "2025-06-22",
+      "balance_minor": 500000,
       "facility_used_minor": 0,
       "uncovered_minor": 0
     },
     {
-      "date": "2026-11-24",
-      "balance_minor": 1200000,
+      "date": "2025-06-23",
+      "balance_minor": 500000,
       "facility_used_minor": 0,
       "uncovered_minor": 0
     },
     {
-      "date": "2026-11-25",
-      "balance_minor": 1200000,
+      "date": "2025-06-24",
+      "balance_minor": 500000,
       "facility_used_minor": 0,
       "uncovered_minor": 0
     },
     {
-      "date": "2026-11-26",
-      "balance_minor": 1200000,
+      "date": "2025-06-25",
+      "balance_minor": 500000,
       "facility_used_minor": 0,
       "uncovered_minor": 0
     },
     {
-      "date": "2026-11-27",
-      "balance_minor": -500000,
-      "facility_used_minor": 500000,
-      "uncovered_minor": 0
-    },
-    {
-      "date": "2026-11-28",
-      "balance_minor": -500000,
-      "facility_used_minor": 500000,
-      "uncovered_minor": 0
-    },
-    {
-      "date": "2026-11-29",
-      "balance_minor": -500000,
-      "facility_used_minor": 500000,
-      "uncovered_minor": 0
-    },
-    {
-      "date": "2026-11-30",
-      "balance_minor": 400000,
+      "date": "2025-06-26",
+      "balance_minor": 500000,
       "facility_used_minor": 0,
       "uncovered_minor": 0
     },
     {
-      "date": "2026-12-01",
-      "balance_minor": 400000,
+      "date": "2025-06-27",
+      "balance_minor": 235000,
       "facility_used_minor": 0,
       "uncovered_minor": 0
     },
     {
-      "date": "2026-12-02",
-      "balance_minor": 400000,
-      "facility_used_minor": 0,
+      "date": "2025-06-28",
+      "balance_minor": -625000,
+      "facility_used_minor": 625000,
       "uncovered_minor": 0
     },
     {
-      "date": "2026-12-03",
-      "balance_minor": 400000,
-      "facility_used_minor": 0,
+      "date": "2025-06-29",
+      "balance_minor": -625000,
+      "facility_used_minor": 625000,
       "uncovered_minor": 0
     },
     {
-      "date": "2026-12-04",
-      "balance_minor": 400000,
-      "facility_used_minor": 0,
+      "date": "2025-06-30",
+      "balance_minor": -625000,
+      "facility_used_minor": 625000,
       "uncovered_minor": 0
     },
     {
-      "date": "2026-12-05",
-      "balance_minor": 400000,
-      "facility_used_minor": 0,
+      "date": "2025-07-01",
+      "balance_minor": -776077,
+      "facility_used_minor": 776077,
       "uncovered_minor": 0
     },
     {
-      "date": "2026-12-06",
-      "balance_minor": 400000,
-      "facility_used_minor": 0,
+      "date": "2025-07-02",
+      "balance_minor": -774984,
+      "facility_used_minor": 774984,
+      "uncovered_minor": 0
+    },
+    {
+      "date": "2025-07-03",
+      "balance_minor": -824891,
+      "facility_used_minor": 824891,
+      "uncovered_minor": 0
+    },
+    {
+      "date": "2025-07-04",
+      "balance_minor": -471100,
+      "facility_used_minor": 471100,
+      "uncovered_minor": 0
+    },
+    {
+      "date": "2025-07-05",
+      "balance_minor": -507907,
+      "facility_used_minor": 507907,
       "uncovered_minor": 0
     }
   ],

@@ -13,10 +13,30 @@ DEMO = Path(__file__).resolve().parents[1] / "demo"
 
 
 def _payload() -> dict:
-    forecast = json.loads((DEMO / "forecast.example.json").read_text(encoding="utf-8"))
+    days = [
+        {"date": f"2026-11-{day:02d}", "balance_minor": bal}
+        for day, bal in [
+            (23, 1_200_000),
+            (24, 1_200_000),
+            (25, 1_200_000),
+            (26, 1_200_000),
+            (27, -500_000),
+            (28, -500_000),
+            (29, -500_000),
+            (30, 400_000),
+        ]
+    ] + [{"date": f"2026-12-0{day}", "balance_minor": 400_000} for day in range(1, 7)]
     return {
-        "baseline": forecast["baseline"],
-        "transactions": forecast["transactions"],
+        "baseline": {
+            "days": days,
+            "first_deficit": {"date": "2026-11-27", "shortfall_minor": 500_000},
+        },
+        "transactions": [
+            {"id": "PAY-001", "date": "2026-11-27", "amount_minor": -1_100_000, "label": "Payroll"},
+            {"id": "PAY-002", "date": "2026-11-27", "amount_minor": -600_000, "label": "Office rent"},
+            {"id": "INV-001", "date": "2026-11-30", "amount_minor": 900_000, "label": "Client invoice"},
+        ],
+        "currency": "EUR",
     }
 
 

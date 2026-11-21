@@ -15,6 +15,8 @@ import ssl
 import time
 import urllib.error
 import urllib.request
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
@@ -44,10 +46,22 @@ log = logging.getLogger("autonomous_cfo.advice")
 # Thousands separators: comma, no-break space and narrow no-break space. A plain
 # space is left out so "November 27, 5,000 PLN" isn't read as 275,000.
 _DIGITS = r"\d[\d,\u00a0\u202f]*(?:\.\d{1,2})?"
+_CURRENCY_SYMBOLS = r"(?:EUR|PLN|CHF|USD|GBP|CZK|SEK|DKK|HUF|RON|BGN|NOK|€|zł|zl|\$|£)"
 _AMOUNT = re.compile(
-    rf"(?:EUR|€|PLN|zł|zl)\s*[-−]?\s*({_DIGITS})|({_DIGITS})\s*(?:EUR|€|PLN|zł|zl)\b",
+    rf"{_CURRENCY_SYMBOLS}\s*[-−]?\s*({_DIGITS})|({_DIGITS})\s*{_CURRENCY_SYMBOLS}(?!\w)",
     re.IGNORECASE,
 )
+
+_ACTIVE_CURRENCY: ContextVar[str] = ContextVar("cfo_currency", default="EUR")
+
+
+@contextmanager
+def use_currency(code: str):
+    token = _ACTIVE_CURRENCY.set(code.upper())
+    try:
+        yield
+    finally:
+        _ACTIVE_CURRENCY.reset(token)
 
 OUTPUT_SCHEMA = {
     "type": "object",
@@ -142,7 +156,7 @@ class ModelConfig:
 def pln(minor: int) -> str:
     sign = "-" if minor < 0 else ""
     whole, cents = divmod(abs(minor), 100)
-    return f"{sign}EUR {whole:,}.{cents:02d}"
+    return f"{sign}{_ACTIVE_CURRENCY.get()} {whole:,}.{cents:02d}"
 
 
 def day_name(day: date) -> str:
@@ -642,12 +656,29 @@ def get_advice(*, mode: str, request: AdviceRequest) -> AdviceResponse:
             log.warning("advice unavailable: %s", exc)
             raise HTTPException(503, f"The AI explanation is unavailable. {exc}") from exc
 
-    forecast = json.loads((DEMO_DIR / "forecast.example.json").read_text(encoding="utf-8"))
-    expected = {"baseline": forecast["baseline"], "transactions": forecast["transactions"]}
-    if request.model_dump(mode="json", exclude_none=True) != expected:
-        raise HTTPException(422, "Submit the bundled baseline forecast in demo mode.")
-
-    return AdviceResponse.model_validate_json((DEMO_DIR / "advice.example.json").read_text(encoding="utf-8"))
+    facts = build_facts(request)
+    first = facts.proposal.first_shortfall
+    deepest = facts.proposal.deepest_shortfall
+    if deepest.date == first.date:
+        gap_desc = f"on {day_name(first.date)} with a shortfall of {pln(first.shortfall_minor)}"
+    else:
+        gap_desc = (
+            f"on {day_name(first.date)} ({pln(first.shortfall_minor)}) and deepens to "
+            f"{pln(deepest.shortfall_minor)} on {day_name(deepest.date)}"
+        )
+    explanation = (
+        f"The balance is projected to fall below zero {gap_desc}. "
+        f"A temporary credit facility of {pln(facts.proposal.limit_minor)} covers every day of the 14-day forecast."
+    )
+    email_draft = None
+    if facts.reminder:
+        email_draft = f"Hello, {facts.reminder[0].lower() + facts.reminder[1:]} Kind regards,\nThe finance team"
+    return AdviceResponse(
+        explanation=explanation,
+        email_draft=email_draft,
+        model="demo-deterministic",
+        latency_ms=0,
+    )
 
 
 def send_reminder(request: ReminderSendRequest) -> ReminderSendResponse:

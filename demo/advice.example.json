@@ -1,6 +1,6 @@
 {
-  "explanation": "Your balance is projected to fall to -EUR 5,000.00 on Friday, November 27, when Payroll (PAY-001) and Office rent (PAY-002) go out before the Client invoice (INV-001) arrives on Monday, November 30. A credit facility of EUR 5,000.00 covers that gap until the invoice is paid. It is a proposal for you to approve or reject.",
-  "email_draft": "Hello,\n\nWe hope all is well. Could you pay invoice INV-001 for EUR 9,000.00, currently due on Monday, November 30, by Thursday, November 26 instead? Please let us know if that date works for you.\n\nThank you,\nThe finance team",
-  "model": "demo sample",
-  "latency_ms": null
+  "explanation": "Your balance is projected to fall below zero on Saturday, June 28 with a shortfall of EUR 6,250.00 when payroll payments (Vincenzo Amalfi TX-0017, Yusuf Akcit TX-0018, Rosa Pavese TX-0019, Vanessa Paradi TX-0020) leave before incoming settlements arrive, and deepens to a deepest point of -EUR 8,248.91 on Thursday, July 3 (following Main Street Real Estate GmbH rent TX-0013). A credit facility of EUR 8,248.91 covers the 14-day gap.",
+  "email_draft": "Hello,\n\nWe hope all is well. Could you settle Commerzbank Global Pay (TX-0015) for EUR 2,624.21, currently due Tuesday, July 1, by Friday, June 27 instead? Please let us know if that date works.\n\nThank you,\nThe finance team",
+  "model": "demo-deterministic",
+  "latency_ms": 0
 }

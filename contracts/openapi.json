@@ -1,28 +1,25 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Autonomous CFO demo API",
+    "title": "KERNES CFO",
     "version": "0.1.0"
   },
   "paths": {
     "/health": {
       "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
         "responses": {
           "200": {
-            "description": "Process is healthy",
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "const": "ok"
-                    }
+                  "additionalProperties": {
+                    "type": "string"
                   },
-                  "required": [
-                    "status"
-                  ],
-                  "additionalProperties": false
+                  "type": "object",
+                  "title": "Response Health Health Get"
                 }
               }
             }
@@ -41,8 +38,8 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "additionalProperties": true,
+                  "type": "object",
                   "title": "Response Health Ai Health Ai Get"
                 }
               }
@@ -53,20 +50,21 @@
     },
     "/api/forecast": {
       "post": {
-        "description": "Compute 14 end-of-day balances including start_date. Opening balance is before any start_date movement. Sum all dated movements through day 14. Ignore rows outside this window in the projection and return the original CSV rows in transactions. Report the first strictly negative end-of-day balance as a positive shortfall. Both move fields must be supplied together or omitted. If supplied, shift a positive transaction within the window to another date within that window in the scenario only. If omitted, scenario is null. When the baseline goes below zero, proposal is a credit facility with limit_minor = max(0, -min(baseline balances)). deepest_shortfall is the lowest baseline balance; the earliest day wins a tie. relevant_transaction_ids lists the window's rows, by date, up to the day the balance recovers from that deepest gap or the window's end. proposal is null when every baseline balance is zero or above. The scenario never changes the proposal.",
+        "summary": "Forecast",
+        "operationId": "forecast_api_forecast_post",
         "requestBody": {
-          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "$ref": "#/components/schemas/ForecastRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
-            "description": "Computed forecast",
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
@@ -76,27 +74,35 @@
             }
           },
           "422": {
-            "description": "Invalid CSV, fields, transaction ID or scenario date. detail is a readable message, with the CSV line number where it applies."
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/decision": {
       "post": {
-        "description": "Simulate the user's decision on the proposed facility for the baseline from the forecast response. The server recalculates limit_minor from the baseline, so it always matches the proposal. Approved: each day uses up to limit_minor to cover a negative balance and reports what is still uncovered. Rejected: the facility is unused and the original gap stays uncovered. Balances are returned unchanged. Nothing is applied for, transferred or sent. The result is the same in demo and live modes.",
+        "summary": "Decision",
+        "operationId": "decision_api_decision_post",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/DecisionRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
-            "description": "Simulated outcome",
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
@@ -106,27 +112,35 @@
             }
           },
           "422": {
-            "description": "Unknown decision, a baseline that isn't 14 consecutive days, or a baseline without a shortfall"
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/advice": {
       "post": {
-        "description": "Explain the baseline credit facility proposal with the model served on OpenShift AI and draft an editable payment reminder. Send the baseline and transactions from the forecast response. The server recalculates the proposal, gives the model only formatted facts, and rejects an answer whose EUR amounts don't match them. Demo mode returns demo/advice.example.json for the bundled baseline.",
+        "summary": "Advice",
+        "operationId": "advice_api_advice_post",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/AdviceRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
-            "description": "Explanation and editable draft",
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
@@ -136,10 +150,318 @@
             }
           },
           "422": {
-            "description": "Invalid request, or a baseline with no shortfall to explain"
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/predict-delays": {
+      "post": {
+        "summary": "Delay Prediction",
+        "operationId": "delay_prediction_api_predict_delays_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdviceRequest"
+              }
+            }
           },
-          "503": {
-            "description": "The model is unavailable, timed out, or its explanation didn't match the calculated figures. The forecast and proposal stay valid."
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DelayPredictResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/send-reminder": {
+      "post": {
+        "summary": "Reminder",
+        "operationId": "reminder_api_send_reminder_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReminderSendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReminderSendResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stress-test": {
+      "post": {
+        "summary": "Stress",
+        "operationId": "stress_api_stress_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsightRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StressTestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/optimize-payments": {
+      "post": {
+        "summary": "Optimize",
+        "operationId": "optimize_api_optimize_payments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsightRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentOptimizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/credit-check": {
+      "post": {
+        "summary": "Credit",
+        "operationId": "credit_api_credit_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdviceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditCheckResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ask-cfo": {
+      "post": {
+        "summary": "Ask",
+        "operationId": "ask_api_ask_cfo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/detect-anomalies": {
+      "post": {
+        "summary": "Anomalies",
+        "operationId": "anomalies_api_detect_anomalies_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnomalyDetectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnomalyDetectResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compare-options": {
+      "post": {
+        "summary": "Compare Options",
+        "operationId": "compare_options_api_compare_options_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompareOptionsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompareOptionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
@@ -147,307 +469,630 @@
   },
   "components": {
     "schemas": {
-      "Transaction": {
-        "type": "object",
+      "AdviceRequest": {
         "properties": {
-          "id": {
+          "baseline": {
+            "$ref": "#/components/schemas/Projection"
+          },
+          "transactions": {
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            },
+            "type": "array",
+            "maxItems": 5000,
+            "minItems": 1,
+            "title": "Transactions"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "EUR",
+              "PLN",
+              "CHF",
+              "USD",
+              "GBP",
+              "CZK",
+              "SEK",
+              "DKK",
+              "HUF",
+              "RON",
+              "BGN",
+              "NOK"
+            ],
+            "title": "Currency",
+            "default": "EUR"
+          },
+          "client_delays": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer",
+                  "maximum": 365.0,
+                  "minimum": 0.0
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Delays"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "baseline",
+          "transactions"
+        ],
+        "title": "AdviceRequest",
+        "description": "The baseline and transactions from the forecast response.\n\nThe server recalculates the proposal from them, so the model always explains\nthe deterministic figures."
+      },
+      "AdviceResponse": {
+        "properties": {
+          "explanation": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 64,
-            "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]*$"
+            "title": "Explanation"
+          },
+          "email_draft": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Draft"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "explanation",
+          "email_draft",
+          "model",
+          "latency_ms"
+        ],
+        "title": "AdviceResponse"
+      },
+      "AnomalyDetectRequest": {
+        "properties": {
+          "baseline": {
+            "$ref": "#/components/schemas/Projection"
+          },
+          "transactions": {
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Transactions"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "EUR",
+              "PLN",
+              "CHF",
+              "USD",
+              "GBP",
+              "CZK",
+              "SEK",
+              "DKK",
+              "HUF",
+              "RON",
+              "BGN",
+              "NOK"
+            ],
+            "title": "Currency",
+            "default": "EUR"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "baseline",
+          "transactions"
+        ],
+        "title": "AnomalyDetectRequest"
+      },
+      "AnomalyDetectResponse": {
+        "properties": {
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/AnomalyFinding"
+            },
+            "type": "array",
+            "title": "Findings"
+          },
+          "risk_flag": {
+            "type": "string",
+            "enum": [
+              "clean",
+              "review_recommended"
+            ],
+            "title": "Risk Flag"
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Summary"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "findings",
+          "risk_flag",
+          "summary",
+          "model",
+          "latency_ms"
+        ],
+        "title": "AnomalyDetectResponse"
+      },
+      "AnomalyFinding": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "duplicate_payment",
+              "outlier_expense",
+              "same_day_spike"
+            ],
+            "title": "Kind"
           },
           "date": {
             "type": "string",
-            "format": "date"
+            "format": "date",
+            "title": "Date"
           },
           "amount_minor": {
             "type": "integer",
-            "minimum": -100000000000,
-            "maximum": 100000000000
+            "minimum": 0.0,
+            "title": "Amount Minor"
           },
-          "label": {
+          "transaction_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Transaction Ids"
+          },
+          "detail": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 200,
-            "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]*$"
+            "title": "Detail"
           }
         },
+        "additionalProperties": false,
+        "type": "object",
         "required": [
-          "id",
+          "kind",
           "date",
           "amount_minor",
-          "label"
+          "transaction_ids",
+          "detail"
         ],
-        "additionalProperties": false
+        "title": "AnomalyFinding"
       },
-      "Deficit": {
-        "type": "object",
+      "AskRequest": {
         "properties": {
-          "date": {
-            "type": "string",
-            "format": "date"
+          "baseline": {
+            "$ref": "#/components/schemas/Projection"
           },
-          "shortfall_minor": {
-            "type": "integer",
-            "minimum": 1
+          "transactions": {
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            },
+            "type": "array",
+            "maxItems": 5000,
+            "minItems": 1,
+            "title": "Transactions"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "EUR",
+              "PLN",
+              "CHF",
+              "USD",
+              "GBP",
+              "CZK",
+              "SEK",
+              "DKK",
+              "HUF",
+              "RON",
+              "BGN",
+              "NOK"
+            ],
+            "title": "Currency",
+            "default": "EUR"
+          },
+          "question": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Question"
           }
         },
+        "additionalProperties": false,
+        "type": "object",
         "required": [
-          "date",
-          "shortfall_minor"
+          "baseline",
+          "transactions",
+          "question"
         ],
-        "additionalProperties": false
+        "title": "AskRequest"
+      },
+      "AskResponse": {
+        "properties": {
+          "answer": {
+            "type": "string",
+            "title": "Answer"
+          },
+          "what_if": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WhatIf"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "latency_ms": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Latency Ms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "answer",
+          "what_if",
+          "model",
+          "latency_ms"
+        ],
+        "title": "AskResponse"
+      },
+      "CompareOptionsRequest": {
+        "properties": {
+          "baseline": {
+            "$ref": "#/components/schemas/Projection"
+          },
+          "transactions": {
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Transactions"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "EUR",
+              "PLN",
+              "CHF",
+              "USD",
+              "GBP",
+              "CZK",
+              "SEK",
+              "DKK",
+              "HUF",
+              "RON",
+              "BGN",
+              "NOK"
+            ],
+            "title": "Currency",
+            "default": "EUR"
+          },
+          "annual_rate_bps": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Annual Rate Bps",
+            "default": 1200
+          },
+          "factoring_fee_bps": {
+            "type": "integer",
+            "maximum": 5000.0,
+            "minimum": 0.0,
+            "title": "Factoring Fee Bps",
+            "default": 150
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "baseline",
+          "transactions"
+        ],
+        "title": "CompareOptionsRequest"
+      },
+      "CompareOptionsResponse": {
+        "properties": {
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/FinancingOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "recommended_option": {
+            "type": "string",
+            "enum": [
+              "credit_facility",
+              "invoice_factoring",
+              "defer_outflow",
+              "none_needed"
+            ],
+            "title": "Recommended Option"
+          },
+          "explanation": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Explanation"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "options",
+          "recommended_option",
+          "explanation",
+          "model",
+          "latency_ms"
+        ],
+        "title": "CompareOptionsResponse"
+      },
+      "CreditCheckResponse": {
+        "properties": {
+          "score": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Score"
+          },
+          "risk": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Risk"
+          },
+          "limit_minor": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Limit Minor"
+          },
+          "factors": {
+            "items": {
+              "$ref": "#/components/schemas/ScoreFactor"
+            },
+            "type": "array",
+            "title": "Factors"
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explanation"
+          },
+          "explanation_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explanation Error"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "score",
+          "risk",
+          "limit_minor",
+          "factors",
+          "explanation",
+          "explanation_error",
+          "model",
+          "latency_ms"
+        ],
+        "title": "CreditCheckResponse",
+        "description": "A transparent scorecard for the proposed facility. The score is calculated; the model only explains it."
       },
       "DailyBalance": {
-        "type": "object",
         "properties": {
           "date": {
             "type": "string",
-            "format": "date"
+            "format": "date",
+            "title": "Date"
           },
           "balance_minor": {
-            "type": "integer"
+            "type": "integer",
+            "title": "Balance Minor"
           }
         },
+        "additionalProperties": false,
+        "type": "object",
         "required": [
           "date",
           "balance_minor"
         ],
-        "additionalProperties": false
-      },
-      "Forecast": {
-        "type": "object",
-        "properties": {
-          "days": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DailyBalance"
-            },
-            "minItems": 14,
-            "maxItems": 14,
-            "description": "14 end-of-day balances on consecutive dates."
-          },
-          "first_deficit": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Deficit"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "days",
-          "first_deficit"
-        ],
-        "additionalProperties": false
-      },
-      "ForecastRequest": {
-        "type": "object",
-        "properties": {
-          "file": {
-            "type": "string",
-            "format": "binary",
-            "description": "UTF-8 CSV, at most 1 MB and 5,000 rows. Header id,date,amount_minor,label in any order. Unique IDs; ISO dates; signed integer grosz up to 100,000,000,000 in absolute value. Blank lines are ignored."
-          },
-          "starting_balance_minor": {
-            "type": "integer"
-          },
-          "start_date": {
-            "type": "string",
-            "format": "date"
-          },
-          "move_transaction_id": {
-            "type": "string"
-          },
-          "move_to_date": {
-            "type": "string",
-            "format": "date"
-          }
-        },
-        "required": [
-          "file",
-          "starting_balance_minor",
-          "start_date"
-        ],
-        "additionalProperties": false
-      },
-      "Proposal": {
-        "type": "object",
-        "description": "Credit facility proposed for a baseline shortfall. Amounts come from the calculation, never from the model.",
-        "properties": {
-          "limit_minor": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "first_shortfall": {
-            "$ref": "#/components/schemas/Deficit"
-          },
-          "deepest_shortfall": {
-            "$ref": "#/components/schemas/Deficit"
-          },
-          "relevant_transaction_ids": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "limit_minor",
-          "first_shortfall",
-          "deepest_shortfall",
-          "relevant_transaction_ids"
-        ],
-        "additionalProperties": false
-      },
-      "EarlierPayment": {
-        "type": "object",
-        "description": "An incoming payment that would shrink the proposed facility if the client paid it by pay_by. Calculated, never from the model.",
-        "properties": {
-          "transaction_id": {
-            "type": "string"
-          },
-          "pay_by": {
-            "type": "string",
-            "format": "date",
-            "description": "The day before the first shortfall, or the first day of the forecast."
-          },
-          "limit_after_minor": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "Facility still needed if the payment arrives by pay_by."
-          }
-        },
-        "required": [
-          "transaction_id",
-          "pay_by",
-          "limit_after_minor"
-        ],
-        "additionalProperties": false
-      },
-      "ForecastResponse": {
-        "type": "object",
-        "properties": {
-          "transactions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Transaction"
-            }
-          },
-          "baseline": {
-            "$ref": "#/components/schemas/Forecast"
-          },
-          "proposal": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Proposal"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "earlier_payments": {
-            "type": "array",
-            "description": "Incoming payments due after the first shortfall that would lower the facility if paid earlier, best first. Empty without a shortfall.",
-            "items": {
-              "$ref": "#/components/schemas/EarlierPayment"
-            }
-          },
-          "scenario": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Forecast"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "transactions",
-          "baseline",
-          "proposal",
-          "earlier_payments",
-          "scenario"
-        ],
-        "additionalProperties": false
-      },
-      "DecisionRequest": {
-        "type": "object",
-        "properties": {
-          "decision": {
-            "type": "string",
-            "enum": [
-              "approved",
-              "rejected"
-            ]
-          },
-          "baseline": {
-            "$ref": "#/components/schemas/Forecast"
-          }
-        },
-        "required": [
-          "decision",
-          "baseline"
-        ],
-        "additionalProperties": false
+        "title": "DailyBalance"
       },
       "DecisionDay": {
-        "type": "object",
         "properties": {
           "date": {
             "type": "string",
-            "format": "date"
+            "format": "date",
+            "title": "Date"
           },
           "balance_minor": {
-            "type": "integer"
+            "type": "integer",
+            "title": "Balance Minor"
           },
           "facility_used_minor": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0.0,
+            "title": "Facility Used Minor"
           },
           "uncovered_minor": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0.0,
+            "title": "Uncovered Minor"
           }
         },
+        "additionalProperties": false,
+        "type": "object",
         "required": [
           "date",
           "balance_minor",
           "facility_used_minor",
           "uncovered_minor"
         ],
-        "additionalProperties": false
+        "title": "DecisionDay"
       },
-      "DecisionResponse": {
-        "type": "object",
+      "DecisionRequest": {
         "properties": {
           "decision": {
             "type": "string",
             "enum": [
               "approved",
               "rejected"
-            ]
+            ],
+            "title": "Decision"
+          },
+          "baseline": {
+            "$ref": "#/components/schemas/Projection"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decision",
+          "baseline"
+        ],
+        "title": "DecisionRequest"
+      },
+      "DecisionResponse": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ],
+            "title": "Decision"
           },
           "simulated": {
-            "const": true
+            "type": "boolean",
+            "const": true,
+            "title": "Simulated"
           },
           "limit_minor": {
             "type": "integer",
-            "minimum": 1
+            "exclusiveMinimum": 0.0,
+            "title": "Limit Minor"
           },
           "days": {
-            "type": "array",
             "items": {
               "$ref": "#/components/schemas/DecisionDay"
             },
+            "type": "array",
+            "maxItems": 14,
             "minItems": 14,
-            "maxItems": 14
+            "title": "Days"
           },
           "largest_uncovered": {
             "anyOf": [
@@ -460,6 +1105,8 @@
             ]
           }
         },
+        "additionalProperties": false,
+        "type": "object",
         "required": [
           "decision",
           "simulated",
@@ -467,37 +1114,36 @@
           "days",
           "largest_uncovered"
         ],
-        "additionalProperties": false
+        "title": "DecisionResponse",
+        "description": "Outcome of a simulated human decision. Nothing is applied for, sent or moved."
       },
-      "AdviceRequest": {
-        "type": "object",
-        "description": "The baseline and original transactions from the forecast response. The server recalculates the proposal from them and sends only those calculated facts to the model.",
+      "Deficit": {
         "properties": {
-          "baseline": {
-            "$ref": "#/components/schemas/Forecast"
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
           },
-          "transactions": {
-            "type": "array",
-            "minItems": 1,
-            "items": {
-              "$ref": "#/components/schemas/Transaction"
-            },
-            "maxItems": 5000
+          "shortfall_minor": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Shortfall Minor"
           }
         },
-        "required": [
-          "baseline",
-          "transactions"
-        ],
-        "additionalProperties": false
-      },
-      "AdviceResponse": {
+        "additionalProperties": false,
         "type": "object",
+        "required": [
+          "date",
+          "shortfall_minor"
+        ],
+        "title": "Deficit"
+      },
+      "DelayPredictResponse": {
         "properties": {
           "explanation": {
             "type": "string",
             "minLength": 1,
-            "description": "Model explanation of the proposal. Every EUR amount it cites was checked against the calculated figures, and it cites the proposed limit."
+            "title": "Explanation"
           },
           "email_draft": {
             "anyOf": [
@@ -508,32 +1154,702 @@
                 "type": "null"
               }
             ],
-            "description": "Editable payment reminder for the first incoming payment after the shortfall starts. Null when there is none. The user sends it themselves."
+            "title": "Email Draft"
           },
-          "model": {
-            "type": "string",
-            "description": "Served model name, or 'demo sample' in demo mode."
-          },
-          "latency_ms": {
+          "delay_warning": {
             "anyOf": [
               {
-                "type": "integer",
-                "minimum": 0
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Time spent on the model call. Null in demo mode."
+            "title": "Delay Warning"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
           }
         },
+        "additionalProperties": false,
+        "type": "object",
         "required": [
           "explanation",
           "email_draft",
+          "delay_warning",
           "model",
           "latency_ms"
         ],
-        "additionalProperties": false
+        "title": "DelayPredictResponse"
+      },
+      "EarlierPayment": {
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "title": "Transaction Id"
+          },
+          "pay_by": {
+            "type": "string",
+            "format": "date",
+            "title": "Pay By"
+          },
+          "limit_after_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Limit After Minor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "transaction_id",
+          "pay_by",
+          "limit_after_minor"
+        ],
+        "title": "EarlierPayment",
+        "description": "An incoming payment that would shrink the proposed facility if the client paid it by pay_by."
+      },
+      "FinancingOption": {
+        "properties": {
+          "option_kind": {
+            "type": "string",
+            "enum": [
+              "credit_facility",
+              "invoice_factoring",
+              "defer_outflow"
+            ],
+            "title": "Option Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "estimated_cost_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Estimated Cost Minor"
+          },
+          "credit_needed_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Credit Needed Minor"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "option_kind",
+          "title",
+          "estimated_cost_minor",
+          "credit_needed_minor",
+          "detail"
+        ],
+        "title": "FinancingOption"
+      },
+      "ForecastRequest": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "starting_balance_minor": {
+            "type": "integer",
+            "title": "Starting Balance Minor"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          },
+          "move_transaction_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Move Transaction Id"
+          },
+          "move_to_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Move To Date"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "file",
+          "starting_balance_minor",
+          "start_date"
+        ],
+        "title": "ForecastRequest"
+      },
+      "ForecastResponse": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "enum": [
+              "EUR",
+              "PLN",
+              "CHF",
+              "USD",
+              "GBP",
+              "CZK",
+              "SEK",
+              "DKK",
+              "HUF",
+              "RON",
+              "BGN",
+              "NOK"
+            ],
+            "title": "Currency",
+            "default": "EUR"
+          },
+          "transactions": {
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            },
+            "type": "array",
+            "title": "Transactions"
+          },
+          "baseline": {
+            "$ref": "#/components/schemas/Projection"
+          },
+          "proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Proposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "earlier_payments": {
+            "items": {
+              "$ref": "#/components/schemas/EarlierPayment"
+            },
+            "type": "array",
+            "title": "Earlier Payments"
+          },
+          "scenario": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Projection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "transactions",
+          "baseline",
+          "proposal",
+          "earlier_payments",
+          "scenario"
+        ],
+        "title": "ForecastResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InsightRequest": {
+        "properties": {
+          "baseline": {
+            "$ref": "#/components/schemas/Projection"
+          },
+          "transactions": {
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            },
+            "type": "array",
+            "maxItems": 5000,
+            "minItems": 1,
+            "title": "Transactions"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "EUR",
+              "PLN",
+              "CHF",
+              "USD",
+              "GBP",
+              "CZK",
+              "SEK",
+              "DKK",
+              "HUF",
+              "RON",
+              "BGN",
+              "NOK"
+            ],
+            "title": "Currency",
+            "default": "EUR"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "baseline",
+          "transactions"
+        ],
+        "title": "InsightRequest",
+        "description": "The baseline and transactions from the forecast response. Every figure is recalculated from them."
+      },
+      "PaymentAction": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "collect_earlier",
+              "pay_later"
+            ],
+            "title": "Kind"
+          },
+          "transaction_id": {
+            "type": "string",
+            "title": "Transaction Id"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Due Date"
+          },
+          "new_date": {
+            "type": "string",
+            "format": "date",
+            "title": "New Date"
+          },
+          "limit_after_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Limit After Minor"
+          },
+          "saves_minor": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Saves Minor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "transaction_id",
+          "due_date",
+          "new_date",
+          "limit_after_minor",
+          "saves_minor"
+        ],
+        "title": "PaymentAction"
+      },
+      "PaymentOptimizationResponse": {
+        "properties": {
+          "proposed_limit_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Proposed Limit Minor"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentAction"
+            },
+            "type": "array",
+            "title": "Actions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "proposed_limit_minor",
+          "actions"
+        ],
+        "title": "PaymentOptimizationResponse",
+        "description": "Ways to need less credit, best first. Calculated, never from the model."
+      },
+      "Projection": {
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/DailyBalance"
+            },
+            "type": "array",
+            "maxItems": 14,
+            "minItems": 14,
+            "title": "Days"
+          },
+          "first_deficit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Deficit"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "days",
+          "first_deficit"
+        ],
+        "title": "Projection"
+      },
+      "Proposal": {
+        "properties": {
+          "limit_minor": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Limit Minor"
+          },
+          "first_shortfall": {
+            "$ref": "#/components/schemas/Deficit"
+          },
+          "deepest_shortfall": {
+            "$ref": "#/components/schemas/Deficit"
+          },
+          "relevant_transaction_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Relevant Transaction Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "limit_minor",
+          "first_shortfall",
+          "deepest_shortfall",
+          "relevant_transaction_ids"
+        ],
+        "title": "Proposal",
+        "description": "Credit facility the Liquidity Agent proposes for a baseline shortfall."
+      },
+      "ReminderSendRequest": {
+        "properties": {
+          "to_email": {
+            "type": "string",
+            "maxLength": 254,
+            "minLength": 3,
+            "title": "To Email"
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Subject"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Body"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "to_email",
+          "subject",
+          "body"
+        ],
+        "title": "ReminderSendRequest"
+      },
+      "ReminderSendResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "simulated",
+            "title": "Status"
+          },
+          "recipient": {
+            "type": "string",
+            "title": "Recipient"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "recipient",
+          "subject",
+          "message"
+        ],
+        "title": "ReminderSendResponse"
+      },
+      "ScoreFactor": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "repayment",
+              "coverage",
+              "duration",
+              "depth",
+              "concentration",
+              "delays"
+            ],
+            "title": "Name"
+          },
+          "points": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Points"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "points",
+          "reason"
+        ],
+        "title": "ScoreFactor"
+      },
+      "StressScenario": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "deepest_shortfall": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Deficit"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "extra_needed_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Extra Needed Minor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "deepest_shortfall",
+          "extra_needed_minor"
+        ],
+        "title": "StressScenario"
+      },
+      "StressTestResponse": {
+        "properties": {
+          "proposed_limit_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Proposed Limit Minor"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/StressScenario"
+            },
+            "type": "array",
+            "title": "Scenarios"
+          },
+          "buffer_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Buffer Minor"
+          },
+          "recommended_limit_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Recommended Limit Minor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "proposed_limit_minor",
+          "scenarios",
+          "buffer_minor",
+          "recommended_limit_minor"
+        ],
+        "title": "StressTestResponse",
+        "description": "Worst cases for the forecast and the extra credit they would need. Calculated, never from the model."
+      },
+      "Transaction": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]*$",
+            "title": "Id"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "amount_minor": {
+            "type": "integer",
+            "maximum": 100000000000.0,
+            "minimum": -100000000000.0,
+            "title": "Amount Minor"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]*$",
+            "title": "Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "date",
+          "amount_minor",
+          "label"
+        ],
+        "title": "Transaction"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WhatIf": {
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "title": "Transaction Id"
+          },
+          "new_amount_minor": {
+            "type": "integer",
+            "title": "New Amount Minor"
+          },
+          "new_date": {
+            "type": "string",
+            "format": "date",
+            "title": "New Date"
+          },
+          "deepest_shortfall": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Deficit"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "transaction_id",
+          "new_amount_minor",
+          "new_date",
+          "deepest_shortfall"
+        ],
+        "title": "WhatIf",
+        "description": "The change the question asked about, recalculated by the application."
       }
     }
   }
