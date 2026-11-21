@@ -8,7 +8,8 @@
 
 ## Pre-Stage Checklist (2 Minutes Before Going Live)
 
-- [ ] **Warm up GPU model:** Run one quick Luigi forecast in a hidden tab so `kernes-qwen-7b` (vLLM on NVIDIA L4 GPU) has zero cold-start delay.
+- [ ] **Download the June scenario file:** open `https://autonomous-cfo-kernes-ai.apps.ocp.9hpps.sandbox580.opentlc.com/demo/amalfi.csv` and keep `pizzeria-amalfi-sample-2025.csv` on the desktop for Block 1.
+- [ ] **Warm up GPU model + prepare the Block 4 tab:** In a second tab, click **`Check my cash →`** with the default sample (*Pizzeria Amalfi · Full 2025 statement* → 1–14 January 2026, learned from history). This removes the `kernes-qwen-7b` (vLLM on NVIDIA L4 GPU) cold start and stays open for Block 4.
 - [ ] **Open clean browser tab** at `https://autonomous-cfo-kernes-ai.apps.ocp.9hpps.sandbox580.opentlc.com` (`100%` zoom, bookmarks bar hidden).
 - [ ] **Have backup local tab ready** (`http://127.0.0.1:8080`) in case conference Wi-Fi drops.
 - [ ] **Reset to Setup Screen (`#setup-screen`)** before stepping on stage.
@@ -35,10 +36,10 @@
 
 That's **KERNES CFO**—our Autonomous Liquidity Assistant built for *Innovations for all generations*."
 
-> **[Драйвер за ноутбуком:]** Натиснути чіп `Pizzeria / Restaurant`, потім `Avoid running out of cash`. Показати, що CSV *Pizzeria Amalfi example (ready to use)* вже підхоплений, і натиснути **`Check my cash →`**.
+> **[Драйвер за ноутбуком:]** Натиснути чіп `Pizzeria / Restaurant`, потім `Avoid running out of cash`. Перетягнути з робочого столу `pizzeria-amalfi-sample-2025.csv` і натиснути **`Check my cash →`**. Застосунок сам бере старт 22 червня, але оцінює баланс у €4,500: натиснути **`Edit`** біля *Opening balance*, ввести `5000.00` і натиснути **`Update`**. Не натискати *Use Amalfi sample* — це січень 2026 без нестачі грошей.
 
 **Spoken (EN):**
-"Two taps—his business type and his main goal—plus his bank export. For today's demo, we run a **known-payments scenario** starting with **€5,000** on June 22nd—and separately, we also validated pure historical-only forecasting from the full statement in Jupyter."
+"Two taps—his business type and his main goal—plus his bank export. KERNES picks the forecast window by itself; Luigi only corrects his balance to **€5,000** on June 22nd, and everything recalculates instantly. This June story uses his payments as **known, scheduled payments**—in a moment you'll also see KERNES forecast entirely on its own from a full year of real history."
 
 ---
 
@@ -86,6 +87,11 @@ Look at his tailored **Action Plan**. Under the hood, our deterministic **Transa
 
 Every balance, shortfall, anomaly, and fee is computed deterministically in Python using **integer minor units**. Only verified facts are passed to our open-weight **Qwen2.5 7B Instruct** model running via **vLLM on Red Hat OpenShift AI with an NVIDIA L4 GPU**, backed by a **Qwen2.5 1.5B** CPU fallback. Every response is checked by our numeric-boundary `cited_amounts()` guard—if a figure doesn't match the backend calculation, it retries or falls back cleanly without ever hiding the numbers. We also evaluated model accuracy in a **Jupyter Notebook on OpenShift AI**."
 
+> **[Драйвер за ноутбуком:]** Перемкнутися на другу вкладку з січневим прогнозом (повна виписка 2025, напис *Estimated from past transactions*). Якщо час закінчується — пропустити цей абзац.
+
+**Spoken (EN, ~20 s):**
+"And Luigi doesn't need a list of future bills. Here the engine read the organizers' real 2025 Pizzeria Amalfi statement—1,125 transactions—learned his rhythm, like rent on the same day every month and weekly supplier runs, and forecast January 2026 by itself: a healthy month, with **€23,333.39** still above zero after our stress test. We backtested that rule on the full year: once it had three months of history, it caught every real shortfall in 38 weekly windows, with no false alarms and a third of the error of a naive forecast."
+
 ---
 
 ## Block 5 (4:00–5:00) — Business Model (B2B2C for Commerzbank) & Close
@@ -106,7 +112,7 @@ From a stressed pizzaiolo staring at a CSV to an actionable, zero-hallucination 
 ## Jury Q&A Cheat Sheet
 
 1. **Why is Luigi's balance on June 22 €5,000 if the raw statement had a negative reconstructed balance?**
-   - *Answer:* "`€5,000` on June 22 is our explicit known-payments demo scenario. Separately, we reconstructed the full historical balance (`−€8,848.69`) and tested historical-only forecasting in Jupyter (documented in PR #17)."
+   - *Answer:* "`€5,000` on June 22 is our explicit known-payments demo scenario; the reconstructed real balance that day was `−€8,848.69`. The forecast learned purely from history is live in the app: the one-click sample forecasts January 2026 from the full 2025 statement, and the same rule is backtested in PR #17."
 2. **Can Ask CFO simulate buying a brand-new €3,000 pizza oven?**
    - *Answer:* "Current `/api/ask-cfo` shifts or scales existing scheduled transactions in the CSV (e.g., delayed client payments or payroll growth). Supporting net-new capex injection is next on our roadmap."
 3. **What happens if the GPU LLM goes down during a surge?**
@@ -115,3 +121,5 @@ From a stressed pizzaiolo staring at a CSV to an actionable, zero-hallucination 
    - *Answer:* "Our deterministic `classify_transaction()` engine tags `CARD SETTLEMENT` as `retail_non_contactable` and taxes, social security, and staff salaries as `fixed_mandatory`, strictly excluding them from email recommendations."
 5. **Do you execute real bank transfers or send real emails?**
    - *Answer:* "Never. Every approval and email send is 100% simulated—explicitly labeled with Challenge Card autonomy level `4 · Simulation only — nothing sent`."
+6. **Does it really forecast, or does it just replay the CSV?**
+   - *Answer:* "Both, and the app says which. Payments the statement already lists for the forecast dates are used as known, scheduled payments—that's the June story. When the forecast starts after the statement ends, it reads only rows before the start date: monthly and weekly payees it has seen three times in a row, plus a 28-day average for the rest, and the screen says *Estimated from past transactions*. Our backtest of the same rule multiplies the future rows by 10 and checks the forecast doesn't move."

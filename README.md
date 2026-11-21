@@ -10,7 +10,7 @@
 
 ## One-Line Summary
 
-An AI-powered Autonomous CFO on Red Hat OpenShift AI that turns SME bank statements into plain-English cash-crunch action plans, verified credit simulations, and outreach drafts.
+An AI CFO on Red Hat OpenShift AI that forecasts an SME's cash 14 days ahead from its own bank statement and turns shortfalls into plain-English plans, credit simulations and email drafts.
 
 ## Technology Stack
 
@@ -18,7 +18,7 @@ An AI-powered Autonomous CFO on Red Hat OpenShift AI that turns SME bank stateme
 - **Frontend:** HTML5, CSS3 (Bento & Progressive Disclosure UI), Vanilla ES Modules JavaScript, interactive SVG cash-flow chart
 - **AI & Inference:** Open-weight **Qwen2.5 7B Instruct** (`kernes-qwen-7b`) served via **vLLM** on Red Hat OpenShift AI (**NVIDIA L4 GPU**), with automatic fallback to **Qwen2.5 1.5B Instruct** (`kernes-qwen`, `llama.cpp` CPU)
 - **Platform & OpenShift Bonus Paths:** Red Hat OpenShift Container Platform & OpenShift AI (`Containerfile`, KServe `InferenceService`, Deployment, Service, HTTPS Route, Secrets), **vLLM** GPU serving, **Jupyter Notebooks on OpenShift AI** ([evaluate_liquidity_agent.ipynb](notebooks/evaluate_liquidity_agent.ipynb) + historical forecast validation in PR #17), optional **MLflow** latency & grounding telemetry
-- **Testing & Workflow:** `uv` + `uv.lock`, `pytest` (8 automated test suites), GitHub Pull Request workflow
+- **Testing & Workflow:** `uv` + `uv.lock`, `pytest` (170 automated tests in 8 suites), rolling-origin backtest on the real 2025 statement (PR #17), GitHub Pull Request workflow
 
 ## Source Code Repository
 
@@ -38,13 +38,14 @@ Small and medium-sized enterprises (SMEs) are often run by hands-on founders who
 **KERNES CFO** pairs a **deterministic Python liquidity engine** with a **grounded open-weight LLM (`kernes-qwen-7b`)** inside a **Progressive Disclosure UI** built for *"Innovations for all generations"*:
 
 1. **Simple Guided Entry:** Two quick context taps (*business type* + *main goal*) and a bank CSV upload (or one-click *Pizzeria Amalfi* demo) produce an immediate, jargon-free diagnosis and a 2–4 step **AI Action Plan** (`POST /api/action-plan`) tailored to either **Survival Mode** (closing a cash gap) or **Growth Mode** (safe reinvestment buffer).
-2. **Counterparty-Aware Outreach:** A deterministic **Transaction & Counterparty Classifier** (`classify_transaction()`) inspects `Transaction Type`, `Beneficiary/Payer`, and `Payment Reference` so walk-in card customers (`retail_non_contactable`) and mandatory taxes, social security, or staff payroll (`fixed_mandatory`) are **never** suggested as deferral/email targets—only real B2B clients (`email_collect_early`) or B2B suppliers/landlord (`email_defer_supplier`) receive polite, editable email drafts.
-3. **Strict 4-Level Autonomy Boundaries:** Every card and action in the UI explicitly distinguishes:
+2. **A Forecast Learned from the Owner's Own Statement:** Upload a bank statement and the engine learns the business's rhythm—rent on the same day every month, weekly supplier runs, typical daily card takings—to project the next 14 days (`backend/history_forecast.py`). Payments the statement already lists inside the window are used as known, scheduled payments.
+3. **Counterparty-Aware Outreach:** A deterministic **Transaction & Counterparty Classifier** (`classify_transaction()`) inspects `Transaction Type`, `Beneficiary/Payer`, and `Payment Reference` so walk-in card customers (`retail_non_contactable`) and mandatory taxes, social security, or staff payroll (`fixed_mandatory`) are **never** suggested as deferral/email targets—only real B2B clients (`email_collect_early`) or B2B suppliers/landlord (`email_defer_supplier`) receive polite, editable email drafts.
+4. **Strict 4-Level Autonomy Boundaries:** Every card and action in the UI explicitly distinguishes:
    - `1 · Analyzed by agent` (14-day forecast, shortfall detection, anomaly scan, stress test, cash health score)
    - `2 · Agent recommends` (peak-gap safety buffer, actionable payment timing moves, financing comparison)
    - `3 · Your decision needed` (human Approve / Reject credit buffer preview, editable email drafts)
    - `4 · Simulation only — nothing sent` (zero real bank transfers, loan applications, or emails)
-4. **Progressive Disclosure for Advanced Users:** Extra analytical tools (*What-If Simulator & Q&A*, *Client-Pays-Late Predictor*, *Compare Financing Options*, *Cash Health Score & Stress Test*, *Smart Payment Moves*, *Anomaly Detector*) stay tucked inside clean collapsible accordions (`More details & deeper analysis`) until needed.
+5. **Progressive Disclosure for Advanced Users:** Extra analytical tools (*What-If Simulator & Q&A*, *Client-Pays-Late Predictor*, *Compare Financing Options*, *Cash Health Score & Stress Test*, *Smart Payment Moves*, *Anomaly Detector*) stay tucked inside clean collapsible accordions (`More details & deeper analysis`) until needed.
 
 **Proposed Business Model (B2B2C Embedded Banking + Freemium Pro):**
 - **Layer 1 — White-Label Embedded Banking (Commerzbank):** Offered free inside the bank's SME portal to reduce SME cash-flow defaults and generate high-intent, pre-qualified credit-line and factoring leads at the exact moment a temporary cash dip is detected.
@@ -54,14 +55,15 @@ Small and medium-sized enterprises (SMEs) are often run by hands-on founders who
 
 **Implemented & Live on OpenShift AI today:**
 - **Multi-currency MT940-style semicolon CSV parser & classifier** (`EUR`, `PLN`, `USD`, `CHF`, `GBP`) with strict HTTP 422 validation.
-- **14-day integer minor-unit cash forecast** (`POST /api/forecast`) identifying first shortfall, deepest shortfall, and what-if payment-date shifts without mutating the baseline.
+- **14-day integer minor-unit cash forecast** (`POST /api/forecast`) identifying first shortfall, deepest shortfall, and what-if payment-date shifts without mutating the baseline—built from known scheduled payments, or learned from the statement's history when the forecast starts after its last day.
+- **One-click real-data demo:** the organizers' full 2025 Pizzeria Amalfi statement (1,125 rows) forecasts 1–14 January 2026 from the `EUR 33,266.35` year-end balance: lowest projected balance `EUR 28,714.67`, with `EUR 23,333.39` still above zero after the stress test (Growth Mode).
 - **Peak-gap credit facility proposal & simulation** (`POST /api/decision` — `Approve preview` reduces uncovered gap to `0.00`; `Reject preview` preserves the baseline gap).
 - **Grounded AI Action Plan & Briefing** (`POST /api/action-plan`, `POST /api/advice`) running on OpenShift AI (`kernes-qwen-7b` GPU primary + `kernes-qwen` CPU fallback) with HTTP 503 resilience that keeps deterministic numbers visible during model outages.
 - **Full Advanced CFO Suite:** Interactive SVG chart with Forecast / Stress Test / What-If overlays, **What-If Q&A** (`POST /api/ask-cfo`), **Client-Pays-Late Predictor** (`POST /api/predict-delays`), **Compare Financing Options** (`POST /api/compare-options`), **Cash Health Score** (`POST /api/credit-check`), **Stress Test** (`POST /api/stress-test`), **Smart Payment Moves** (`POST /api/optimize-payments`), and **Anomaly Detector** (`POST /api/detect-anomalies`).
 
 **Simulated by Design (Zero Real Execution):**
 - Credit facility approval/rejection and payment reminder sending (`POST /api/send-reminder`) are 100% simulated.
-- **Demo Scenario Framing:** In the *Pizzeria Amalfi* demo (`demo/pizzeria_amalfi_sample.csv`), starting with `EUR 5,000.00` on `2025-06-22` represents a **scenario with known/scheduled payments** (dropping to `−EUR 6,250.00` on `2025-06-28` and peaking at `−EUR 8,248.91` on `2025-07-03`). By contrast, the reconstructed historical balance on `2025-06-22` from the full raw statement was `−EUR 8,848.69`; pure historical-only forecasting was evaluated separately in Jupyter (PR #17).
+- **Demo Scenario Framing:** Besides the January forecast learned from history, the survival scenario (`demo/pizzeria_amalfi_sample.csv`) starts with `EUR 5,000.00` on `2025-06-22` as a **scenario with known/scheduled payments** (dropping to `−EUR 6,250.00` on `2025-06-28` and peaking at `−EUR 8,248.91` on `2025-07-03`). The reconstructed real balance on `2025-06-22` was `−EUR 8,848.69`, so this opening balance is a stated scenario assumption.
 
 ### BEHIND THE BUILD
 
@@ -75,13 +77,13 @@ Small and medium-sized enterprises (SMEs) are often run by hands-on founders who
 1. **Eliminating LLM Numeric Hallucinations & Substring False Positives:** Early grounding checks matched `'200'` inside `'1,200.00'`. We replaced substring checks with regex numeric-boundary matching (`_matches_amount_token`) and added dual-model fallback (`kernes-qwen-7b` GPU → `kernes-qwen` CPU).
 2. **Pivoting from Telemetry Overload to Progressive Disclosure:** Mid-hackathon mentor feedback highlighted that non-financial SME owners like Luigi get lost in dense analytics. We restructured the experience around a 2-question setup + `POST /api/action-plan` + counterparty classifier while preserving every deep analytical widget inside collapsible accordions.
 3. **Preventing Impossible AI Suggestions:** Generic payment-move optimizers initially risked suggesting emailing walk-in card customers or delaying mandatory taxes/payroll. Adding deterministic `classify_transaction()` rules fixed this at the source.
-4. **Clarifying Known-Payments vs. Historical-Only Forecasting:** Testing the full Pizzeria Amalfi statement in Jupyter (PR #17) revealed the difference between reconstructing past balances (`−EUR 8,848.69`) and simulating known scheduled payments (`EUR 5,000.00` opening scenario), ensuring complete transparency in our demo.
+4. **From Replaying Known Payments to Learning from History:** Backtesting on the full 2025 Pizzeria Amalfi statement (rolling-origin cross-validation, PR #17) showed that a forecast built from rows inside the window only replays the future it is given. We added a history-only forecaster: it learns payees paid on the same day of the month 3 months running or on the same weekday 3 weeks running, and averages everything else over the last 28 days. With at least 3 months of history, this rule caught every real 14-day shortfall in 38 weekly windows with no false alarms, and cut the mean daily balance error to `EUR 1,267` from about `EUR 3,850` for naive flat or average forecasts. One-off events such as the June closure cannot be learned from history.
 
 ### RESULTS AND NEXT STEPS
 
-- **Results Achieved:** Live end-to-end deployment on Red Hat OpenShift AI (`kernes-qwen-7b` on NVIDIA L4 GPU + `kernes-qwen` fallback), 8 automated `pytest` suites covering math, CSV validation, counterparty classification, action plans, grounding, and error paths, plus a Jupyter evaluation notebook ([evaluate_liquidity_agent.ipynb](notebooks/evaluate_liquidity_agent.ipynb)).
+- **Results Achieved:** Live end-to-end deployment on Red Hat OpenShift AI (`kernes-qwen-7b` on NVIDIA L4 GPU + `kernes-qwen` fallback), 170 automated `pytest` tests in 8 suites covering math, CSV validation, counterparty classification, action plans, grounding, and error paths, a rolling-origin backtest of the forecast on the real 2025 statement (PR #17), plus a Jupyter evaluation notebook ([evaluate_liquidity_agent.ipynb](notebooks/evaluate_liquidity_agent.ipynb)).
 - **Current Limitations:** Uses uploaded CSV exports rather than live PSD2 bank feeds; `/api/ask-cfo` shifts or scales existing scheduled transactions (e.g., *"What if a client pays 3 days late?"*) rather than adding brand-new capex items; all banking actions are simulated.
-- **Next Steps:** Connect Commerzbank / PSD2 APIs for real-time account sync, integrate historical cash-flow ML forecasting alongside known-payment schedules, support adding new planned capex items in What-If Q&A, and expand to FX Hedging, Tax, and Investment sub-agents.
+- **Next Steps:** Connect Commerzbank / PSD2 APIs for real-time account sync, let owners add planned one-off events (closures, holidays) on top of the learned forecast and flag statements with under 3 months of history, support adding new planned capex items in What-If Q&A, and expand to FX Hedging, Tax, and Investment sub-agents.
 
 ---
 
