@@ -1,88 +1,124 @@
-# Autonomous CFO
+# KERNES CFO — Autonomous Liquidity Assistant for SMEs
 
-Our Autonomous CFO entry for the Red Hat challenge at Collabothon focuses on the **Liquidity Agent**. The current starter covers CSV upload, cash forecasting, moving an incoming payment earlier, and draft reminder advice. The complete challenge scenario includes an automatic credit facility proposal, a human decision, and a simulated outcome. The steps below define the target the team will implement and verify.
+> **Collabothon 2026 — Red Hat & Commerzbank Challenge: Autonomous CFO (Liquidity Agent)**
 
-## Liquidity Agent demo scope
+---
 
-1. The user uploads synthetic upcoming payments and enters an opening balance and start date. The app projects 14 end-of-day cash balances in PLN and identifies the first day below zero.
-2. If the baseline forecast shows a shortfall, the app automatically shows a proposed credit facility. Calculate its limit as `max(0, -min(projected_balances))` over the baseline horizon in integer grosz. Show the first shortfall date and amount, the date and size of the deepest shortfall, and the relevant transactions. Use the earliest date if the deepest shortfall spans multiple days. A baseline that stays at or above zero needs no facility.
-3. The open-source or open-weight model explains why the limit would cover the projected gap, using the forecast figures and relevant transaction facts supplied by the backend. The deterministic calculation supplies the amount. During a model outage, show the forecast and proposal figures with a clear explanation error so the user can still review them.
-4. The user chooses **Approve simulation** or **Reject simulation**. For approval, show the projected uncovered gap after simulated access to the facility limit on each day. For rejection, show the original unfunded gap. Keep the underlying balances intact. Both decisions are simulations and trigger zero real applications, transfers, or messages.
-5. Keep the what-if comparison for moving an incoming payment earlier. The separate scenario shows how the cash position changes and keeps the baseline and its proposal available. The user can still request an editable payment reminder draft.
+## Project Name
 
-Run the complete solution on the team's assigned OpenShift AI environment, with the app on its OpenShift cluster and an open-source or open-weight model served on that OpenShift AI deployment for all model inference. Record the model name and evidence of a live inference call. MaaS and an OpenShift AI Jupyter workbench evaluation are optional bonus paths if available.
+**KERNES CFO — Autonomous Liquidity Assistant for SMEs**
 
-## Run locally
+## One-Line Summary
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and run this command from the repository root.
+An AI-powered Autonomous CFO on Red Hat OpenShift AI that turns SME bank statements into plain-English cash-crunch action plans, verified credit simulations, and outreach drafts.
+
+## Technology Stack
+
+- **Backend:** Python 3.12, FastAPI, Pydantic v2, Uvicorn, `python-multipart` (deterministic integer minor-unit arithmetic across `EUR`, `PLN`, `USD`, `CHF`, `GBP`)
+- **Frontend:** HTML5, CSS3 (Bento & Progressive Disclosure UI), Vanilla ES Modules JavaScript, interactive SVG cash-flow chart
+- **AI & Inference:** Open-weight **Qwen2.5 7B Instruct** (`kernes-qwen-7b`) served via **vLLM** on Red Hat OpenShift AI (**NVIDIA L4 GPU**), with automatic fallback to **Qwen2.5 1.5B Instruct** (`kernes-qwen`, `llama.cpp` CPU)
+- **Platform & OpenShift Bonus Paths:** Red Hat OpenShift Container Platform & OpenShift AI (`Containerfile`, KServe `InferenceService`, Deployment, Service, HTTPS Route, Secrets), **vLLM** GPU serving, **Jupyter Notebooks on OpenShift AI** ([evaluate_liquidity_agent.ipynb](notebooks/evaluate_liquidity_agent.ipynb) + historical forecast validation in PR #17), optional **MLflow** latency & grounding telemetry
+- **Testing & Workflow:** `uv` + `uv.lock`, `pytest` (8 automated test suites), GitHub Pull Request workflow
+
+## Source Code Repository
+
+- **GitHub Repository:** `https://github.com/docRonal/Kernes-AI`
+- **Live OpenShift Deployment:** `https://autonomous-cfo-kernes-ai.apps.ocp.9hpps.sandbox580.opentlc.com`
+
+---
+
+## Project Overview
+
+### THE PROBLEM
+
+Small and medium-sized enterprises (SMEs) are often run by hands-on founders who have no dedicated Chief Financial Officer—for example, **Luigi**, a former pizzaiolo who opened *Pizzeria Amalfi* with a small starting capital. When rent, payroll, taxes, and wholesale supplier invoices hit in the same week before card payouts clear, SME owners discover cash shortfalls too late. Traditional financial dashboards overwhelm non-financial owners with raw tables and jargon instead of telling them in plain language what is happening and what to do next.
+
+### YOUR SOLUTION
+
+**KERNES CFO** pairs a **deterministic Python liquidity engine** with a **grounded open-weight LLM (`kernes-qwen-7b`)** inside a **Progressive Disclosure UI** built for *"Innovations for all generations"*:
+
+1. **Simple Guided Entry:** Two quick context taps (*business type* + *main goal*) and a bank CSV upload (or one-click *Pizzeria Amalfi* demo) produce an immediate, jargon-free diagnosis and a 2–4 step **AI Action Plan** (`POST /api/action-plan`) tailored to either **Survival Mode** (closing a cash gap) or **Growth Mode** (safe reinvestment buffer).
+2. **Counterparty-Aware Outreach:** A deterministic **Transaction & Counterparty Classifier** (`classify_transaction()`) inspects `Transaction Type`, `Beneficiary/Payer`, and `Payment Reference` so walk-in card customers (`retail_non_contactable`) and mandatory taxes, social security, or staff payroll (`fixed_mandatory`) are **never** suggested as deferral/email targets—only real B2B clients (`email_collect_early`) or B2B suppliers/landlord (`email_defer_supplier`) receive polite, editable email drafts.
+3. **Strict 4-Level Autonomy Boundaries:** Every card and action in the UI explicitly distinguishes:
+   - `1 · Analyzed by agent` (14-day forecast, shortfall detection, anomaly scan, stress test, cash health score)
+   - `2 · Agent recommends` (peak-gap safety buffer, actionable payment timing moves, financing comparison)
+   - `3 · Your decision needed` (human Approve / Reject credit buffer preview, editable email drafts)
+   - `4 · Simulation only — nothing sent` (zero real bank transfers, loan applications, or emails)
+4. **Progressive Disclosure for Advanced Users:** Extra analytical tools (*What-If Simulator & Q&A*, *Client-Pays-Late Predictor*, *Compare Financing Options*, *Cash Health Score & Stress Test*, *Smart Payment Moves*, *Anomaly Detector*) stay tucked inside clean collapsible accordions (`More details & deeper analysis`) until needed.
+
+**Proposed Business Model (B2B2C Embedded Banking + Freemium Pro):**
+- **Layer 1 — White-Label Embedded Banking (Commerzbank):** Offered free inside the bank's SME portal to reduce SME cash-flow defaults and generate high-intent, pre-qualified credit-line and factoring leads at the exact moment a temporary cash dip is detected.
+- **Layer 2 — Optional Pro Tier (€19–€49/month):** Unlocks multi-currency branch forecasting, automated PSD2/bank-feed sync, custom stress scenarios, and recurring accountant-ready exports.
+
+### THE WORKING PROTOTYPE
+
+**Implemented & Live on OpenShift AI today:**
+- **Multi-currency MT940-style semicolon CSV parser & classifier** (`EUR`, `PLN`, `USD`, `CHF`, `GBP`) with strict HTTP 422 validation.
+- **14-day integer minor-unit cash forecast** (`POST /api/forecast`) identifying first shortfall, deepest shortfall, and what-if payment-date shifts without mutating the baseline.
+- **Peak-gap credit facility proposal & simulation** (`POST /api/decision` — `Approve preview` reduces uncovered gap to `0.00`; `Reject preview` preserves the baseline gap).
+- **Grounded AI Action Plan & Briefing** (`POST /api/action-plan`, `POST /api/advice`) running on OpenShift AI (`kernes-qwen-7b` GPU primary + `kernes-qwen` CPU fallback) with HTTP 503 resilience that keeps deterministic numbers visible during model outages.
+- **Full Advanced CFO Suite:** Interactive SVG chart with Forecast / Stress Test / What-If overlays, **What-If Q&A** (`POST /api/ask-cfo`), **Client-Pays-Late Predictor** (`POST /api/predict-delays`), **Compare Financing Options** (`POST /api/compare-options`), **Cash Health Score** (`POST /api/credit-check`), **Stress Test** (`POST /api/stress-test`), **Smart Payment Moves** (`POST /api/optimize-payments`), and **Anomaly Detector** (`POST /api/detect-anomalies`).
+
+**Simulated by Design (Zero Real Execution):**
+- Credit facility approval/rejection and payment reminder sending (`POST /api/send-reminder`) are 100% simulated.
+- **Demo Scenario Framing:** In the *Pizzeria Amalfi* demo (`demo/pizzeria_amalfi_sample.csv`), starting with `EUR 5,000.00` on `2025-06-22` represents a **scenario with known/scheduled payments** (dropping to `−EUR 6,250.00` on `2025-06-28` and peaking at `−EUR 8,248.91` on `2025-07-03`). By contrast, the reconstructed historical balance on `2025-06-22` from the full raw statement was `−EUR 8,848.69`; pure historical-only forecasting was evaluated separately in Jupyter (PR #17).
+
+### BEHIND THE BUILD
+
+- **Single-Container Deployment:** FastAPI serves both the REST API and the static `frontend/` bundle from one container (`Containerfile`) behind an OpenShift Deployment, Service, and HTTPS Route.
+- **Deterministic Math vs. LLM Narrative:** All monetary totals, dates, anomalies, stress cushions, and action rankings are computed deterministically in Python using integer minor units. The LLM never calculates money—it only translates verified backend facts into plain-English explanations and polite B2B emails.
+- **Anti-Hallucination Grounding (`cited_amounts()`):** Every monetary token produced by the LLM is validated against exact boundary-matched backend numbers before reaching the user, retrying once and falling back cleanly if validation fails.
+- **Security & Telemetry:** API tokens live strictly in OpenShift Secrets (`CFO_MODEL_TOKEN`); logs record model name, attempt count, and latency without ever logging prompts, PII, or credentials.
+
+### CHALLENGES AND DISCOVERIES
+
+1. **Eliminating LLM Numeric Hallucinations & Substring False Positives:** Early grounding checks matched `'200'` inside `'1,200.00'`. We replaced substring checks with regex numeric-boundary matching (`_matches_amount_token`) and added dual-model fallback (`kernes-qwen-7b` GPU → `kernes-qwen` CPU).
+2. **Pivoting from Telemetry Overload to Progressive Disclosure:** Mid-hackathon mentor feedback highlighted that non-financial SME owners like Luigi get lost in dense analytics. We restructured the experience around a 2-question setup + `POST /api/action-plan` + counterparty classifier while preserving every deep analytical widget inside collapsible accordions.
+3. **Preventing Impossible AI Suggestions:** Generic payment-move optimizers initially risked suggesting emailing walk-in card customers or delaying mandatory taxes/payroll. Adding deterministic `classify_transaction()` rules fixed this at the source.
+4. **Clarifying Known-Payments vs. Historical-Only Forecasting:** Testing the full Pizzeria Amalfi statement in Jupyter (PR #17) revealed the difference between reconstructing past balances (`−EUR 8,848.69`) and simulating known scheduled payments (`EUR 5,000.00` opening scenario), ensuring complete transparency in our demo.
+
+### RESULTS AND NEXT STEPS
+
+- **Results Achieved:** Live end-to-end deployment on Red Hat OpenShift AI (`kernes-qwen-7b` on NVIDIA L4 GPU + `kernes-qwen` fallback), 8 automated `pytest` suites covering math, CSV validation, counterparty classification, action plans, grounding, and error paths, plus a Jupyter evaluation notebook ([evaluate_liquidity_agent.ipynb](notebooks/evaluate_liquidity_agent.ipynb)).
+- **Current Limitations:** Uses uploaded CSV exports rather than live PSD2 bank feeds; `/api/ask-cfo` shifts or scales existing scheduled transactions (e.g., *"What if a client pays 3 days late?"*) rather than adding brand-new capex items; all banking actions are simulated.
+- **Next Steps:** Connect Commerzbank / PSD2 APIs for real-time account sync, integrate historical cash-flow ML forecasting alongside known-payment schedules, support adding new planned capex items in What-If Q&A, and expand to FX Hedging, Tax, and Investment sub-agents.
+
+---
+
+## Run Locally & Verify
+
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and run from the repository root:
 
 ```sh
 uv run --locked uvicorn backend.main:app --host 127.0.0.1 --port 8080
 ```
 
-Open the [app](http://127.0.0.1:8080) or the [Swagger UI](http://127.0.0.1:8080/docs). Run the tests in a separate terminal.
+Open the [app](http://127.0.0.1:8080) or [Swagger UI](http://127.0.0.1:8080/docs). Run the automated test suite:
 
 ```sh
 uv run --locked pytest -q
 ```
 
-Edit the HTML, CSS, and JavaScript in `frontend/`, then refresh the browser. FastAPI serves these files directly in local development and in the OpenShift container.
+For `live` mode against a local or OpenShift model endpoint, copy `.env.example` to `.env` and pass `--env-file .env` immediately after `uv run --locked`. See [deploy/README.md](deploy/README.md) for OpenShift AI deployment instructions.
 
-In `demo` mode, the app accepts [demo/transactions.csv](demo/transactions.csv) and returns a saved response. The starter includes two forecast outcomes and a sample model response. The `live` mode is the integration point for live forecasting and calls to OpenShift AI. See the [deployment guide](deploy/README.md).
+### Canonical Demo & Verification Cases ([demo/qa_cases.json](demo/qa_cases.json))
 
-For local configuration, copy `.env.example` to `.env` and add `--env-file .env` immediately after `uv run --locked`. The app starts in `demo` mode by default.
+1. **Pizzeria Amalfi (`demo/pizzeria_amalfi_sample.csv`):** Opening balance `EUR 5,000.00` on `2025-06-22` (known-payments scenario) → first shortfall `−EUR 6,250.00` on `2025-06-28`, peak shortfall `−EUR 8,248.91` on `2025-07-03`, proposed buffer `EUR 8,248.91`.
+2. **Peak Shortfall (`demo/credit_peak_case.csv`):** Opening balance `EUR 1,000.00` on `2026-11-23` → first shortfall `−EUR 200.00` (`2026-11-24`), deepens to `−EUR 700.00` (`2026-11-26`) before `EUR 1,000.00` B2B invoice arrives (`2026-11-29`).
+3. **Healthy Surplus (`demo/no_shortfall_case.csv`):** Opening balance `EUR 15,000.00` on `2026-11-23` → stays positive across all 14 days (triggers Growth Mode checklist).
+4. **Multi-Currency & Stress Cases (`demo/stress_cases/`):** Includes `PLN` branch, mixed FX, duplicate-payment anomaly, and invalid-CSV HTTP 422 cases.
 
-## Tech stack
+---
 
-| Layer | Technology |
-| --- | --- |
-| Backend | Python 3.12+, FastAPI, Pydantic, Uvicorn, and `python-multipart` for CSV uploads. The container uses Python 3.12. |
-| Frontend | HTML, CSS, and vanilla JavaScript in `frontend/`. FastAPI serves the UI and the browser calls the API with `fetch`. |
-| Forecast data | Python's `csv` module, integer grosz amounts, and in-memory request processing. Synthetic CSVs and example responses live in `demo/`. |
-| AI inference | An open-source or open-weight model served on the team's assigned Red Hat OpenShift AI environment. Use Python's `urllib.request` for server-side JSON calls to the configured endpoint. MaaS is an optional bonus path if available. |
-| Deployment | One container built from `Containerfile`. Red Hat OpenShift runs it through a Deployment, Service, and HTTPS Route. Store the model token in an OpenShift Secret. |
-| Tooling and verification | `uv` and `uv.lock` for dependencies, `pytest` for automated tests, and GitHub for branches and PRs. Use an OpenShift AI Jupyter workbench for the optional evaluation notebook. |
-
-## Team roles
-
-Each folder contains the owner's responsibilities, file scope, checks, and starter prompt. Application files stay in their component directories, so each role works against the same runnable app.
+## Team & Workflow
 
 | Owner | Tool | Role | Branch |
 | --- | --- | --- | --- |
 | Mikhail | Codex | [Deployment & Integration](agents/deployment/README.md) | `feat/openshift` |
 | Andrii | Claude Code | [Cash Flow Backend](agents/backend/README.md) | `feat/backend` |
-| Timur | Antigravity | [Frontend & UX](agents/frontend/README.md) | `feat/frontend` |
+| Tsimur | Antigravity | [Frontend & UX](agents/frontend/README.md) | `feat/frontend` |
 | Ivan | Antigravity | [AI Model Integration](agents/ai-integration/README.md) | `feat/advice` |
-| Yuri | Antigravity | [QA, Demo & Evaluation](agents/qa/README.md) | `feat/qa-demo` |
+| Yurii | Antigravity | [QA, Demo & Evaluation](agents/qa/README.md) | `feat/qa-demo` |
 
-## How we stay in sync
-
-1. Fetch `origin` and check out your assigned role branch. Open the repository root in your coding tool and use your role's starter prompt. On a shared laptop, use one Git worktree per branch.
-2. Treat [the OpenAPI contract](contracts/openapi.json) and the examples in [demo/](demo/) as shared. The checked-in contract describes the current scaffold. Mikhail, Andrii, Timur, Ivan, and Yuri agree on the proposal data, explanation, decision and simulation flow, and fixture expectations through one coordinated contract PR. Use the agreed contract for the feature branches. Coordinate dependency changes with Mikhail and the affected owners.
-3. Open a PR with what changed, the checks you ran, and anything another role needs to pick up. Mikhail coordinates reviews and merges. When a dependency merges, bring the latest `main` into your branch and rerun your checks.
-4. Deploy the starter early while the frontend uses the saved HTTP responses and the backend and AI owners build their implementations. Deploy the complete scenario in `live` after the forecast, model explanation, and simulation are integrated. Yuri runs the end-to-end demo check on that same deployment.
-
-On your first checkout from a personal clone, track the remote branch listed above. For example:
-
-```sh
-git fetch origin
-git switch --track origin/feat/backend
-```
-
-## Instructions and subagents
-
-All role sessions use the shared rules in [AGENTS.md](AGENTS.md). [CLAUDE.md](CLAUDE.md) imports the same file for Claude Code. Open the root of the relevant clone or worktree in each tool.
-
-- `forecast-reviewer` checks the calculations, input validation, and payment-date scenario.
-- `integration-reviewer` checks how the UI, API, and OpenShift fit together.
-
-The configurations are in `.codex/agents/`, `.claude/agents/`, and `.agents/agents/`, respectively. In Codex and Antigravity App or CLI, ask the primary agent to delegate the review by name and pass the list of changed files. In Claude Code, mention `@agent-forecast-reviewer` or `@agent-integration-reviewer`. If your installed version does not show a subagent, give the primary agent the [review checklists](agents/reviewer.md). [Codex](https://learn.chatgpt.com/docs/agent-configuration/subagents#custom-agents) · [Claude Code](https://code.claude.com/docs/en/sub-agents#invoke-subagents-explicitly) · [Antigravity](https://antigravity.google/docs/subagents#custom-subagents)
-
-## Verify before the demo
-
-Use at least two synthetic PLN cases on the deployed live app. **Try Kernes demo (PLN)** runs the first case against the API. The Pizzeria Amalfi example uses EUR and runs its forecast and simulation in the browser.
-
-1. Upload the starter sample, enter PLN 12,000 as the opening balance, and select November 23, 2026. The baseline reaches **−PLN 5,000** on November 27. It should show a **PLN 5,000** credit facility automatically. Verify that the live OpenShift AI explanation matches the dates, limit, and transactions.
-2. Approve the proposal and verify that the simulated uncovered gap drops to **PLN 0**. Reload the original case, reject the proposal, and verify that the uncovered gap stays **PLN 5,000** on November 27. Verify that the UI makes the simulation status clear in both cases.
-3. Move payment `INV-001` to November 26. Verify that the alternative Friday balance is **PLN 4,000** and the baseline still shows **−PLN 5,000**. Request the editable reminder draft if demonstrating that feature.
-4. Use [the peak-shortfall fixture](demo/credit_peak_case.csv) with a November 23 start date. It starts with PLN 1,000, projects a PLN 1,200 outflow on day 2 and a PLN 500 outflow on day 4, and receives PLN 1,000 on day 7. Verify that the explanation distinguishes the **PLN 200** first shortfall from the **PLN 700** peak shortfall and that the app proposes **PLN 700**. Check a no-shortfall forecast separately and verify that it shows no proposal.
+- **Git Discipline:** Merge all changes into `main` **strictly via Pull Request**; never force-push to `main`.
+- **Key Docs:** [5-Minute Live Demo Script](docs/DEMO_SCRIPT_5MIN.md) · [Shared Agent Rules](AGENTS.md) · [OpenAPI Contract](contracts/openapi.json) · [OpenShift Deploy Guide](deploy/README.md) · [Chat-First Strategy](docs/CHAT_FIRST_STRATEGY.md)
