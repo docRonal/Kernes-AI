@@ -138,6 +138,7 @@ function showStatus(message, isError = false) {
 function showSetupScreen() {
   state.forecast = null;
   state.adviceRequestId += 1;
+  state.insightsRequestId += 1;
   agentStatusPill.textContent = "Assistant ready";
   setupScreen.hidden = false;
   resultsSection.hidden = true;
@@ -432,7 +433,7 @@ async function loadInsights() {
     requestOptimizePayments(payload),
   ]);
 
-  if (reqId !== state.insightsRequestId) return;
+  if (reqId !== state.insightsRequestId || !state.forecast) return;
 
   if (anomaliesRes.status === "fulfilled" && anomaliesRes.value) {
     renderAnomalies(anomaliesRes.value, currency);
