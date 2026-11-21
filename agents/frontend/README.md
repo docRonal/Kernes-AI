@@ -1,20 +1,20 @@
 # Frontend & UX
 
-**Owner** Timur · **Tool** Antigravity · **Branch** `feat/frontend`
+**Owner** Tsimur · **Tool** Antigravity · **Branch** `feat/frontend`
 
 ## Scope
 
-Own the HTML, CSS, and JavaScript in `frontend/`. Run FastAPI from the repository root and verify your edits in the browser. Follow the [API contract](../../contracts/openapi.json) and coordinate proposed contract changes with Mikhail. See the [team workflow and tech stack](../../README.md).
+Own the HTML, CSS, and ES modules in `frontend/` (`index.html`, `assets/app.js`, `assets/chart.js`, `assets/styles.css`, `assets/css/*.css`, `assets/js/*.js`). Run FastAPI from the repository root and verify edits in the browser against [contracts/openapi.json](../../contracts/openapi.json). See [README.md](../../README.md).
 
 ## Deliverables
 
-1. Build one page for CSV upload, opening balance, start date, and loading the sample scenario.
-2. Show 14 daily balances in a chart or clear table. Highlight the first shortfall and let the user move an incoming payment to compare the baseline and adjusted forecasts.
-3. Automatically display the credit facility proposal when the baseline has a shortfall. Show the deterministic limit and shortfall facts, and load the model explanation automatically using the agreed contract. Provide approval and rejection controls labeled as simulations, then show the resulting uncovered gap. Keep the editable reminder draft available on request.
-4. Handle loading, invalid input, and model outages. Keep the forecast and calculated proposal figures visible if the explanation request fails. Clear the proposal and decision for a new baseline, and show no proposal for a forecast with no shortfall. Keep the baseline and the payment-date comparison accessible throughout both decision paths.
+1. Deliver the Progressive Disclosure UX: 2 quick onboarding context questions (*business type* + *main goal*) + CSV upload / 1-click *Pizzeria Amalfi* demo on `#setup-screen`.
+2. Show the top-level verdict, 14-day interactive SVG cash chart (with Forecast / Stress Test / What-If overlays), grounded briefing, and `POST /api/action-plan` steps (`frontend/assets/js/action_plan.js`, `frontend/assets/css/progressive.css`) with all 4 autonomy badges.
+3. Provide simulation-only Approve/Reject credit buffer controls, payment-date comparison, and editable B2B email drafts (`Simulate send` / `Copy email`) that never trigger real transfers or messages.
+4. Tuck deeper analytical tools (*What-If Simulator & Q&A*, *Client Pays Late*, *Compare Options*, *Cash Health Score & Stress Test*, *Smart Payment Moves*, *Anomaly Detector*) inside collapsible `#advanced-details-section` accordions, keeping forecast/proposal visible during HTTP 503 model outages and guarding async requests against `← Change file` race conditions.
 
-Agree on the proposal, advice, and decision flow in Mikhail's shared contract PR. Start with the agreed sample responses in `demo` mode. Test with the live API after Andrii and Ivan verify their implementations, then share the browser steps with Yuri.
+Share UI and DOM selector updates with Yurii for end-to-end QA and merge via Pull Request into `main`.
 
 ## Starter prompt
 
-> Read AGENTS.md, agents/frontend/README.md, and contracts/openapi.json. Work on feat/frontend and edit frontend/. Implement the automatic explanatory proposal and the human decision simulation within the CSV-to-forecast flow. Preserve the what-if comparison and verify both decisions in a browser.
+> Read AGENTS.md, agents/frontend/README.md, and contracts/openapi.json. Work on a feature branch for PR into main. Maintain the Progressive Disclosure UI, Action Plan cards, autonomy badges, and simulation-only controls in frontend/.
