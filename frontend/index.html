@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/styles.css?v=history-chart">
-  <script type="module" src="/assets/app.js?v=history-chart"></script>
+  <script type="module" src="/assets/app.js?v=csv-opening-balance"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -109,6 +109,11 @@
                   </div>
                   <span class="file-action">Browse</span>
                 </div>
+              </div>
+              <div class="question-group" id="csv-opening-balance-group" hidden>
+                <label for="csv-opening-balance">Opening balance</label>
+                <input id="csv-opening-balance" inputmode="decimal" aria-describedby="csv-opening-balance-hint">
+                <span class="question-hint" id="csv-opening-balance-hint"></span>
               </div>
             </div>
 

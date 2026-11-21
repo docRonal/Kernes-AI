@@ -15,7 +15,8 @@ import {
   resolveForecast,
 } from "./js/api.js?v=tc16";
 import { renderActionPlan } from "./js/action_plan.js?v=amalfi-chat";
-import { printMoney, replayFade, toMinor } from "./js/format.js?v=tc11";
+import { extractCsvDefaults } from "./js/csv.js?v=1";
+import { printDate, printMoney, replayFade, toMinor } from "./js/format.js?v=tc11";
 import {
   populateDelayCandidates,
   renderAnomalies,
@@ -51,6 +52,9 @@ const promptChips = document.querySelectorAll(".prompt-chip");
 const scenarioForm = document.querySelector("#scenario-form");
 const fileInput = document.querySelector("#csv-file");
 const fileDropzone = document.querySelector("#file-dropzone");
+const csvOpeningBalanceGroup = document.querySelector("#csv-opening-balance-group");
+const csvOpeningBalance = document.querySelector("#csv-opening-balance");
+const csvOpeningBalanceHint = document.querySelector("#csv-opening-balance-hint");
 const fileNameEl = document.querySelector("#file-name");
 const sampleFileLabel = fileNameEl.textContent;
 const sampleHint = document.querySelector("#sample-hint");
@@ -330,149 +334,24 @@ async function fetchAdvice({ forceDraft = false } = {}) {
   }
 }
 
-function splitSemicolonCsvLine(line) {
-  const cols = [];
-  let cur = "";
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        cur += '"';
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (ch === ";" && !inQuotes) {
-      cols.push(cur.trim());
-      cur = "";
-    } else {
-      cur += ch;
-    }
-  }
-  cols.push(cur.trim());
-  return cols;
-}
-
-function parseBankDateIso(raw) {
-  const s = String(raw || "").trim();
-  const dot = /^(\d{2})\.(\d{2})\.(\d{2}|\d{4})$/.exec(s);
-  if (dot) {
-    const day = Number(dot[1]);
-    const month = Number(dot[2]);
-    const year = dot[3].length === 2 ? Number(`20${dot[3]}`) : Number(dot[3]);
-    const dt = new Date(Date.UTC(year, month - 1, day));
-    if (dt.getUTCFullYear() === year && dt.getUTCMonth() === month - 1 && dt.getUTCDate() === day) {
-      return dt.toISOString().slice(0, 10);
-    }
-    return null;
-  }
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    const dt = new Date(`${s}T00:00:00Z`);
-    if (!Number.isNaN(dt.getTime()) && dt.toISOString().slice(0, 10) === s) {
-      return s;
-    }
-  }
-  return null;
-}
-
-function parseBankMinorSafe(raw) {
-  const normalized = String(raw || "")
-    .trim()
-    .replace(/[\s\u00a0]/g, "")
-    .replace(/\.(?=\d{3}(?:,|$))/g, "")
-    .replace(",", ".");
-  if (!/^[+-]?\d+(?:\.\d{1,2})?$/.test(normalized)) return null;
-  try {
-    return BigInt(toMinor(normalized));
-  } catch {
-    return null;
-  }
-}
-
-function extractCsvDefaults(csvText) {
-  const lines = String(csvText || "")
-    .replace(/^\uFEFF/, "")
-    .split(/\r?\n/)
-    .filter((line) => line.trim() !== "");
-  const headers = lines.length > 0 ? splitSemicolonCsvLine(lines[0]).map((h) => h.toLowerCase()) : [];
-
-  const idxOf = (...candidates) => {
-    for (const c of candidates) {
-      const idx = headers.indexOf(c);
-      if (idx !== -1) return idx;
-    }
-    return -1;
-  };
-
-  const valDateIdx = idxOf("value date");
-  const bookDateIdx = idxOf("booking date");
-  const amountIdx = idxOf("amount");
-  const balanceIdx = idxOf("balance", "saldo", "closing balance", "running balance");
-
-  const rows = [];
-  let latestDateIso = null;
-
-  for (let i = 1; i < lines.length; i += 1) {
-    const cols = splitSemicolonCsvLine(lines[i]);
-    const iso =
-      (valDateIdx !== -1 ? parseBankDateIso(cols[valDateIdx]) : null) ||
-      (bookDateIdx !== -1 ? parseBankDateIso(cols[bookDateIdx]) : null);
-    if (!iso) continue;
-
-    if (!latestDateIso || iso > latestDateIso) {
-      latestDateIso = iso;
-    }
-    rows.push({
-      iso,
-      amountMinor: amountIdx !== -1 ? parseBankMinorSafe(cols[amountIdx]) : null,
-      balanceMinor: balanceIdx !== -1 ? parseBankMinorSafe(cols[balanceIdx]) : null,
-    });
-  }
-
-  // Anchor the 14-day window so its last day always equals the latest CSV date (chart divider).
-  const startDate = latestDateIso
-    ? addDaysIso(latestDateIso, -(HORIZON_DAYS - 1))
-    : new Date().toISOString().slice(0, 10);
-  const endDate = latestDateIso || addDaysIso(startDate, HORIZON_DAYS - 1);
-
-  let openingBalanceMinor = null;
-  let balanceSourceLabel = "";
-
-  // 1. Prefer an explicit Balance/Saldo column if the bank CSV includes one.
-  const preWindowRows = rows.filter((r) => r.iso < startDate && r.balanceMinor !== null);
-  const windowBalanceRows = rows.filter((r) => r.balanceMinor !== null);
-  if (preWindowRows.length > 0) {
-    preWindowRows.sort((a, b) => (a.iso < b.iso ? -1 : a.iso > b.iso ? 1 : 0));
-    openingBalanceMinor = Number(preWindowRows[preWindowRows.length - 1].balanceMinor);
-    balanceSourceLabel = "From CSV balance";
-  } else if (windowBalanceRows.length > 0) {
-    openingBalanceMinor = Number(windowBalanceRows[0].balanceMinor);
-    balanceSourceLabel = "From CSV balance";
-  } else {
-    // Auto-estimate an opening liquidity cushion (50% of 14-day inflows, rounded to 500.00, min 1,000.00).
-    let inflowsMinor = 0n;
-    for (const r of rows) {
-      if (r.iso >= startDate && r.iso <= endDate && r.amountMinor !== null && r.amountMinor > 0n) {
-        inflowsMinor += r.amountMinor;
-      }
-    }
-    const half = inflowsMinor / 2n;
-    const rounded = ((half + 25_000n) / 50_000n) * 50_000n;
-    const clamped = rounded < 100_000n ? 100_000n : rounded;
-    openingBalanceMinor = Number(clamped);
-    balanceSourceLabel = "Auto-estimated balance";
-  }
-
-  return { startDate, openingBalanceMinor, balanceSourceLabel };
-}
-
 async function loadForecastSetup() {
   const selectedFile = fileInput.files?.[0];
   if (selectedFile) {
     const csvText = await selectedFile.text();
     validateCsvUpload(selectedFile, csvText);
-    return { csvFile: selectedFile, ...extractCsvDefaults(csvText) };
+    const defaults = extractCsvDefaults(csvText, HORIZON_DAYS);
+    if (defaults.openingBalanceMinor === null) {
+      const instructions = `Enter the account balance before any payments on ${printDate(defaults.startDate)}.`;
+      csvOpeningBalanceHint.textContent = instructions;
+      csvOpeningBalanceGroup.hidden = false;
+      if (!csvOpeningBalance.value.trim()) {
+        csvOpeningBalance.focus();
+        throw new Error(`We couldn't reconstruct the opening balance from this CSV. ${instructions}`);
+      }
+      defaults.openingBalanceMinor = Number(toMinor(csvOpeningBalance.value));
+      defaults.balanceSourceLabel = "Custom balance";
+    }
+    return { csvFile: selectedFile, ...defaults };
   }
 
   const response = await request(sampleDownloadLink.href);
@@ -829,6 +708,8 @@ delayForm.addEventListener("submit", async (event) => {
 // File upload & drag-and-drop
 fileInput.addEventListener("change", () => {
   const file = fileInput.files?.[0];
+  csvOpeningBalance.value = "";
+  csvOpeningBalanceGroup.hidden = true;
   sampleHint.hidden = Boolean(file);
   useSampleBtn.hidden = !file;
   fileNameEl.textContent = file
