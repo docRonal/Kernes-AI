@@ -22,8 +22,8 @@ Forecasters:
 
 - **flat:** the balance never changes. A naive baseline.
 - **average net:** the last 28 days' average daily net, every day. A naive baseline.
-- **recurring:** learns payees paid on the same day of the month 3 months running, or on the same weekday 3 weeks running, and averages everything else over the last 28 days. Same rule as the statement forecaster on `feat/backend`.
-- **current /api/forecast:** what `main` does today with a statement. It sums the statement rows dated inside the window.
+- **recurring:** learns payees paid on the same day of the month 3 months running, or on the same weekday 3 weeks running, and averages everything else over the last 28 days. Same rule as `backend/history_forecast.py`, which `/api/forecast` uses when the forecast starts after the statement ends; run through this backtest, it gives exactly the same figures.
+- **current /api/forecast:** the known-payments path, used when the statement already has rows inside the window. It sums the statement rows dated inside the window.
 
 <!-- backtest:start -->
 ### Every weekly origin from February
@@ -53,7 +53,7 @@ Forecasters:
 
 ### What this shows
 
-- **`main` has no forecast for statements yet.** With only the past, `/api/forecast` predicts no movement at all, the same as the flat baseline. With the whole statement it copies the real future. The leak check catches this. On the demo it looks perfect because it reads the answer.
+- **Known payments are not a forecast; the history rule is.** Fed only the past, the known-payments path predicts no movement at all, the same as the flat baseline. With the whole statement it copies the real future, and the leak check catches this. That is why the app switches to `backend/history_forecast.py` when the forecast starts after the statement ends, and why the demo presents the June case as known, scheduled payments.
 - **Learning from history works.** After 3 months of history, the recurring forecaster warns about every real 14-day shortfall with no false alarms (precision and recall 100%). Its error is a third of the baselines' (EUR 1,267 against about EUR 3,850).
 - **Under 3 months of history, it misses shortfalls** (February and March). Monthly payments aren't recognised yet. The app should say "not enough history" instead of showing a confident forecast.
 - **The June closure can't be learnt from history.** Late May and early June windows under-propose the facility. On 4 June the 30-day forecast expects −EUR 6,426 against a real −EUR 22,098. The fix is a planned-event input ("closed 8–28 June"), not a better average.
