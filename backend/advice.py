@@ -83,6 +83,14 @@ class ModelError(RuntimeError):
     """The model is unreachable or its answer can't be used."""
 
 
+def _parse_timeout(raw: str, default: float) -> float:
+    try:
+        value = float(raw) if raw.strip() else default
+        return value if value > 0 else default
+    except ValueError:
+        return default
+
+
 @dataclass(frozen=True)
 class ModelConfig:
     url: str
@@ -98,12 +106,7 @@ class ModelConfig:
         if not url.startswith(("http://", "https://")) or not name:
             raise ModelError("The model endpoint isn't configured. Set CFO_MODEL_URL and CFO_MODEL_NAME.")
         raw_timeout = os.environ.get("CFO_MODEL_TIMEOUT") or os.environ.get("CFO_MODEL_TIMEOUT_SECONDS") or ""
-        try:
-            timeout = float(raw_timeout) if raw_timeout.strip() else DEFAULT_TIMEOUT_SECONDS
-            if timeout <= 0:
-                timeout = DEFAULT_TIMEOUT_SECONDS
-        except ValueError:
-            timeout = DEFAULT_TIMEOUT_SECONDS
+        timeout = _parse_timeout(raw_timeout, DEFAULT_TIMEOUT_SECONDS)
         ca_bundle = os.environ.get("CFO_CA_BUNDLE", "").strip()
         ssl_context: ssl.SSLContext | None = None
         if ca_bundle:
@@ -125,11 +128,12 @@ class ModelConfig:
         name = os.environ.get("CFO_FALLBACK_MODEL_NAME", "").strip()
         if not url.startswith(("http://", "https://")) or not name:
             return None
+        fallback_timeout = _parse_timeout(os.environ.get("CFO_FALLBACK_MODEL_TIMEOUT", ""), timeout)
         return cls(
             url=url,
             name=name,
             token=os.environ.get("CFO_FALLBACK_MODEL_TOKEN") or os.environ.get("CFO_MODEL_TOKEN") or None,
-            timeout=timeout,
+            timeout=fallback_timeout,
             ssl_context=ssl_context,
         )
 
@@ -599,3 +603,49 @@ def send_reminder(request: ReminderSendRequest) -> ReminderSendResponse:
         subject=request.subject,
         message="Simulation only: nothing was sent. Copy the draft and send it from your own email.",
     )
+
+
+
+def _probe_model(config: ModelConfig, *, probe_timeout: float = 2.5) -> dict:
+    models_url = re.sub(r"/chat/completions/?$", "/models", config.url)
+    headers = {"Accept": "application/json"}
+    if config.token:
+        headers["Authorization"] = f"Bearer {config.token}"
+    req = urllib.request.Request(models_url, headers=headers, method="GET")
+    started = time.monotonic()
+    try:
+        with urllib.request.urlopen(req, timeout=probe_timeout, context=config.ssl_context) as resp:
+            ok = 200 <= resp.status < 300
+        return {
+            "model": config.name,
+            "reachable": ok,
+            "timeout_seconds": config.timeout,
+            "latency_ms": round((time.monotonic() - started) * 1000),
+        }
+    except Exception as exc:
+        return {
+            "model": config.name,
+            "reachable": False,
+            "timeout_seconds": config.timeout,
+            "error": str(exc),
+        }
+
+
+def check_ai_health() -> dict:
+    """Check reachability of configured OpenShift AI primary and fallback models."""
+    try:
+        primary = ModelConfig.from_env()
+    except ModelError as exc:
+        return {"status": "unconfigured", "detail": str(exc), "primary": None, "fallback": None}
+
+    primary_status = _probe_model(primary)
+    fallback = ModelConfig.fallback_from_env(timeout=primary.timeout, ssl_context=primary.ssl_context)
+    fallback_status = _probe_model(fallback) if fallback else None
+
+    if primary_status["reachable"]:
+        overall = "ok"
+    elif fallback_status and fallback_status["reachable"]:
+        overall = "degraded"
+    else:
+        overall = "unavailable"
+    return {"status": overall, "primary": primary_status, "fallback": fallback_status}

@@ -29,6 +29,27 @@
         }
       }
     },
+    "/health/ai": {
+      "get": {
+        "summary": "Health Ai",
+        "description": "Reachability of the configured OpenShift AI primary and fallback models.",
+        "operationId": "health_ai_health_ai_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Ai Health Ai Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/forecast": {
       "post": {
         "summary": "Forecast",

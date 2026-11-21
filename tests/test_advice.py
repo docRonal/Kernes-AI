@@ -385,3 +385,55 @@ def test_amalfi_recurring_obligations_noted_when_inflows_pause(live):
     prompt = model.requests[0]["messages"][1]["content"]
     assert "Ongoing regular obligations (Payroll, Office rent)" in prompt
     assert "closure or vacation" in prompt
+
+
+def test_fallback_model_uses_separate_timeout_from_env(monkeypatch):
+    from backend.advice import ModelConfig
+
+    monkeypatch.setenv("CFO_MODEL_URL", "http://primary.local:8080/v1/chat/completions")
+    monkeypatch.setenv("CFO_MODEL_NAME", "kernes-qwen-7b")
+    monkeypatch.setenv("CFO_MODEL_TIMEOUT", "30")
+    monkeypatch.setenv("CFO_FALLBACK_MODEL_URL", "http://fallback.local:8080/v1/chat/completions")
+    monkeypatch.setenv("CFO_FALLBACK_MODEL_NAME", "kernes-qwen")
+    monkeypatch.setenv("CFO_FALLBACK_MODEL_TIMEOUT", "60")
+
+    primary = ModelConfig.from_env()
+    fallback = ModelConfig.fallback_from_env(timeout=primary.timeout, ssl_context=primary.ssl_context)
+    assert primary.timeout == 30.0
+    assert fallback is not None
+    assert fallback.timeout == 60.0
+
+
+def test_health_ai_reports_unconfigured_and_degraded(monkeypatch):
+    monkeypatch.delenv("CFO_MODEL_URL", raising=False)
+    monkeypatch.delenv("CFO_MODEL_NAME", raising=False)
+    unconfigured = TestClient(create_app("demo")).get("/health/ai")
+    assert unconfigured.status_code == 200
+    assert unconfigured.json()["status"] == "unconfigured"
+
+    monkeypatch.setenv("CFO_MODEL_URL", "http://primary.local:8080/v1/chat/completions")
+    monkeypatch.setenv("CFO_MODEL_NAME", "kernes-qwen-7b")
+    monkeypatch.setenv("CFO_FALLBACK_MODEL_URL", "http://fallback.local:8080/v1/chat/completions")
+    monkeypatch.setenv("CFO_FALLBACK_MODEL_NAME", "kernes-qwen")
+
+    class _OkResp:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    def fake_urlopen(req, timeout=None, context=None):
+        if "primary.local" in req.full_url:
+            raise TimeoutError("primary timed out")
+        return _OkResp()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    degraded = TestClient(create_app("live")).get("/health/ai")
+    assert degraded.status_code == 200
+    body = degraded.json()
+    assert body["status"] == "degraded"
+    assert body["primary"]["reachable"] is False
+    assert body["fallback"]["reachable"] is True
