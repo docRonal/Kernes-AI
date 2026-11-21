@@ -13,12 +13,14 @@
   line-height: 1.6;
   color: var(--ink);
   white-space: pre-line;
+  animation: fadeInSoft 0.26s var(--ease-out) both;
 }
 
 .agent-sub {
   margin: 0 0 14px;
   font-size: 12.5px;
   color: var(--ink-muted);
+  animation: fadeInSoft 0.26s var(--ease-out) both;
 }
 
 .skeleton-stack {
@@ -123,6 +125,7 @@
   border-radius: 12px;
   background: var(--surface-tile);
   font-size: 13.5px;
+  animation: fadeInSoft 0.26s var(--ease-out) both;
 }
 
 .tx-meta {
@@ -178,7 +181,16 @@
 }
 
 .compact-header {
-  margin-bottom: 16px;
+  margin-bottom: 0;
+}
+
+.actions-top-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
 }
 
 /* Dark Pill Tab Switcher */
@@ -189,7 +201,8 @@
   background: var(--surface-dark-tile);
   border-radius: var(--radius-pill);
   padding: 4px;
-  margin-bottom: 18px;
+  margin-bottom: 0;
+  min-width: 300px;
 }
 
 .tab-btn {
@@ -214,6 +227,10 @@
   color: var(--ink);
 }
 
+.tab-panel {
+  animation: fadeInSoft 0.24s var(--ease-out) both;
+}
+
 .panel-intro {
   margin: 0 0 14px;
   font-size: 14px;
@@ -233,6 +250,17 @@
   color: #a2a2a1;
 }
 
+.credit-panel-grid {
+  display: grid;
+  grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
+  gap: 22px;
+  align-items: center;
+}
+
+.credit-controls {
+  min-width: 0;
+}
+
 /* Nested Dark Credit Callout Tile */
 .credit-callout {
   background: var(--surface-dark-tile);
@@ -242,7 +270,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-bottom: 14px;
+  margin-bottom: 0;
 }
 
 .credit-callout-label {
@@ -319,6 +347,7 @@
   padding: 16px;
   border-radius: 16px;
   font-size: 13.5px;
+  animation: fadeInSoft 0.26s var(--ease-out) both;
 }
 
 .outcome-box.approved {
@@ -375,23 +404,61 @@
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
 }
 
-.divider-dark {
-  border: none;
-  border-top: 1px solid var(--hairline-dark);
-  margin: 18px 0;
+.whatif-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(0, 1.35fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.whatif-grid.is-single {
+  grid-template-columns: 1fr;
+}
+
+.whatif-sim-col {
+  min-width: 0;
+}
+
+.whatif-draft-col {
+  min-width: 0;
+  background: var(--surface-dark-tile);
+  border-radius: var(--radius-tile);
+  padding: 18px 20px;
+}
+
+.draft-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+
+.draft-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.draft-source-note {
+  font-size: 12.5px;
+  color: #a2a2a1;
 }
 
 .draft-editor {
-  margin-top: 12px;
+  margin-top: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
+.whatif-draft-col input,
+.whatif-draft-col textarea {
+  background: #141413;
+}
+
 .reminder-fields {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .draft-actions {
@@ -418,6 +485,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  animation: fadeInSoft 0.26s var(--ease-out) both;
 }
 
 @media (max-width: 640px) {

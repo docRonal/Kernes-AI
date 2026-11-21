@@ -5,6 +5,23 @@
   gap: 20px;
 }
 
+.dashboard > section,
+.dashboard > .story-grid {
+  animation: fadeSlideUp 0.36s var(--ease-out) both;
+}
+
+.dashboard > section:nth-of-type(2) {
+  animation-delay: 45ms;
+}
+
+.dashboard > section:nth-of-type(3) {
+  animation-delay: 85ms;
+}
+
+.dashboard > section:nth-of-type(4) {
+  animation-delay: 120ms;
+}
+
 /* 1. Verdict Frame with Guttered 3-Stat Bento Strip */
 .hero-card {
   display: flex;
@@ -82,12 +99,16 @@
   color: var(--ink-secondary);
 }
 
-/* 3. Side-by-Side Story Grid (Light Briefing + Dark Decision) */
+/* 3. Side-by-Side Story Grid (Cash Health + Stress Test) */
 .story-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
   align-items: stretch;
+}
+
+.story-grid.is-expanded {
+  align-items: start;
 }
 
 .story-col {
@@ -99,6 +120,10 @@
 
 .story-col > .card {
   flex: 1;
+}
+
+.story-grid.is-expanded .story-col > .card {
+  flex: 0 0 auto;
 }
 
 /* 2. Chart Card & Controls */

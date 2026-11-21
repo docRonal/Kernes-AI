@@ -340,7 +340,7 @@ def test_remote_deployment_workflow():
     assert status == 200 and health == {"status": "ok"}
 
     status, html = _http_call(base_url, "/", ssl_ctx=ssl_ctx)
-    assert status == 200 and "Autonomous CFO" in html
+    assert status == 200 and "KERNES CFO" in html
 
     status, _ = _http_call(base_url, "/demo/transactions.csv", ssl_ctx=ssl_ctx)
     assert status == 200

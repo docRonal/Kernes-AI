@@ -1,11 +1,11 @@
-import { parseRedHatBankCsv } from "./parser.js?v=tc4";
+import { parseRedHatBankCsv } from "./parser.js?v=tc6";
 import {
   AMALFI_DEFAULT_MOVE_DATE,
   AMALFI_DEFAULT_OPENING_EUR,
   AMALFI_DEFAULT_START_DATE,
   AMALFI_SAMPLE_CSV,
   AMALFI_SAMPLE_FILENAME,
-} from "./sample-amalfi.js?v=tc4";
+} from "./sample-amalfi.js?v=tc6";
 import {
   buildInsightPayload,
   request,
@@ -21,8 +21,8 @@ import {
   requestSendReminder,
   requestStressTest,
   resolveForecast,
-} from "./js/api.js?v=tc4";
-import { toMinor } from "./js/format.js?v=tc4";
+} from "./js/api.js?v=tc6";
+import { replayFade, toMinor } from "./js/format.js?v=tc6";
 import {
   populateDelayCandidates,
   renderAnomalies,
@@ -36,14 +36,15 @@ import {
   renderOptimizePayments,
   renderStressTest,
   resetInsightsUi,
-} from "./js/insights.js?v=tc4";
-import { computeProposal } from "./js/proposal.js?v=tc4";
+} from "./js/insights.js?v=tc6";
+import { computeProposal } from "./js/proposal.js?v=tc6";
 import {
+  buildReminderTemplate,
   populateIncomingPayments,
   renderKpis,
   renderLedgerAndChart,
   renderProposalPanel,
-} from "./js/render.js?v=tc4";
+} from "./js/render.js?v=tc6";
 
 const forecastForm = document.querySelector("#forecast-form");
 const scenarioForm = document.querySelector("#scenario-form");
@@ -86,6 +87,7 @@ const panelWhatIf = document.querySelector("#panel-whatif");
 
 const adviceButton = document.querySelector("#advice-button");
 const adviceWrap = document.querySelector("#advice");
+const draftSourceNote = document.querySelector("#draft-source-note");
 const draftTextarea = document.querySelector("#draft");
 const reminderEmailInput = document.querySelector("#reminder-email");
 const reminderSubjectInput = document.querySelector("#reminder-subject");
@@ -106,6 +108,7 @@ const state = {
   forecast: null,
   proposal: null,
   advice: null,
+  draftEdited: false,
   adviceRequestId: 0,
   insightsRequestId: 0,
   simulationDecision: null,
@@ -162,7 +165,17 @@ function renderAll() {
   renderProposalPanel(state);
 }
 
-async function fetchAdvice({ revealDraft = false } = {}) {
+function applyTemplateDraft({ force = false } = {}) {
+  if (!state.forecast || (!force && state.draftEdited)) return;
+  const { subject, body } = buildReminderTemplate(state, scenarioForm);
+  reminderSubjectInput.value = subject;
+  draftTextarea.value = body;
+  draftSourceNote.textContent = "Template for selected payment · editable, sent manually by you";
+  replayFade(draftTextarea);
+  replayFade(draftSourceNote);
+}
+
+async function fetchAdvice({ forceDraft = false } = {}) {
   if (!state.forecast || state.parsedCsv || !state.forecast.baseline.first_deficit) return;
 
   const reqId = ++state.adviceRequestId;
@@ -183,13 +196,17 @@ async function fetchAdvice({ revealDraft = false } = {}) {
     state.advice = data;
     explanationEl.textContent = data.explanation;
     explanationEl.hidden = false;
+    replayFade(explanationEl);
     adviceModelEl.textContent = data.model;
     adviceModelEl.hidden = !data.model;
-    draftTextarea.value = data.email_draft || "";
-    if (revealDraft) {
-      adviceWrap.hidden = false;
-      adviceButton.textContent = "Refresh email draft";
+    if (data.email_draft && (forceDraft || !state.draftEdited)) {
+      draftTextarea.value = data.email_draft;
+      draftSourceNote.textContent = "Drafted by AI · editable, sent manually by you";
+      replayFade(draftTextarea);
+      replayFade(draftSourceNote);
     }
+    adviceWrap.hidden = false;
+    adviceButton.textContent = "Regenerate draft";
     agentStatusPill.textContent = "Assistant Ready";
   } catch {
     if (reqId !== state.adviceRequestId) return;
@@ -198,6 +215,9 @@ async function fetchAdvice({ revealDraft = false } = {}) {
       "Our AI writer is temporarily offline, but your cash numbers and suggested credit line below are accurate and ready to test.";
     adviceError.hidden = false;
     retryAdviceBtn.hidden = false;
+    if (forceDraft) {
+      applyTemplateDraft({ force: true });
+    }
   } finally {
     if (reqId === state.adviceRequestId) {
       adviceLoading.hidden = true;
@@ -250,24 +270,27 @@ async function runBaselineForecast() {
     state.simulationDecision = null;
     state.simulationOutcome = null;
     state.advice = null;
-    adviceWrap.hidden = true;
-    adviceButton.textContent = "Write reminder email draft";
+    state.draftEdited = false;
+    adviceWrap.hidden = false;
+    adviceButton.textContent = "Regenerate draft";
     copyFeedback.textContent = "";
     reminderReceipt.hidden = true;
     reminderError.hidden = true;
 
     populateIncomingPayments(state, scenarioForm);
+    applyTemplateDraft({ force: true });
     setActiveTab(state.proposal ? "credit" : "whatif");
     showStatus("");
     renderAll();
     loadInsights();
 
     if (state.proposal && state.parsedCsv) {
-      adviceError.textContent = "This bank statement is analyzed locally. Load the Kernes demo (EUR) to try the AI explanation and email draft.";
+      adviceError.textContent =
+        "This bank statement is analyzed locally. Your cash summary, credit preview, and editable email draft in Tab 2 are ready below.";
       adviceError.hidden = false;
       agentStatusPill.textContent = "Local forecast";
     } else if (state.proposal) {
-      fetchAdvice({ revealDraft: false });
+      fetchAdvice({ forceDraft: false });
     } else {
       agentStatusPill.textContent = "Assistant Ready";
     }
@@ -321,6 +344,7 @@ function previewCollectAction(action) {
   if (!action || !scenarioForm.elements.move_transaction_id) return;
   scenarioForm.elements.move_transaction_id.value = action.transaction_id;
   scenarioForm.elements.move_to_date.value = action.new_date;
+  applyTemplateDraft();
   setActiveTab("whatif");
   document.querySelector("#actions-heading")?.scrollIntoView({ behavior: "smooth", block: "center" });
   scenarioForm.requestSubmit();
@@ -584,17 +608,34 @@ document.querySelector("#reset-sim-btn").addEventListener("click", () => {
 
 // AI advice retry & editable reminder draft
 retryAdviceBtn.addEventListener("click", () => {
-  fetchAdvice({ revealDraft: !adviceWrap.hidden });
+  fetchAdvice({ forceDraft: false });
+});
+
+draftTextarea.addEventListener("input", () => {
+  state.draftEdited = true;
+});
+
+scenarioForm.elements.move_transaction_id.addEventListener("change", () => {
+  applyTemplateDraft();
+});
+
+scenarioForm.elements.move_to_date.addEventListener("change", () => {
+  applyTemplateDraft();
 });
 
 adviceButton.addEventListener("click", () => {
-  if (state.advice && adviceWrap.hidden) {
-    draftTextarea.value = state.advice.email_draft || "";
-    adviceWrap.hidden = false;
-    adviceButton.textContent = "Refresh email draft";
+  state.draftEdited = false;
+  reminderReceipt.hidden = true;
+  reminderError.hidden = true;
+  if (!state.parsedCsv && state.proposal) {
+    fetchAdvice({ forceDraft: true });
     return;
   }
-  fetchAdvice({ revealDraft: true });
+  applyTemplateDraft({ force: true });
+  copyFeedback.textContent = "Draft updated";
+  setTimeout(() => {
+    copyFeedback.textContent = "";
+  }, 2000);
 });
 
 copyDraftBtn.addEventListener("click", async () => {
@@ -635,6 +676,7 @@ sendReminderBtn.addEventListener("click", async () => {
     msg.textContent = data.message;
     reminderReceipt.replaceChildren(title, meta, msg);
     reminderReceipt.hidden = false;
+    replayFade(reminderReceipt);
   } catch (error) {
     reminderReceipt.hidden = true;
     reminderError.textContent = error.message;

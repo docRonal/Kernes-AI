@@ -99,6 +99,7 @@
   display: flex;
   flex-direction: column;
   gap: 28px;
+  animation: fadeSlideUp 0.34s var(--ease-out) both;
 }
 
 .setup-hero {
@@ -413,6 +414,7 @@ textarea {
   font-weight: 500;
   background: var(--surface-tile);
   color: var(--ink);
+  animation: fadeInSoft 0.24s var(--ease-out) both;
 }
 
 .status-banner.error {
@@ -426,6 +428,7 @@ textarea {
   border-radius: 14px;
   font-size: 13.5px;
   line-height: 1.45;
+  animation: fadeInSoft 0.24s var(--ease-out) both;
 }
 
 .inline-alert-soft {
