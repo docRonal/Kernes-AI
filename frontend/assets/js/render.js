@@ -4,7 +4,7 @@ import { groupTransactionsByDate } from "./proposal.js";
 
 export function renderKpis(state) {
   const { forecast, proposal, openingBalanceMinor, simulationDecision } = state;
-  const currency = forecast.currency ?? "PLN";
+  const currency = forecast.currency ?? "EUR";
   const money = (amount, unit = currency) => printMoney(amount, unit);
   const baseline = forecast.baseline;
   const firstDay = baseline.days[0]?.date;
@@ -95,7 +95,7 @@ export function renderKpis(state) {
 
 export function renderLedgerAndChart(state) {
   const { forecast, proposal, simulationDecision, simulationOutcome } = state;
-  const currency = forecast.currency ?? "PLN";
+  const currency = forecast.currency ?? "EUR";
   const money = (amount, unit = currency) => printMoney(amount, unit);
   const baseline = forecast.baseline;
   const scenario = forecast.scenario;
@@ -122,11 +122,7 @@ export function renderLedgerAndChart(state) {
     formatDate: printDate,
   });
 
-  const scenarioMessage = document.querySelector("#scenario-message");
   const scenarioSummaryBox = document.querySelector("#scenario-summary-box");
-  document.querySelector("#scenario-heading").hidden = !scenario;
-  document.querySelector("#simulation-heading").hidden = !simulationDecision;
-  scenarioMessage.hidden = !scenario;
   document.querySelector("#clear-scenario-btn").hidden = !scenario;
 
   if (scenario) {
@@ -134,7 +130,6 @@ export function renderLedgerAndChart(state) {
     const summaryText = adjDeficit
       ? `Even if paid earlier, you would still dip by ${money(adjDeficit.shortfall_minor)} on ${printDate(adjDeficit.date)}.`
       : `Great news — moving that payment keeps your balance at or above ${money(0)} for the whole period!`;
-    scenarioMessage.textContent = summaryText;
 
     if (baseline.first_deficit) {
       const targetDate = baseline.first_deficit.date;
@@ -151,81 +146,11 @@ export function renderLedgerAndChart(state) {
   } else {
     scenarioSummaryBox.hidden = true;
   }
-
-  const limitMinor = proposal?.recommendedLimitMinor ?? 0;
-  const visibleEntries = baseline.days
-    .map((day, idx) => ({ day, idx }))
-    .filter(({ day, idx }) => {
-      if (baseline.days.length <= 60) return true;
-      const hasTx = (txByDate.get(day.date) || []).length > 0;
-      return hasTx || idx === 0 || idx === baseline.days.length - 1 || day.date === proposal?.peakDeficit.date;
-    });
-
-  document.querySelector("#table-count-pill").textContent =
-    visibleEntries.length === baseline.days.length
-      ? `${baseline.days.length} days`
-      : `${visibleEntries.length} active days`;
-
-  const rows = visibleEntries.map(({ day, idx }) => {
-    const tr = document.createElement("tr");
-    if (day.balance_minor < 0) tr.classList.add("row-deficit");
-
-    const dateCell = tr.insertCell();
-    dateCell.textContent = printDate(day.date);
-
-    const eventsCell = tr.insertCell();
-    const dayTxs = txByDate.get(day.date) || [];
-    if (dayTxs.length > 0) {
-      const wrap = document.createElement("div");
-      wrap.className = "event-chips";
-      for (const tx of dayTxs) {
-        const chip = document.createElement("span");
-        chip.className = `event-chip ${tx.amount_minor < 0 ? "outflow" : "inflow"}`;
-        const sign = tx.amount_minor > 0 ? "+" : "";
-        const fxTag =
-          tx.original_currency && tx.original_currency !== currency
-            ? ` [${money(tx.original_amount_minor, tx.original_currency)}]`
-            : "";
-        chip.textContent = `${tx.label} (${sign}${money(tx.amount_minor)})${fxTag}`;
-        if (tx.reference) chip.title = tx.reference;
-        wrap.append(chip);
-      }
-      eventsCell.append(wrap);
-    } else {
-      eventsCell.textContent = "No payments";
-      eventsCell.className = "muted-note";
-    }
-
-    const baseCell = tr.insertCell();
-    baseCell.className = `num ${day.balance_minor < 0 ? "negative" : ""}`;
-    baseCell.textContent = money(day.balance_minor);
-
-    if (scenario) {
-      const adjBalance = scenario.days[idx].balance_minor;
-      const adjCell = tr.insertCell();
-      adjCell.className = `num ${adjBalance < 0 ? "negative" : "positive"}`;
-      adjCell.textContent = money(adjBalance);
-    }
-
-    if (simulationDecision) {
-      const rawGap = Math.max(0, -day.balance_minor);
-      const uncovered = simulationOutcome
-        ? simulationOutcome.days[idx].uncovered_minor
-        : simulationDecision === "approved" ? Math.max(0, rawGap - limitMinor) : rawGap;
-      const simCell = tr.insertCell();
-      simCell.className = `num ${uncovered > 0 ? "negative" : "positive"}`;
-      simCell.textContent = money(uncovered);
-    }
-
-    return tr;
-  });
-
-  document.querySelector("#balances").replaceChildren(...rows);
 }
 
 export function renderProposalPanel(state) {
   const { forecast, parsedCsv, proposal, simulationDecision, simulationOutcome } = state;
-  const currency = forecast.currency ?? "PLN";
+  const currency = forecast.currency ?? "EUR";
   const money = (amount, unit = currency) => printMoney(amount, unit);
   const noShortfallCard = document.querySelector("#no-shortfall-card");
   const assistantCard = document.querySelector("#assistant-card");
@@ -335,7 +260,7 @@ export function renderProposalPanel(state) {
 }
 
 export function populateIncomingPayments(state, scenarioForm) {
-  const money = (amount) => printMoney(amount, state.forecast.currency ?? "PLN");
+  const money = (amount) => printMoney(amount, state.forecast.currency ?? "EUR");
   const baseline = state.forecast.baseline;
   const startDate = baseline.days[0]?.date;
   const endDate = baseline.days[baseline.days.length - 1]?.date;
@@ -356,7 +281,10 @@ export function populateIncomingPayments(state, scenarioForm) {
   scenarioForm.hidden = incoming.length === 0;
   document.querySelector("#no-incoming-msg").hidden = incoming.length > 0;
 
-  if (state.proposal?.firstDeficit?.date) {
+  const suggestedDate = state.forecast.earlier_payments?.[0]?.pay_by;
+  if (suggestedDate) {
+    scenarioForm.elements.move_to_date.value = suggestedDate;
+  } else if (state.proposal?.firstDeficit?.date) {
     scenarioForm.elements.move_to_date.value = state.proposal.firstDeficit.date;
   } else if (startDate) {
     scenarioForm.elements.move_to_date.value = startDate;

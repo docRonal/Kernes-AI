@@ -32,7 +32,7 @@ def live_extras(monkeypatch):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
-                answer = queue.pop(0) if queue else {"text": "PLN 5,000.00"}
+                answer = queue.pop(0) if queue else {"text": "EUR 5,000.00"}
                 body = {"choices": [{"message": {"content": json.dumps(answer)}}]}
                 self.wfile.write(json.dumps(body).encode("utf-8"))
 
@@ -75,7 +75,7 @@ def test_detect_anomalies_finds_same_day_spike_and_duplicates(live_extras):
     kinds = {f["kind"] for f in r2.json()["findings"]}
     assert "duplicate_payment" in kinds
 
-    live_client, srv = live_extras([{"text": "Review the PLN 17,000.00 payment concentration on Friday, November 27."}])
+    live_client, srv = live_extras([{"text": "Review the EUR 17,000.00 payment concentration on Friday, November 27."}])
     try:
         r_live = live_client.post("/api/detect-anomalies", json=base)
         assert r_live.status_code == 200
@@ -83,7 +83,7 @@ def test_detect_anomalies_finds_same_day_spike_and_duplicates(live_extras):
     finally:
         srv.shutdown()
 
-    bad_client, srv2 = live_extras([{"text": "Suspicious PLN 88,888.00 transfer detected."}])
+    bad_client, srv2 = live_extras([{"text": "Suspicious EUR 88,888.00 transfer detected."}])
     try:
         r_bad = bad_client.post("/api/detect-anomalies", json=base)
         assert r_bad.status_code == 503
@@ -102,7 +102,7 @@ def test_compare_financing_options_ranks_cheapest_and_live(live_extras):
     assert data["options"][0]["estimated_cost_minor"] <= data["options"][1]["estimated_cost_minor"]
     assert data["recommended_option"] == data["options"][0]["option_kind"]
 
-    live_client, srv = live_extras([{"text": "The credit facility for PLN 5,000.00 is the lowest-cost option here."}])
+    live_client, srv = live_extras([{"text": "The credit facility for EUR 5,000.00 is the lowest-cost option here."}])
     try:
         r_live = live_client.post("/api/compare-options", json=base)
         assert r_live.status_code == 200

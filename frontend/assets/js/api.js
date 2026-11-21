@@ -9,7 +9,9 @@ export async function request(path, options) {
         ? error.detail
         : error.detail?.map?.((issue) => issue.msg).filter(Boolean).join(" ") ||
           `Request failed (HTTP ${response.status}).`;
-    throw new Error(detail);
+    const err = new Error(detail);
+    err.status = response.status;
+    throw err;
   }
   return response;
 }
@@ -56,10 +58,63 @@ async function post(path, body) {
   return response.json();
 }
 
+/**
+ * Build a strict 14-day { baseline, transactions } payload matching backend InsightRequest/AdviceRequest.
+ */
+export function buildInsightPayload(forecast) {
+  const rawDays = forecast?.baseline?.days;
+  if (!rawDays || rawDays.length < 14) return null;
+
+  const days = rawDays.slice(0, 14).map(({ date, balance_minor }) => ({
+    date,
+    balance_minor: Math.trunc(Number(balance_minor)),
+  }));
+  const firstNeg = days.find((d) => d.balance_minor < 0);
+  const first_deficit = firstNeg
+    ? { date: firstNeg.date, shortfall_minor: -firstNeg.balance_minor }
+    : null;
+
+  const transactions = (forecast.transactions || [])
+    .slice(0, 5000)
+    .map(({ id, date, amount_minor, label }) => ({
+      id: String(id).replace(/[\x00-\x1f\x7f-\x9f]/g, " ").slice(0, 64),
+      date,
+      amount_minor: Math.trunc(Number(amount_minor)),
+      label: String(label || "Transaction").replace(/[\x00-\x1f\x7f-\x9f]/g, " ").slice(0, 200),
+    }));
+
+  if (transactions.length === 0) return null;
+
+  return {
+    baseline: { days, first_deficit },
+    transactions,
+  };
+}
+
 export function requestAdvice({ baseline, transactions }) {
   return post("/api/advice", { baseline, transactions });
 }
 
 export function requestDecision({ baseline, decision }) {
   return post("/api/decision", { baseline, decision });
+}
+
+export function requestAnomalies(payload) {
+  return post("/api/detect-anomalies", payload);
+}
+
+export function requestCompareOptions(payload) {
+  return post("/api/compare-options", payload);
+}
+
+export function requestCreditCheck(payload) {
+  return post("/api/credit-check", payload);
+}
+
+export function requestStressTest(payload) {
+  return post("/api/stress-test", payload);
+}
+
+export function requestAskCfo(payload, question) {
+  return post("/api/ask-cfo", { ...payload, question });
 }

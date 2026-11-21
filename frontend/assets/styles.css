@@ -1,5 +1,6 @@
-@import "./css/tokens.css";
-@import "./css/forms.css";
-@import "./css/dashboard.css";
-@import "./css/panels.css";
-@import "./css/responsive.css";
+@import "./css/tokens.css?v=tc3";
+@import "./css/forms.css?v=tc3";
+@import "./css/dashboard.css?v=tc3";
+@import "./css/panels.css?v=tc3";
+@import "./css/insights.css?v=tc3";
+@import "./css/responsive.css?v=tc3";

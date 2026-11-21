@@ -150,10 +150,10 @@ ANSWER_SCHEMA = {"type": "object", "properties": {"answer": {"type": "string"}},
 WHAT_IF_PROMPT = """You read a business owner's question about their cash forecast and spot a change to one listed transaction.
 Reply with JSON: {"transaction_id": "...", "amount_change_pln": 0, "days_later": 0}
 - transaction_id: the id of the transaction the question changes, or "" if it changes none.
-- amount_change_pln: how many PLN that payment grows by, negative if it shrinks, 0 if unchanged.
+- amount_change_pln: how many EUR that payment grows by, negative if it shrinks, 0 if unchanged.
 - days_later: how many days later it happens, negative if earlier, 0 if unchanged.
 Calculate nothing else. Examples:
-"What if payroll grows by 2,000 PLN?" -> {"transaction_id": "<the payroll id>", "amount_change_pln": 2000, "days_later": 0}
+"What if payroll grows by 2,000 EUR?" -> {"transaction_id": "<the payroll id>", "amount_change_pln": 2000, "days_later": 0}
 "What if the client pays 3 days late?" -> {"transaction_id": "<that invoice id>", "amount_change_pln": 0, "days_later": 3}"""
 
 ASK_PROMPT = """You are the CFO assistant of a small company. The application has already calculated every figure.

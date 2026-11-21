@@ -2,7 +2,7 @@
   "cases": [
     {
       "id": "starter",
-      "description": "Starter case: PLN 12,000 opening balance, Friday Payroll + Office rent create a PLN 5,000 shortfall on 2026-11-27 before Client invoice arrives on 2026-11-30.",
+      "description": "Starter case: EUR 12,000 opening balance, Friday Payroll + Office rent create a EUR 5,000 shortfall on 2026-11-27 before Client invoice arrives on 2026-11-30.",
       "csv": "transactions.csv",
       "starting_balance_minor": 1200000,
       "start_date": "2026-11-23",
@@ -107,7 +107,7 @@
     },
     {
       "id": "credit_peak",
-      "description": "Peak-shortfall case: PLN 1,000 opening balance, first shortfall PLN 200 on 2026-11-24 deepens to PLN 700 on 2026-11-26 before PLN 1,000 invoice arrives on 2026-11-29.",
+      "description": "Peak-shortfall case: EUR 1,000 opening balance, first shortfall EUR 200 on 2026-11-24 deepens to EUR 700 on 2026-11-26 before EUR 1,000 invoice arrives on 2026-11-29.",
       "csv": "credit_peak_case.csv",
       "starting_balance_minor": 100000,
       "start_date": "2026-11-23",
@@ -213,7 +213,7 @@
     },
     {
       "id": "no_shortfall",
-      "description": "Healthy baseline case: PLN 15,000 opening balance stays at or above PLN 9,000 across all 14 days, requiring no credit facility proposal.",
+      "description": "Healthy baseline case: EUR 15,000 opening balance stays at or above EUR 9,000 across all 14 days, requiring no credit facility proposal.",
       "csv": "no_shortfall_case.csv",
       "starting_balance_minor": 1500000,
       "start_date": "2026-11-23",

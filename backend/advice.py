@@ -44,7 +44,7 @@ log = logging.getLogger("autonomous_cfo.advice")
 # space is left out so "November 27, 5,000 PLN" isn't read as 275,000.
 _DIGITS = r"\d[\d,\u00a0\u202f]*(?:\.\d{1,2})?"
 _AMOUNT = re.compile(
-    rf"(?:PLN|zł|zl)\s*[-−]?\s*({_DIGITS})|({_DIGITS})\s*(?:PLN|zł|zl)\b",
+    rf"(?:EUR|€|PLN|zł|zl)\s*[-−]?\s*({_DIGITS})|({_DIGITS})\s*(?:EUR|€|PLN|zł|zl)\b",
     re.IGNORECASE,
 )
 
@@ -136,8 +136,8 @@ class ModelConfig:
 
 def pln(minor: int) -> str:
     sign = "-" if minor < 0 else ""
-    whole, grosz = divmod(abs(minor), 100)
-    return f"{sign}PLN {whole:,}.{grosz:02d}"
+    whole, cents = divmod(abs(minor), 100)
+    return f"{sign}EUR {whole:,}.{cents:02d}"
 
 
 def day_name(day: date) -> str:

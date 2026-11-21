@@ -70,8 +70,8 @@ export function renderCashflowChart(container, config) {
   if (!baselineDays || baselineDays.length === 0) return;
 
   const width = 760;
-  const height = 310;
-  const pad = { top: 24, right: 24, bottom: 44, left: 68 };
+  const height = 320;
+  const pad = { top: 32, right: 24, bottom: 44, left: 68 };
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
 
@@ -88,8 +88,8 @@ export function renderCashflowChart(container, config) {
   const rawMax = Math.max(...allValues);
   const span = Math.max(rawMax - rawMin, 200_000);
   const step = niceStep(span, 5);
-  const yMin = Math.floor((rawMin - step * 0.2) / step) * step;
-  const yMax = Math.ceil((rawMax + step * 0.2) / step) * step;
+  const yMin = Math.floor((rawMin - step * 0.25) / step) * step;
+  const yMax = Math.ceil((rawMax + step * 0.35) / step) * step;
 
   const xAt = (idx) =>
     pad.left + (baselineDays.length === 1 ? plotW / 2 : (idx / (baselineDays.length - 1)) * plotW);
@@ -107,8 +107,8 @@ export function renderCashflowChart(container, config) {
   const defs = el("defs");
   const posGrad = el("linearGradient", { id: "baseline-pos-grad", x1: "0", y1: "0", x2: "0", y2: "1" });
   posGrad.append(
-    el("stop", { offset: "0%", "stop-color": "#0f5132", "stop-opacity": "0.18" }),
-    el("stop", { offset: "100%", "stop-color": "#0f5132", "stop-opacity": "0.01" }),
+    el("stop", { offset: "0%", "stop-color": "#121211", "stop-opacity": "0.10" }),
+    el("stop", { offset: "100%", "stop-color": "#121211", "stop-opacity": "0.01" }),
   );
   const negGrad = el("linearGradient", { id: "deficit-zone-grad", x1: "0", y1: "0", x2: "0", y2: "1" });
   negGrad.append(

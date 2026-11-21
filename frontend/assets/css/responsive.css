@@ -1,37 +1,31 @@
-/* Tablet & Narrow Laptop (<= 960px) */
-@media (max-width: 960px) {
+/* Tablet & Narrow Laptop (<= 860px) */
+@media (max-width: 860px) {
   .story-grid {
     grid-template-columns: 1fr;
   }
   .hero-stats {
-    width: 100%;
-  }
-  .hero-stat {
-    flex: 1 1 150px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 /* Mobile (<= 640px) */
 @media (max-width: 640px) {
-  .container {
-    padding: 0 0.9rem;
+  .container,
+  .topbar-wrap,
+  .footer-wrap {
+    padding-left: 16px;
+    padding-right: 16px;
   }
-  .topbar-inner {
-    padding: 0.75rem 0.9rem;
+  .topbar-wrap {
+    position: static;
   }
-  .brand h1 {
-    font-size: 1.05rem;
-  }
-  .subtitle {
-    font-size: 0.75rem;
+  .topbar {
+    border-radius: 22px;
+    padding: 10px 14px;
   }
   .setup-screen {
-    margin-top: 0.75rem;
-  }
-  .setup-card,
-  .card,
-  .hero-card {
-    padding: 1.1rem;
+    margin-top: 16px;
+    gap: 20px;
   }
   .setup-fields-row {
     grid-template-columns: 1fr;
@@ -40,25 +34,25 @@
     flex-direction: column;
     align-items: stretch;
   }
-  .hero-title {
-    font-size: 1.18rem;
+  .card {
+    padding: 20px;
+  }
+  .hero-main-tile {
+    padding: 20px;
   }
   .hero-stats {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
   .decision-buttons {
     flex-direction: column;
   }
-  .tab-bar {
-    grid-template-columns: 1fr;
-  }
   .ledger-table th,
   .ledger-table td {
-    padding: 0.45rem 0.35rem;
-    font-size: 0.8rem;
+    padding: 8px 6px;
+    font-size: 12.5px;
   }
   .event-chip {
     white-space: normal;
-    font-size: 0.7rem;
+    font-size: 11.5px;
   }
 }

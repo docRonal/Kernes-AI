@@ -1,20 +1,41 @@
-import { parseRedHatBankCsv } from "./parser.js";
+import { parseRedHatBankCsv } from "./parser.js?v=tc3";
 import {
   AMALFI_DEFAULT_MOVE_DATE,
   AMALFI_DEFAULT_OPENING_EUR,
   AMALFI_DEFAULT_START_DATE,
   AMALFI_SAMPLE_CSV,
   AMALFI_SAMPLE_FILENAME,
-} from "./sample-amalfi.js";
-import { request, requestAdvice, requestDecision, resolveForecast } from "./js/api.js";
-import { toMinor } from "./js/format.js";
-import { computeProposal } from "./js/proposal.js";
+} from "./sample-amalfi.js?v=tc3";
+import {
+  buildInsightPayload,
+  request,
+  requestAdvice,
+  requestAnomalies,
+  requestAskCfo,
+  requestCompareOptions,
+  requestCreditCheck,
+  requestDecision,
+  requestStressTest,
+  resolveForecast,
+} from "./js/api.js?v=tc3";
+import { toMinor } from "./js/format.js?v=tc3";
+import {
+  renderAnomalies,
+  renderAskAnswer,
+  renderAskError,
+  renderCompareOptions,
+  renderCreditCheck,
+  renderHealthyCreditScore,
+  renderStressTest,
+  resetInsightsUi,
+} from "./js/insights.js?v=tc3";
+import { computeProposal } from "./js/proposal.js?v=tc3";
 import {
   populateIncomingPayments,
   renderKpis,
   renderLedgerAndChart,
   renderProposalPanel,
-} from "./js/render.js";
+} from "./js/render.js?v=tc3";
 
 const forecastForm = document.querySelector("#forecast-form");
 const scenarioForm = document.querySelector("#scenario-form");
@@ -39,9 +60,11 @@ const retryAdviceBtn = document.querySelector("#retry-advice-btn");
 const explanationEl = document.querySelector("#explanation");
 const adviceModelEl = document.querySelector("#advice-model");
 
-const toggleLedgerBtn = document.querySelector("#toggle-ledger-btn");
-const ledgerPanel = document.querySelector("#ledger-panel");
 const horizonPills = document.querySelectorAll(".horizon-pill");
+const askForm = document.querySelector("#ask-cfo-form");
+const askInput = document.querySelector("#ask-cfo-input");
+const askBtn = document.querySelector("#ask-cfo-btn");
+const askChips = document.querySelectorAll(".ask-chip");
 
 const tabCredit = document.querySelector("#tab-credit");
 const tabWhatIf = document.querySelector("#tab-whatif");
@@ -66,6 +89,7 @@ const state = {
   proposal: null,
   advice: null,
   adviceRequestId: 0,
+  insightsRequestId: 0,
   simulationDecision: null,
   simulationOutcome: null,
 };
@@ -216,9 +240,10 @@ async function runBaselineForecast() {
     setActiveTab(state.proposal ? "credit" : "whatif");
     showStatus("");
     renderAll();
+    loadInsights();
 
     if (state.proposal && state.parsedCsv) {
-      adviceError.textContent = "This EUR bank statement is analyzed locally. Load the Kernes PLN demo to try the AI explanation and email draft.";
+      adviceError.textContent = "This bank statement is analyzed locally. Load the Kernes demo (EUR) to try the AI explanation and email draft.";
       adviceError.hidden = false;
       agentStatusPill.textContent = "Local forecast";
     } else if (state.proposal) {
@@ -252,16 +277,81 @@ for (const pill of horizonPills) {
 tabCredit.addEventListener("click", () => setActiveTab("credit"));
 tabWhatIf.addEventListener("click", () => setActiveTab("whatif"));
 
-// Collapsible day-by-day table toggle
-toggleLedgerBtn.addEventListener("click", () => {
-  const isOpen = !ledgerPanel.hidden;
-  ledgerPanel.hidden = isOpen;
-  toggleLedgerBtn.setAttribute("aria-expanded", String(!isOpen));
-  const count = document.querySelector("#table-count-pill").textContent;
-  toggleLedgerBtn.innerHTML = isOpen
-    ? `<span>Show table (<span id="table-count-pill">${count}</span>)</span>`
-    : `<span>Hide table (<span id="table-count-pill">${count}</span>)</span>`;
+// Load the 4 backend insight milestones in parallel without blocking the main forecast
+async function loadInsights() {
+  const reqId = ++state.insightsRequestId;
+  resetInsightsUi();
+
+  const payload = buildInsightPayload(state.forecast);
+  if (!payload) return;
+
+  const currency = state.forecast.currency ?? "EUR";
+  const hasShortfall = Boolean(payload.baseline.first_deficit);
+
+  const [anomaliesRes, compareRes, stressRes, creditRes] = await Promise.allSettled([
+    requestAnomalies(payload),
+    requestCompareOptions(payload),
+    requestStressTest(payload),
+    hasShortfall ? requestCreditCheck(payload) : Promise.resolve(null),
+  ]);
+
+  if (reqId !== state.insightsRequestId) return;
+
+  if (anomaliesRes.status === "fulfilled" && anomaliesRes.value) {
+    renderAnomalies(anomaliesRes.value, currency);
+  }
+  if (compareRes.status === "fulfilled" && compareRes.value) {
+    renderCompareOptions(compareRes.value, currency);
+  }
+  if (stressRes.status === "fulfilled" && stressRes.value) {
+    renderStressTest(stressRes.value, currency);
+  }
+  if (!hasShortfall) {
+    renderHealthyCreditScore();
+  } else if (creditRes.status === "fulfilled" && creditRes.value) {
+    renderCreditCheck(creditRes.value, currency);
+  }
+}
+
+// Ask the CFO (Milestone 1)
+async function submitAskQuestion(question) {
+  const trimmed = String(question || "").trim();
+  if (!trimmed || !state.forecast) return;
+
+  const payload = buildInsightPayload(state.forecast);
+  if (!payload) {
+    renderAskError("Ask the CFO requires at least 14 forecast days.");
+    return;
+  }
+
+  askBtn.disabled = true;
+  askBtn.textContent = "Thinking…";
+  try {
+    const data = await requestAskCfo(payload, trimmed);
+    renderAskAnswer(data, state.forecast.currency ?? "EUR");
+  } catch (error) {
+    renderAskError(
+      error.status === 503
+        ? "Ask the CFO runs with the live OpenShift AI model. Switch the server to live mode to ask free-form questions."
+        : error.message,
+    );
+  } finally {
+    askBtn.disabled = false;
+    askBtn.textContent = "Ask →";
+  }
+}
+
+askForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  submitAskQuestion(askInput.value);
 });
+
+for (const chip of askChips) {
+  chip.addEventListener("click", () => {
+    askInput.value = chip.dataset.question || chip.textContent;
+    submitAskQuestion(askInput.value);
+  });
+}
 
 // File upload & drag-and-drop
 fileInput.addEventListener("change", () => {
@@ -322,7 +412,7 @@ loadKernesSampleBtn.addEventListener("click", async () => {
     const response = await request("/demo/transactions.csv");
     selectedSample = new File([await response.blob()], "transactions.csv", { type: "text/csv" });
     fileInput.value = "";
-    fileNameEl.textContent = "Kernes demo (PLN)";
+    fileNameEl.textContent = "Kernes demo (EUR)";
     forecastForm.elements.opening_balance.value = "12000.00";
     forecastForm.elements.start_date.value = "2026-11-23";
     horizonSelect.value = "14";
