@@ -16,12 +16,12 @@ BASE_INPUT = {"starting_balance_minor": "1200000", "start_date": "2026-11-23"}
 
 GOOD = {
     "explanation": (
-        "Your balance drops to -PLN 5,000.00 on Friday, November 27, when Payroll (PAY-001) and Office rent "
-        "(PAY-002) go out before the Client invoice (INV-001) arrives. A credit facility of PLN 5,000.00 covers it."
+        "Your balance drops to -EUR 5,000.00 on Friday, November 27, when Payroll (PAY-001) and Office rent "
+        "(PAY-002) go out before the Client invoice (INV-001) arrives. A credit facility of EUR 5,000.00 covers it."
     ),
-    "email_draft": "Hello, could you pay INV-001 for PLN 9,000.00 by Thursday, November 26? The finance team",
+    "email_draft": "Hello, could you pay INV-001 for EUR 9,000.00 by Thursday, November 26? The finance team",
 }
-WRONG_FIGURE = {**GOOD, "explanation": "You are PLN 5,500.00 short on Friday. A facility of PLN 5,000.00 covers it."}
+WRONG_FIGURE = {**GOOD, "explanation": "You are EUR 5,500.00 short on Friday. A facility of EUR 5,000.00 covers it."}
 NO_LIMIT = {**GOOD, "explanation": "Payroll and rent leave before the client pays, so the balance dips on Friday."}
 
 
@@ -106,21 +106,21 @@ def test_live_advice_grounds_the_model_in_calculated_facts(live):
     sent = model.requests[0]
     assert sent["model"] == "kernes-qwen"
     prompt = sent["messages"][1]["content"]
-    for fact in ("-PLN 5,000.00", "Friday, November 27", "PLN 11,000.00", "PAY-002", "INV-001", "Thursday, November 26"):
+    for fact in ("-EUR 5,000.00", "Friday, November 27", "EUR 11,000.00", "PAY-002", "INV-001", "Thursday, November 26"):
         assert fact in prompt
     assert model.headers[0]["Authorization"] == "Bearer secret-token"
     assert "secret-token" not in prompt
 
 
 def test_peak_case_prompt_separates_first_and_deepest_shortfall(live):
-    client, model = live([{**GOOD, "explanation": "The gap peaks at -PLN 700.00, so a PLN 700.00 facility covers it."}])
+    client, model = live([{**GOOD, "explanation": "The gap peaks at -EUR 700.00, so a EUR 700.00 facility covers it."}])
     response = client.post("/api/advice", json=advice_payload(client, "credit_peak_case.csv", "100000"))
 
     assert response.status_code == 200
     prompt = model.requests[0]["messages"][1]["content"]
-    assert "First day below zero: Tuesday, November 24, balance -PLN 200.00." in prompt
-    assert "Deepest point: Thursday, November 26, balance -PLN 700.00." in prompt
-    assert "Proposed credit facility limit: PLN 700.00." in prompt
+    assert "First day below zero: Tuesday, November 24, balance -EUR 200.00." in prompt
+    assert "Deepest point: Thursday, November 26, balance -EUR 700.00." in prompt
+    assert "Proposed credit facility limit: EUR 700.00." in prompt
 
 
 def test_retries_once_when_the_model_misquotes_a_figure(live):
@@ -176,15 +176,15 @@ def test_no_reminder_without_a_later_incoming_payment(live):
 
 def test_reminder_drops_invented_fees_and_facility_mentions(live):
     draft = (
-        "Hello,\n\nPlease pay INV-001 for PLN 9,000.00 by Thursday, November 26. This avoids late fees. "
-        "It aligns with the credit facility limit of PLN 5,000.00. It covers our shortfall and overdraft. "
+        "Hello,\n\nPlease pay INV-001 for EUR 9,000.00 by Thursday, November 26. This avoids late fees. "
+        "It aligns with the credit facility limit of EUR 5,000.00. It covers our shortfall and overdraft. "
         "Thank you.\n\nKind regards,\nThe finance team"
     )
     client, _ = live([{**GOOD, "email_draft": draft}])
     response = client.post("/api/advice", json=advice_payload(client))
     assert response.status_code == 200
     assert response.json()["email_draft"] == (
-        "Hello,\n\nPlease pay INV-001 for PLN 9,000.00 by Thursday, November 26. Thank you.\n\n"
+        "Hello,\n\nPlease pay INV-001 for EUR 9,000.00 by Thursday, November 26. Thank you.\n\n"
         "Kind regards,\nThe finance team"
     )
 
@@ -200,10 +200,10 @@ def test_invalid_ca_bundle_returns_503(live, monkeypatch):
 @pytest.mark.parametrize(
     "text, expected",
     [
-        ("-PLN 5,000.00 on Friday", [500_000]),
+        ("-EUR 5,000.00 on Friday", [500_000]),
         ("about 5 000 zł", [0]),  # a plain space ends the number on purpose
-        ("November 27, 5,000 PLN", [500_000]),
-        ("PLN 700. Then 1,200.50 PLN", [70_000, 120_050]),
+        ("November 27, 5,000 EUR", [500_000]),
+        ("EUR 700. Then 1,200.50 EUR", [70_000, 120_050]),
         ("no money here, 2026", []),
     ],
 )
@@ -243,8 +243,8 @@ def test_client_delay_prediction_warns_owner_with_calculated_shift(live):
             {
                 **GOOD,
                 "delay_warning": (
-                    "Client invoice INV-001 for PLN 9,000.00 was previously delayed by 2 days, "
-                    "shifting expected receipt to Wednesday, December 2; the deepest gap remains PLN 5,000.00."
+                    "Client invoice INV-001 for EUR 9,000.00 was previously delayed by 2 days, "
+                    "shifting expected receipt to Wednesday, December 2; the deepest gap remains EUR 5,000.00."
                 ),
             }
         ]

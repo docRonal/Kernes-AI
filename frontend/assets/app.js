@@ -218,7 +218,7 @@ async function runBaselineForecast() {
     renderAll();
 
     if (state.proposal && state.parsedCsv) {
-      adviceError.textContent = "This EUR bank statement is analyzed locally. Load the Kernes PLN demo to try the AI explanation and email draft.";
+      adviceError.textContent = "This bank statement is analyzed locally. Load the Kernes demo (EUR) to try the AI explanation and email draft.";
       adviceError.hidden = false;
       agentStatusPill.textContent = "Local forecast";
     } else if (state.proposal) {
@@ -322,7 +322,7 @@ loadKernesSampleBtn.addEventListener("click", async () => {
     const response = await request("/demo/transactions.csv");
     selectedSample = new File([await response.blob()], "transactions.csv", { type: "text/csv" });
     fileInput.value = "";
-    fileNameEl.textContent = "Kernes demo (PLN)";
+    fileNameEl.textContent = "Kernes demo (EUR)";
     forecastForm.elements.opening_balance.value = "12000.00";
     forecastForm.elements.start_date.value = "2026-11-23";
     horizonSelect.value = "14";

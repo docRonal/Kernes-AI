@@ -116,7 +116,7 @@ def _read_row(values: dict[str, str], line: int) -> Transaction:
 
     if not _WHOLE_NUMBER.fullmatch(values["amount_minor"]):
         raise ForecastInputError(
-            f"Line {line}: amount_minor must be a whole number of grosz, for example -1100000 for -PLN 11,000.00."
+            f"Line {line}: amount_minor must be a whole number of cents, for example -1100000 for -EUR 11,000.00."
         )
     amount = int(values["amount_minor"])
     if abs(amount) > MAX_ABS_MINOR:
@@ -337,7 +337,7 @@ async def get_forecast(
         raise HTTPException(422, "Demo scenario: move INV-001 to 2026-11-26.")
 
     if (starting_balance_minor, start_date) != (DEMO_STARTING_BALANCE_MINOR, DEMO_START):
-        raise HTTPException(422, "Use 12000 PLN and start date 2026-11-23 in demo mode.")
+        raise HTTPException(422, "Use 12000 EUR and start date 2026-11-23 in demo mode.")
 
     sample = DEMO_FILE.read_text(encoding="utf-8")
     raw = await file.read(len(sample.encode("utf-8")) + 32)

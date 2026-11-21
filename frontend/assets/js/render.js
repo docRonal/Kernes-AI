@@ -4,7 +4,7 @@ import { groupTransactionsByDate } from "./proposal.js";
 
 export function renderKpis(state) {
   const { forecast, proposal, openingBalanceMinor, simulationDecision } = state;
-  const currency = forecast.currency ?? "PLN";
+  const currency = forecast.currency ?? "EUR";
   const money = (amount, unit = currency) => printMoney(amount, unit);
   const baseline = forecast.baseline;
   const firstDay = baseline.days[0]?.date;
@@ -95,7 +95,7 @@ export function renderKpis(state) {
 
 export function renderLedgerAndChart(state) {
   const { forecast, proposal, simulationDecision, simulationOutcome } = state;
-  const currency = forecast.currency ?? "PLN";
+  const currency = forecast.currency ?? "EUR";
   const money = (amount, unit = currency) => printMoney(amount, unit);
   const baseline = forecast.baseline;
   const scenario = forecast.scenario;
@@ -225,7 +225,7 @@ export function renderLedgerAndChart(state) {
 
 export function renderProposalPanel(state) {
   const { forecast, parsedCsv, proposal, simulationDecision, simulationOutcome } = state;
-  const currency = forecast.currency ?? "PLN";
+  const currency = forecast.currency ?? "EUR";
   const money = (amount, unit = currency) => printMoney(amount, unit);
   const noShortfallCard = document.querySelector("#no-shortfall-card");
   const assistantCard = document.querySelector("#assistant-card");
@@ -335,7 +335,7 @@ export function renderProposalPanel(state) {
 }
 
 export function populateIncomingPayments(state, scenarioForm) {
-  const money = (amount) => printMoney(amount, state.forecast.currency ?? "PLN");
+  const money = (amount) => printMoney(amount, state.forecast.currency ?? "EUR");
   const baseline = state.forecast.baseline;
   const startDate = baseline.days[0]?.date;
   const endDate = baseline.days[baseline.days.length - 1]?.date;

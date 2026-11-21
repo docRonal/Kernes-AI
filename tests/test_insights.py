@@ -1,7 +1,7 @@
 """Stress test, payment optimization, credit check and the ask-CFO chat.
 
 Every expected figure is worked out by hand from the CSV in the test; the comments
-show the arithmetic in PLN.
+show the arithmetic in EUR.
 """
 
 import json
@@ -120,7 +120,7 @@ def test_three_and_five_days_late_are_different_scenarios(client):
 
 
 def test_ten_percent_more_is_rounded_half_up_to_the_grosz(client):
-    # 10% of 1.05 PLN is 10.5 grosz, rounded up to 11: -105 becomes -116, so 100 - 116 = -16.
+    # 10% of 1.05 EUR is 10.5 grosz, rounded up to 11: -105 becomes -116, so 100 - 116 = -16.
     body = client.post("/api/stress-test", json=facts(client, HEADER + "OUT,2026-11-24,-105,Card fee\n", "100")).json()
     costlier = next(s for s in body["scenarios"] if s["name"] == "outflows_10_percent_higher")
     assert costlier["deepest_shortfall"] == {"date": "2026-11-24", "shortfall_minor": 16}
@@ -213,7 +213,7 @@ def test_clients_who_paid_late_before_lower_the_score(client, key):
     assert client.post("/api/credit-check", json=payload).json()["score"] == 80
     body = client.post("/api/credit-check", json={**payload, "client_delays": {key: 2}}).json()
     assert points(body)["delays"] == 15
-    assert "PLN 2,500.00" in next(f["reason"] for f in body["factors"] if f["name"] == "delays")
+    assert "EUR 2,500.00" in next(f["reason"] for f in body["factors"] if f["name"] == "delays")
     assert (body["score"], body["risk"]) == (65, "medium")
 
 
@@ -224,8 +224,8 @@ def test_no_credit_check_without_a_shortfall(client):
 
 GOOD_VERDICT = {
     "explanation": (
-        "The PLN 5,000.00 facility scores 70 out of 100, which is low risk. It is repaid when the "
-        "Client invoice (INV-001) for PLN 9,000.00 arrives, but that single client brings all the money in."
+        "The EUR 5,000.00 facility scores 70 out of 100, which is low risk. It is repaid when the "
+        "Client invoice (INV-001) for EUR 9,000.00 arrives, but that single client brings all the money in."
     )
 }
 
@@ -236,12 +236,12 @@ def test_the_model_explains_the_calculated_verdict(client, model):
     assert body["explanation"] == GOOD_VERDICT["explanation"]
     assert (body["model"], body["explanation_error"]) == ("llama-test", None)
     assert body["latency_ms"] >= 0
-    for fact in ("70 out of 100", "Risk level: low", "PLN 5,000.00", "PLN 9,000.00", "180%"):
+    for fact in ("70 out of 100", "Risk level: low", "EUR 5,000.00", "EUR 9,000.00", "180%"):
         assert fact in fake.prompts[0]
 
 
 def test_an_answer_with_the_wrong_risk_level_is_retried(client, model):
-    wrong = {"explanation": "The PLN 5,000.00 facility is high risk."}
+    wrong = {"explanation": "The EUR 5,000.00 facility is high risk."}
     fake = model(wrong, GOOD_VERDICT)
     body = client.post("/api/credit-check", json=starter(client)).json()
     assert body["explanation"] == GOOD_VERDICT["explanation"]
@@ -249,13 +249,13 @@ def test_an_answer_with_the_wrong_risk_level_is_retried(client, model):
 
 
 def test_an_invented_amount_never_reaches_the_owner_but_the_score_does(client, model):
-    invented = {"explanation": "Low risk: the facility of PLN 7,777.00 is safe."}
+    invented = {"explanation": "Low risk: the facility of EUR 7,777.00 is safe."}
     model(invented, invented)
     response = client.post("/api/credit-check", json=starter(client))
     assert response.status_code == 200
     body = response.json()
     assert body["explanation"] is None
-    assert "PLN 7,777.00" in body["explanation_error"]
+    assert "EUR 7,777.00" in body["explanation_error"]
     assert (body["score"], body["risk"]) == (70, "low")
 
 
@@ -282,23 +282,23 @@ def ask(client, payload, question):
 
 def test_a_question_is_answered_from_the_forecast_figures(client, model):
     # No number in the question, so there is no what-if to read: one model call.
-    answer = {"answer": "Friday, November 27 is the riskiest day, with a balance of -PLN 5,000.00."}
+    answer = {"answer": "Friday, November 27 is the riskiest day, with a balance of -EUR 5,000.00."}
     fake = model(answer)
     response = ask(client, starter(client), "What is the riskiest day?")
     assert response.status_code == 200, response.text
     body = response.json()
     assert (body["answer"], body["what_if"], body["model"]) == (answer["answer"], None, "llama-test")
     assert len(fake.prompts) == 1
-    for fact in ("Friday, November 27: -PLN 5,000.00", "Proposed credit facility: PLN 5,000.00", "What is the riskiest day?"):
+    for fact in ("Friday, November 27: -EUR 5,000.00", "Proposed credit facility: EUR 5,000.00", "What is the riskiest day?"):
         assert fact in fake.prompts[0]
 
 
 def test_a_bigger_payment_is_recalculated_before_the_model_answers(client, model):
     # Payroll 11,000 + 2,000 = 13,000: Friday becomes 12,000 - 13,000 - 6,000 = -7,000,
     # which is 2,000 more than the proposed 5,000.
-    answer = {"answer": "No: with payroll at PLN 13,000.00 you would need PLN 7,000.00, PLN 2,000.00 more than proposed."}
+    answer = {"answer": "No: with payroll at EUR 13,000.00 you would need EUR 7,000.00, EUR 2,000.00 more than proposed."}
     fake = model({"transaction_id": "PAY-001", "amount_change_pln": 2000, "days_later": 0}, answer)
-    body = ask(client, starter(client), "Will we have enough money if salaries grow by 2,000 PLN?").json()
+    body = ask(client, starter(client), "Will we have enough money if salaries grow by 2,000 EUR?").json()
     assert body["what_if"] == {
         "transaction_id": "PAY-001",
         "new_amount_minor": -1_300_000,
@@ -306,13 +306,13 @@ def test_a_bigger_payment_is_recalculated_before_the_model_answers(client, model
         "deepest_shortfall": {"date": "2026-11-27", "shortfall_minor": 700_000},
     }
     assert body["answer"] == answer["answer"]
-    assert "a facility of PLN 7,000.00 would be needed" in fake.prompts[1]
-    assert "PLN 2,000.00 more than the proposed facility" in fake.prompts[1]
+    assert "a facility of EUR 7,000.00 would be needed" in fake.prompts[1]
+    assert "EUR 2,000.00 more than the proposed facility" in fake.prompts[1]
 
 
 def test_a_late_invoice_is_moved_before_the_model_answers(client, model):
     # The invoice 3 days late: Mon Nov 30 becomes Thu Dec 3, so the -5,000 lasts until Dec 2.
-    model({"transaction_id": "INV-001", "amount_change_pln": 0, "days_later": 3}, {"answer": "The gap stays at PLN 5,000.00."})
+    model({"transaction_id": "INV-001", "amount_change_pln": 0, "days_later": 3}, {"answer": "The gap stays at EUR 5,000.00."})
     body = ask(client, starter(client), "What if the client pays 3 days late?").json()
     assert body["what_if"] == {
         "transaction_id": "INV-001",
@@ -332,9 +332,9 @@ def test_money_moved_before_the_forecast_counts_from_the_first_day(client, model
 
 
 def test_the_question_decides_which_way_a_date_moves(client, model):
-    # The real 3B model read "3 days late" as -3 days and -300 PLN. "late" makes it +3 days and
+    # The real 3B model read "3 days late" as -3 days and -300 EUR. "late" makes it +3 days and
     # 300 isn't in the question, so: PEAK-003 on Wed Dec 2, -700 from Nov 26 until then.
-    model({"transaction_id": "PEAK-003", "amount_change_pln": -300, "days_later": -3}, {"answer": "You would need PLN 700.00."})
+    model({"transaction_id": "PEAK-003", "amount_change_pln": -300, "days_later": -3}, {"answer": "You would need EUR 700.00."})
     body = ask(client, peak(client), "What if the client invoice is paid 3 days late?").json()
     assert body["what_if"] == {
         "transaction_id": "PEAK-003",
@@ -346,8 +346,8 @@ def test_the_question_decides_which_way_a_date_moves(client, model):
 
 def test_a_number_the_owner_did_not_write_is_dropped(client, model):
     # The real model also moved payroll 2 days earlier; only the 2,000 comes from the question.
-    model({"transaction_id": "PAY-001", "amount_change_pln": 2000, "days_later": -2}, {"answer": "You would need PLN 7,000.00."})
-    body = ask(client, starter(client), "Will we have enough money if payroll grows by 2,000 PLN?").json()
+    model({"transaction_id": "PAY-001", "amount_change_pln": 2000, "days_later": -2}, {"answer": "You would need EUR 7,000.00."})
+    body = ask(client, starter(client), "Will we have enough money if payroll grows by 2,000 EUR?").json()
     assert (body["what_if"]["new_amount_minor"], body["what_if"]["new_date"]) == (-1_300_000, "2026-11-27")
 
 
@@ -370,17 +370,17 @@ def test_a_percentage_is_not_read_as_an_amount(client, model):
 )
 def test_an_unusable_what_if_is_ignored(client, model, change):
     model(change, {"answer": "Friday, November 27 is the riskiest day."})
-    body = ask(client, starter(client), "What if a payment changes by 100 PLN?").json()
+    body = ask(client, starter(client), "What if a payment changes by 100 EUR?").json()
     assert body["what_if"] is None
     assert body["answer"] == "Friday, November 27 is the riskiest day."
 
 
 def test_an_answer_with_an_invented_amount_is_refused(client, model):
-    invented = {"answer": "You need PLN 1,234.00."}
+    invented = {"answer": "You need EUR 1,234.00."}
     model(invented, invented)
     response = ask(client, starter(client), "How much do I need?")
     assert response.status_code == 503
-    assert "PLN 1,234.00" in response.json()["detail"]
+    assert "EUR 1,234.00" in response.json()["detail"]
 
 
 def test_the_question_must_be_real_text(client):
