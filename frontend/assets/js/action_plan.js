@@ -185,7 +185,7 @@ function renderPlanIntoContainer(container, plan, currency, profile, onOpenEmail
   replayFade(container);
 }
 
-export async function renderActionPlan({ state, insightsPromise, onOpenEmailTab }) {
+export async function renderActionPlan({ state, insightsPromise, onOpenEmailTab, onSuggestedQuestions = null }) {
   const forecast = state.forecast;
   const shortfallContainer = document.querySelector("#action-plan-steps");
   const growthContainer = document.querySelector("#growth-plan-steps");
@@ -212,4 +212,7 @@ export async function renderActionPlan({ state, insightsPromise, onOpenEmailTab 
 
   if (state.forecast !== forecast) return;
   renderPlanIntoContainer(target, plan, forecast.currency ?? "EUR", state.profile, onOpenEmailTab);
+  if (onSuggestedQuestions && Array.isArray(plan?.suggested_questions) && plan.suggested_questions.length > 0) {
+    onSuggestedQuestions(plan.suggested_questions);
+  }
 }
