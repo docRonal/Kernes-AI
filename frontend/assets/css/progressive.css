@@ -1,0 +1,361 @@
+/* Screen 1: Onboarding Questions Tile */
+.setup-questions-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.question-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.question-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.question-hint {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.prompt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.prompt-chip {
+  background: var(--surface);
+  color: var(--ink-secondary);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-pill);
+  padding: 6px 13px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.prompt-chip:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.prompt-chip.is-selected {
+  background: var(--surface-dark);
+  border-color: var(--surface-dark);
+  color: #ffffff;
+}
+
+.prompt-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Inline "Cash today" Editor on Screen 2 */
+.hero-stat-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.balance-edit-trigger {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.balance-edit-trigger:hover {
+  color: var(--ink);
+}
+
+.inline-balance-form {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inline-balance-form input {
+  padding: 7px 10px;
+  font-size: 13.5px;
+}
+
+.inline-balance-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-xs {
+  padding: 5px 11px;
+  font-size: 12px;
+}
+
+/* Personalized Action Plan Steps inside Briefing / Healthy Cards */
+.plan-steps-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: fadeInSoft 0.25s var(--ease-out) both;
+}
+
+.plan-steps-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.plan-steps-header h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-muted);
+}
+
+.plan-steps-meta {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.plan-headline {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+.plan-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plan-step-card {
+  background: var(--surface-tile);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-tile);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plan-step-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+}
+
+.plan-step-title-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.plan-step-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface-dark);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.plan-step-title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.plan-step-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.plan-step-detail {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-secondary);
+}
+
+.plan-step-cta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Screen 2: Progressive Disclosure Accordion Section for Detailed Analytics */
+.advanced-details-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.advanced-details-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 6px 4px 2px;
+}
+
+.advanced-details-header h2 {
+  margin: 2px 0 2px;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.detail-accordion {
+  background: var(--surface);
+  border-radius: var(--radius-frame);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.detail-accordion > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 18px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  transition: background 0.15s ease;
+}
+
+.detail-accordion > summary::-webkit-details-marker {
+  display: none;
+}
+
+.detail-accordion > summary:hover {
+  background: #fafaf8;
+}
+
+.detail-accordion[open] > summary {
+  border-bottom: 1px solid var(--hairline);
+}
+
+.detail-accordion-summary-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.detail-accordion-summary-main strong {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+.detail-accordion-summary-main span {
+  font-size: 13px;
+  color: var(--ink-secondary);
+}
+
+.detail-accordion-summary-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.detail-accordion-chevron {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--surface-tile);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.detail-accordion-chevron::after {
+  content: "+";
+}
+
+.detail-accordion[open] .detail-accordion-chevron::after {
+  content: "−";
+}
+
+.detail-accordion-body {
+  padding: 10px 18px 20px;
+  animation: fadeInSoft 0.24s var(--ease-out) both;
+}
+
+/* Strip redundant outer frame card shadows inside accordions */
+.detail-accordion-body > .card,
+.detail-accordion-body > .bento-frame {
+  box-shadow: none;
+  padding: 8px 4px 4px;
+  border-radius: 0;
+}
+
+.detail-accordion-body > .story-grid {
+  gap: 12px;
+}
+
+.detail-accordion-body > .story-grid .card {
+  border: 1px solid var(--hairline-strong);
+  box-shadow: none;
+}
+
+@media (max-width: 640px) {
+  .plan-step-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .plan-step-title-wrap {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+  .detail-accordion > summary {
+    padding: 15px 16px;
+  }
+  .detail-accordion-body {
+    padding: 8px 14px 16px;
+  }
+}
