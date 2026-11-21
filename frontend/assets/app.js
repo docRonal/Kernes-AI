@@ -1,11 +1,11 @@
-import { parseRedHatBankCsv } from "./parser.js?v=tc3";
+import { parseRedHatBankCsv } from "./parser.js?v=tc4";
 import {
   AMALFI_DEFAULT_MOVE_DATE,
   AMALFI_DEFAULT_OPENING_EUR,
   AMALFI_DEFAULT_START_DATE,
   AMALFI_SAMPLE_CSV,
   AMALFI_SAMPLE_FILENAME,
-} from "./sample-amalfi.js?v=tc3";
+} from "./sample-amalfi.js?v=tc4";
 import {
   buildInsightPayload,
   request,
@@ -15,27 +15,35 @@ import {
   requestCompareOptions,
   requestCreditCheck,
   requestDecision,
+  requestHealth,
+  requestOptimizePayments,
+  requestPredictDelays,
+  requestSendReminder,
   requestStressTest,
   resolveForecast,
-} from "./js/api.js?v=tc3";
-import { toMinor } from "./js/format.js?v=tc3";
+} from "./js/api.js?v=tc4";
+import { toMinor } from "./js/format.js?v=tc4";
 import {
+  populateDelayCandidates,
   renderAnomalies,
   renderAskAnswer,
   renderAskError,
   renderCompareOptions,
   renderCreditCheck,
+  renderDelayError,
+  renderDelayResult,
   renderHealthyCreditScore,
+  renderOptimizePayments,
   renderStressTest,
   resetInsightsUi,
-} from "./js/insights.js?v=tc3";
-import { computeProposal } from "./js/proposal.js?v=tc3";
+} from "./js/insights.js?v=tc4";
+import { computeProposal } from "./js/proposal.js?v=tc4";
 import {
   populateIncomingPayments,
   renderKpis,
   renderLedgerAndChart,
   renderProposalPanel,
-} from "./js/render.js?v=tc3";
+} from "./js/render.js?v=tc4";
 
 const forecastForm = document.querySelector("#forecast-form");
 const scenarioForm = document.querySelector("#scenario-form");
@@ -52,6 +60,7 @@ const resultsStatusBanner = document.querySelector("#results-status");
 const setupScreen = document.querySelector("#setup-screen");
 const resultsSection = document.querySelector("#results");
 const changeFileBtn = document.querySelector("#change-file-btn");
+const healthPill = document.querySelector("#health-pill");
 const agentStatusPill = document.querySelector("#agent-status-pill");
 
 const adviceLoading = document.querySelector("#advice-loading");
@@ -65,6 +74,10 @@ const askForm = document.querySelector("#ask-cfo-form");
 const askInput = document.querySelector("#ask-cfo-input");
 const askBtn = document.querySelector("#ask-cfo-btn");
 const askChips = document.querySelectorAll(".ask-chip");
+const delayForm = document.querySelector("#delay-form");
+const delayTxSelect = document.querySelector("#delay-tx-select");
+const delayDaysInput = document.querySelector("#delay-days-input");
+const delayPredictBtn = document.querySelector("#delay-predict-btn");
 
 const tabCredit = document.querySelector("#tab-credit");
 const tabWhatIf = document.querySelector("#tab-whatif");
@@ -74,6 +87,11 @@ const panelWhatIf = document.querySelector("#panel-whatif");
 const adviceButton = document.querySelector("#advice-button");
 const adviceWrap = document.querySelector("#advice");
 const draftTextarea = document.querySelector("#draft");
+const reminderEmailInput = document.querySelector("#reminder-email");
+const reminderSubjectInput = document.querySelector("#reminder-subject");
+const sendReminderBtn = document.querySelector("#send-reminder-btn");
+const reminderReceipt = document.querySelector("#reminder-receipt");
+const reminderError = document.querySelector("#reminder-error");
 const copyDraftBtn = document.querySelector("#copy-draft-btn");
 const copyFeedback = document.querySelector("#copy-feedback");
 
@@ -235,6 +253,8 @@ async function runBaselineForecast() {
     adviceWrap.hidden = true;
     adviceButton.textContent = "Write reminder email draft";
     copyFeedback.textContent = "";
+    reminderReceipt.hidden = true;
+    reminderError.hidden = true;
 
     populateIncomingPayments(state, scenarioForm);
     setActiveTab(state.proposal ? "credit" : "whatif");
@@ -277,7 +297,35 @@ for (const pill of horizonPills) {
 tabCredit.addEventListener("click", () => setActiveTab("credit"));
 tabWhatIf.addEventListener("click", () => setActiveTab("whatif"));
 
-// Load the 4 backend insight milestones in parallel without blocking the main forecast
+// Backend health check (/health)
+async function checkHealth() {
+  try {
+    const data = await requestHealth();
+    if (data?.status === "ok") {
+      healthPill.textContent = "API Online";
+      healthPill.classList.remove("is-down");
+      healthPill.classList.add("is-ok");
+      return;
+    }
+  } catch {
+    // Fall through to offline indicator
+  }
+  healthPill.textContent = "API Offline";
+  healthPill.classList.remove("is-ok");
+  healthPill.classList.add("is-down");
+}
+checkHealth();
+
+// Load the backend insight milestones in parallel without blocking the main forecast
+function previewCollectAction(action) {
+  if (!action || !scenarioForm.elements.move_transaction_id) return;
+  scenarioForm.elements.move_transaction_id.value = action.transaction_id;
+  scenarioForm.elements.move_to_date.value = action.new_date;
+  setActiveTab("whatif");
+  document.querySelector("#actions-heading")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  scenarioForm.requestSubmit();
+}
+
 async function loadInsights() {
   const reqId = ++state.insightsRequestId;
   resetInsightsUi();
@@ -288,11 +336,12 @@ async function loadInsights() {
   const currency = state.forecast.currency ?? "EUR";
   const hasShortfall = Boolean(payload.baseline.first_deficit);
 
-  const [anomaliesRes, compareRes, stressRes, creditRes] = await Promise.allSettled([
+  const [anomaliesRes, compareRes, stressRes, creditRes, optimizeRes] = await Promise.allSettled([
     requestAnomalies(payload),
     requestCompareOptions(payload),
     requestStressTest(payload),
     hasShortfall ? requestCreditCheck(payload) : Promise.resolve(null),
+    requestOptimizePayments(payload),
   ]);
 
   if (reqId !== state.insightsRequestId) return;
@@ -311,6 +360,15 @@ async function loadInsights() {
   } else if (creditRes.status === "fulfilled" && creditRes.value) {
     renderCreditCheck(creditRes.value, currency);
   }
+  if (optimizeRes.status === "fulfilled" && optimizeRes.value) {
+    renderOptimizePayments(
+      optimizeRes.value,
+      state.forecast.transactions,
+      currency,
+      previewCollectAction,
+    );
+  }
+  populateDelayCandidates(state.forecast, currency);
 }
 
 // Ask the CFO (Milestone 1)
@@ -352,6 +410,37 @@ for (const chip of askChips) {
     submitAskQuestion(askInput.value);
   });
 }
+
+// Client payment delay prediction (/api/predict-delays)
+delayForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!state.forecast) return;
+
+  const payload = buildInsightPayload(state.forecast);
+  if (!payload) {
+    renderDelayError("Delay prediction requires at least 14 forecast days.");
+    return;
+  }
+
+  const txId = delayTxSelect.value;
+  const days = Number.parseInt(delayDaysInput.value, 10);
+  if (!txId || !Number.isFinite(days) || days < 1 || days > 365) {
+    renderDelayError("Enter a delay between 1 and 365 days.");
+    return;
+  }
+
+  delayPredictBtn.disabled = true;
+  delayPredictBtn.textContent = "Checking…";
+  try {
+    const data = await requestPredictDelays(payload, { [txId]: days });
+    renderDelayResult(data);
+  } catch (error) {
+    renderDelayError(error.message);
+  } finally {
+    delayPredictBtn.disabled = false;
+    delayPredictBtn.textContent = "Predict delay impact →";
+  }
+});
 
 // File upload & drag-and-drop
 fileInput.addEventListener("change", () => {
@@ -517,5 +606,41 @@ copyDraftBtn.addEventListener("click", async () => {
     }, 2200);
   } catch {
     copyFeedback.textContent = "Select and copy manually";
+  }
+});
+
+// Simulated reminder email sender (/api/send-reminder)
+sendReminderBtn.addEventListener("click", async () => {
+  const to_email = reminderEmailInput.value.trim();
+  const subject = reminderSubjectInput.value.trim();
+  const body = draftTextarea.value.trim();
+
+  reminderError.hidden = true;
+  if (to_email.length < 3 || !subject || !body) {
+    reminderReceipt.hidden = true;
+    reminderError.textContent = "Enter a recipient email, subject, and message body first.";
+    reminderError.hidden = false;
+    return;
+  }
+
+  sendReminderBtn.disabled = true;
+  sendReminderBtn.textContent = "Simulating…";
+  try {
+    const data = await requestSendReminder({ to_email, subject, body });
+    const title = document.createElement("strong");
+    title.textContent = "Simulated · Nothing sent";
+    const meta = document.createElement("span");
+    meta.textContent = `To: ${data.recipient} · Subject: ${data.subject}`;
+    const msg = document.createElement("span");
+    msg.textContent = data.message;
+    reminderReceipt.replaceChildren(title, meta, msg);
+    reminderReceipt.hidden = false;
+  } catch (error) {
+    reminderReceipt.hidden = true;
+    reminderError.textContent = error.message;
+    reminderError.hidden = false;
+  } finally {
+    sendReminderBtn.disabled = false;
+    sendReminderBtn.textContent = "Simulate send";
   }
 });

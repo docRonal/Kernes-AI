@@ -192,6 +192,36 @@ main.container {
   background: var(--accent);
 }
 
+.pill-health {
+  background: var(--surface-tile);
+  color: var(--ink-secondary);
+}
+
+.pill-health::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-muted);
+}
+
+.pill-health.is-ok {
+  color: var(--ink);
+}
+
+.pill-health.is-ok::before {
+  background: var(--positive);
+}
+
+.pill-health.is-down {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.pill-health.is-down::before {
+  background: var(--danger);
+}
+
 .pill-success {
   background: var(--positive-soft);
   color: var(--positive);

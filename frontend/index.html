@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/styles.css?v=tc3">
-  <script type="module" src="/assets/app.js?v=tc3"></script>
+  <link rel="stylesheet" href="/assets/styles.css?v=tc4">
+  <script type="module" src="/assets/app.js?v=tc4"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -27,6 +27,7 @@
         </div>
         <div class="topbar-meta">
           <button type="button" class="btn-topbar" id="change-file-btn" hidden>← Change file</button>
+          <span class="pill pill-health" id="health-pill" title="Backend API health">Checking API…</span>
           <span class="pill pill-neutral" id="account-pill">EUR Account</span>
           <span class="pill pill-status" id="agent-status-pill">Assistant Ready</span>
         </div>
@@ -287,12 +288,25 @@
                   <button type="button" class="btn btn-dark-ghost btn-full" id="advice-button">Write reminder email draft</button>
 
                   <div id="advice" class="draft-editor" hidden>
+                    <div class="reminder-fields">
+                      <div class="field">
+                        <label for="reminder-email">Recipient email</label>
+                        <input id="reminder-email" type="email" value="accounts@client.example" placeholder="client@company.com">
+                      </div>
+                      <div class="field">
+                        <label for="reminder-subject">Subject</label>
+                        <input id="reminder-subject" type="text" value="Payment schedule request" placeholder="Invoice payment request">
+                      </div>
+                    </div>
                     <label for="draft">Editable draft (sent manually by you)</label>
                     <textarea id="draft" rows="4"></textarea>
                     <div class="draft-actions">
-                      <button type="button" class="btn btn-inverted" id="copy-draft-btn">Copy email</button>
+                      <button type="button" class="btn btn-inverted" id="send-reminder-btn">Simulate send</button>
+                      <button type="button" class="btn btn-dark-ghost" id="copy-draft-btn">Copy email</button>
                       <span class="copy-feedback" id="copy-feedback" aria-live="polite"></span>
                     </div>
+                    <div id="reminder-receipt" class="reminder-receipt" hidden></div>
+                    <div id="reminder-error" class="inline-alert inline-alert-dark" hidden></div>
                   </div>
                 </div>
               </div>
@@ -389,6 +403,57 @@
               </div>
 
               <ul class="stress-list" id="stress-scenarios-list"></ul>
+            </section>
+          </div>
+        </div>
+
+        <!-- 6b. Smart Payment Moves & Client Payment Delay Risk -->
+        <div id="optimize-delay-grid" class="story-grid" hidden>
+          <div class="story-col">
+            <section id="optimize-card" class="card" aria-labelledby="optimize-heading" hidden>
+              <div class="card-header">
+                <div>
+                  <span class="eyebrow-dot">Optimize Timing</span>
+                  <h2 id="optimize-heading">Smart payment moves</h2>
+                  <p class="card-desc">Ranked changes that shrink the credit line you need.</p>
+                </div>
+              </div>
+              <div id="optimize-list" class="optimize-list"></div>
+            </section>
+          </div>
+
+          <div class="story-col">
+            <section id="delay-predict-card" class="card" aria-labelledby="delay-heading" hidden>
+              <div class="card-header">
+                <div>
+                  <span class="eyebrow-dot">Delay Risk</span>
+                  <h2 id="delay-heading">What if a client pays late?</h2>
+                  <p class="card-desc">Model how historical payment delays affect your shortfall.</p>
+                </div>
+              </div>
+
+              <form id="delay-form" class="delay-form" novalidate>
+                <div class="delay-row">
+                  <div class="field">
+                    <label for="delay-tx-select">Incoming payment</label>
+                    <select id="delay-tx-select" name="transaction_id" required></select>
+                  </div>
+                  <div class="field">
+                    <label for="delay-days-input">Delay (days)</label>
+                    <input id="delay-days-input" name="delay_days" type="number" min="1" max="365" value="3" required>
+                  </div>
+                </div>
+                <button type="submit" class="btn btn-primary" id="delay-predict-btn">Predict delay impact →</button>
+              </form>
+
+              <p id="delay-empty" class="muted-note" hidden></p>
+
+              <div id="delay-result-box" class="delay-result" hidden>
+                <div id="delay-warning-box" class="delay-warning"></div>
+                <p id="delay-explanation" class="agent-text"></p>
+                <div id="delay-meta" class="ask-answer-meta" hidden></div>
+              </div>
+              <div id="delay-error" class="inline-alert inline-alert-soft" hidden></div>
             </section>
           </div>
         </div>
