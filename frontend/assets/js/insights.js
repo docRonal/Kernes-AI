@@ -173,7 +173,7 @@ export function renderCreditCheck(data, currency = "EUR") {
   if (explainErrEl) {
     if (data.explanation_error) {
       explainErrEl.textContent =
-        "AI commentary is temporarily offline, but your readiness score and factor breakdown above are calculated accurately.";
+        "AI commentary is temporarily offline, but your readiness score and factor breakdown below are calculated accurately.";
       explainErrEl.hidden = false;
     } else {
       explainErrEl.hidden = true;
@@ -193,8 +193,14 @@ export function renderCreditCheck(data, currency = "EUR") {
           createEl("span", "factor-name", FACTOR_LABELS[f.name] || f.name),
           createEl("span", "factor-reason", f.reason),
         );
+        const right = createEl("div", "factor-bar-wrap");
+        const track = createEl("div", "factor-mini-track");
+        const fill = createEl("div", "factor-mini-fill");
+        fill.style.width = `${Math.max(8, Math.min(100, Math.round((Number(f.points) / 25) * 100)))}%`;
+        track.append(fill);
         const pts = createEl("strong", "factor-pts", `+${f.points}`);
-        li.append(left, pts);
+        right.append(track, pts);
+        li.append(left, right);
         return li;
       }),
     );

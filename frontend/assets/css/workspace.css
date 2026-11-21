@@ -1,0 +1,1157 @@
+/* ==========================================================================
+   KERNES CFO — Workspace Navigation, Signal Strip, Cash Calendar & Modules
+   ========================================================================== */
+
+/* Topbar Print / Export button */
+.btn-topbar-ghost {
+  background: transparent;
+  color: var(--ink-secondary);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-pill);
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-topbar-ghost:hover {
+  background: var(--surface-tile);
+  color: var(--ink);
+  border-color: #c5c5bf;
+}
+
+/* --------------------------------------------------------------------------
+   1. Glanceable 4-Tile Signal Strip (Directly under Hero Verdict)
+   -------------------------------------------------------------------------- */
+.signal-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.signal-tile {
+  appearance: none;
+  text-align: left;
+  font: inherit;
+  background: var(--surface);
+  border: 1px solid transparent;
+  border-radius: 20px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  transition: transform 0.16s var(--ease-out), border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.signal-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--hairline-strong);
+  box-shadow: 0 8px 24px rgba(18, 18, 17, 0.07);
+}
+
+.signal-tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.signal-tile-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.signal-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+}
+
+.signal-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-muted);
+  flex-shrink: 0;
+}
+
+.signal-dot.is-ok {
+  background: var(--positive);
+}
+
+.signal-dot.is-warn {
+  background: var(--accent);
+}
+
+.signal-dot.is-danger {
+  background: var(--danger);
+}
+
+.signal-value {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.signal-sub {
+  font-size: 12px;
+  color: var(--ink-secondary);
+  line-height: 1.35;
+}
+
+.signal-tile.is-alert {
+  background: #fffaf6;
+  border-color: rgba(255, 123, 75, 0.35);
+}
+
+/* --------------------------------------------------------------------------
+   2. Prominent Workspace Tab Navigation Bar
+   -------------------------------------------------------------------------- */
+.workspace-nav-wrap {
+  position: sticky;
+  top: 68px;
+  z-index: 20;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 8px;
+  border-radius: 24px;
+  border: 1px solid var(--hairline-strong);
+  box-shadow: 0 8px 28px rgba(18, 18, 17, 0.06);
+}
+
+.workspace-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  flex: 1 1 560px;
+}
+
+.ws-tab {
+  appearance: none;
+  border: 1px solid transparent;
+  background: var(--surface-tile);
+  border-radius: 16px;
+  padding: 12px 15px;
+  min-height: 60px;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s var(--ease-out), box-shadow 0.15s ease;
+}
+
+.ws-tab:hover:not(.is-active) {
+  background: var(--surface-stone);
+  border-color: #d0d0ca;
+  transform: translateY(-1px);
+}
+
+.ws-tab.is-active {
+  background: var(--surface-dark);
+  color: #ffffff;
+  box-shadow: 0 6px 18px rgba(18, 18, 17, 0.18);
+}
+
+.ws-tab-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+}
+
+.ws-tab-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+.ws-tab-sub {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  line-height: 1.25;
+}
+
+.ws-tab.is-active .ws-tab-sub {
+  color: #bdbdb9;
+}
+
+.ws-tab-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-stone);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.ws-tab.is-active .ws-tab-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.ws-tab-badge.is-warn {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.ws-tab.is-active .ws-tab-badge.is-warn {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.ws-tab-badge.is-ok {
+  background: var(--positive-soft);
+  color: var(--positive);
+}
+
+.ws-tab.is-active .ws-tab-badge.is-ok {
+  background: rgba(52, 199, 89, 0.25);
+  color: #a7f3bd;
+}
+
+.ws-view-all-btn {
+  appearance: none;
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 16px;
+  padding: 10px 16px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ws-view-all-btn:hover {
+  background: var(--surface-tile);
+  border-color: #bcbcb6;
+}
+
+.ws-view-all-btn.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: #b5451b;
+}
+
+/* Larger, clearer secondary tab bars inside Decision Card & What-If Simulator */
+.actions-card .tab-btn {
+  padding: 11px 16px;
+  font-size: 14px;
+}
+
+.whatif-mode-btn {
+  padding: 9px 16px;
+  font-size: 13.5px;
+}
+
+.filter-chip {
+  padding: 7px 14px;
+  font-size: 13px;
+}
+
+/* --------------------------------------------------------------------------
+   2a. Active Simulations Control Bar (Unified Scenario Manager)
+   -------------------------------------------------------------------------- */
+.active-sims-bar {
+  background: var(--surface);
+  border: 1px solid rgba(255, 123, 75, 0.35);
+  border-radius: 20px;
+  padding: 12px 16px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: fadeInSoft 0.22s var(--ease-out) both;
+}
+
+.active-sims-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.active-sims-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.active-sims-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.active-sims-hint {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.active-sims-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.active-sims-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sim-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface-tile);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.sim-chip.is-enabled.sim-expense {
+  background: #fff7ed;
+  border-color: rgba(234, 88, 12, 0.38);
+  color: #9a3412;
+}
+
+.sim-chip.is-enabled.sim-income {
+  background: var(--positive-soft);
+  border-color: rgba(31, 138, 76, 0.35);
+  color: #166534;
+}
+
+.sim-chip.is-enabled.sim-stress {
+  background: var(--danger-soft);
+  border-color: rgba(217, 56, 58, 0.35);
+  color: #991b1b;
+}
+
+.sim-chip.is-enabled.sim-buffer {
+  background: #eef2ff;
+  border-color: rgba(79, 70, 229, 0.35);
+  color: #3730a3;
+}
+
+.sim-chip.is-paused {
+  opacity: 0.58;
+  text-decoration: line-through;
+}
+
+.sim-chip-toggle {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.sim-chip-check {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.sim-chip.is-enabled .sim-chip-check {
+  color: #ffffff;
+  border-color: transparent;
+}
+
+.sim-chip.is-enabled.sim-expense .sim-chip-check {
+  background: #ea580c;
+}
+
+.sim-chip.is-enabled.sim-income .sim-chip-check {
+  background: #16a34a;
+}
+
+.sim-chip.is-enabled.sim-stress .sim-chip-check {
+  background: #dc2626;
+}
+
+.sim-chip.is-enabled.sim-buffer .sim-chip-check {
+  background: #4f46e5;
+}
+
+/* Prevent sticky topbar + workspace nav from covering anchor-scrolled cards */
+#chart-heading,
+#breakdown-card,
+#cash-calendar-card,
+#actions-card,
+#actions-heading,
+#optimize-card,
+#afford-card,
+#credit-score-card,
+#anomalies-card {
+  scroll-margin-top: 160px;
+}
+
+.sim-chip-amount {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+
+.sim-chip-remove {
+  appearance: none;
+  border: none;
+  background: rgba(18, 18, 17, 0.08);
+  color: inherit;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.14s ease;
+}
+
+.sim-chip-remove:hover {
+  background: rgba(18, 18, 17, 0.18);
+}
+
+.workspace-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeInSoft 0.22s var(--ease-out) both;
+}
+
+.workspace-section-divider {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+}
+
+.workspace-section-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--hairline-strong);
+}
+
+.dashboard.is-show-all .workspace-section-divider {
+  display: flex;
+}
+
+/* --------------------------------------------------------------------------
+   3. Interactive Day Inspector Strip (Below Chart)
+   -------------------------------------------------------------------------- */
+.day-inspector {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.day-inspector-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.day-inspector-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-secondary);
+}
+
+.day-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.day-pill {
+  appearance: none;
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface-tile);
+  border-radius: 14px;
+  padding: 8px 11px;
+  min-width: 78px;
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+  flex-shrink: 0;
+}
+
+.day-pill:hover {
+  border-color: #b5b5ae;
+  background: #f0f0ec;
+}
+
+.day-pill.is-deficit {
+  background: var(--danger-soft);
+  border-color: rgba(217, 56, 58, 0.28);
+}
+
+.day-pill.is-selected {
+  background: var(--surface-dark);
+  border-color: var(--surface-dark);
+  color: #ffffff;
+}
+
+.day-pill-date {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.day-pill.is-selected .day-pill-date {
+  color: #c5c5c2;
+}
+
+.day-pill-bal {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.day-pill.is-deficit .day-pill-bal {
+  color: var(--danger);
+}
+
+.day-pill.is-selected .day-pill-bal {
+  color: #ffffff;
+}
+
+.day-pill.is-deficit.is-selected .day-pill-bal {
+  color: #ff9a9a;
+}
+
+.day-detail-box {
+  background: var(--surface-tile);
+  border-radius: var(--radius-tile);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.day-detail-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.day-detail-date {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.day-detail-balance {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
+   2b. Chart Card Header & Dedicated Full-Width Legend Bar
+   -------------------------------------------------------------------------- */
+.chart-card .chart-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px 20px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.chart-title-col {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.chart-card .chart-controls {
+  flex: 0 1 auto;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+.chart-card .chart-pills-row {
+  flex-wrap: wrap;
+}
+
+.chart-legend-bar {
+  background: var(--surface-tile);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  padding: 9px 14px;
+  margin-bottom: 14px;
+}
+
+.chart-legend-bar .chart-legend {
+  justify-content: flex-start;
+  max-width: none;
+  gap: 8px 18px;
+}
+
+.chart-legend-bar .legend-item {
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   4. Cash Breakdown & Dual Income / Expense Donut Charts
+   -------------------------------------------------------------------------- */
+.breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.breakdown-stat {
+  background: var(--surface-tile);
+  border-radius: var(--radius-tile);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.breakdown-stat.is-inflow {
+  background: var(--positive-soft);
+}
+
+.breakdown-stat.is-outflow {
+  background: var(--danger-soft);
+}
+
+.breakdown-stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.breakdown-stat-value {
+  font-size: 19px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.breakdown-stat-value.positive {
+  color: var(--positive);
+}
+
+.breakdown-stat-value.negative {
+  color: var(--danger);
+}
+
+.donut-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.donut-panel {
+  background: var(--surface-tile);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-tile);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.donut-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.donut-panel-head h3 {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+.donut-visual-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+.donut-svg {
+  width: 176px;
+  height: 176px;
+  display: block;
+  overflow: visible;
+}
+
+.donut-slice {
+  cursor: pointer;
+  transition: opacity 0.16s ease, stroke-width 0.16s ease;
+}
+
+.donut-slice.is-dimmed {
+  opacity: 0.35;
+}
+
+.donut-slice.is-active {
+  stroke-width: 28;
+}
+
+.donut-center-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  fill: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.donut-center-value {
+  font-size: 16px;
+  font-weight: 700;
+  fill: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.donut-center-sub {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--ink-secondary);
+}
+
+.donut-legend-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.donut-legend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 11px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid transparent;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.donut-legend-row:hover,
+.donut-legend-row.is-active {
+  border-color: var(--hairline-strong);
+  background: #ffffff;
+}
+
+.donut-legend-left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.breakdown-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.breakdown-cat-name {
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+.donut-legend-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdown-cat-val {
+  font-weight: 600;
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+
+.donut-pct-pill {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-tile);
+  color: var(--ink);
+  min-width: 38px;
+  text-align: center;
+}
+
+.donut-empty {
+  text-align: center;
+  padding: 24px 12px;
+  font-size: 13.5px;
+  color: var(--ink-muted);
+}
+
+/* --------------------------------------------------------------------------
+   5. Smart Cash Calendar (Transactions with Actionability Tags)
+   -------------------------------------------------------------------------- */
+.calendar-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  appearance: none;
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface-tile);
+  color: var(--ink-secondary);
+  border-radius: var(--radius-pill);
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.filter-chip:hover:not(.is-active) {
+  color: var(--ink);
+  background: var(--surface-stone);
+}
+
+.filter-chip.is-active {
+  background: var(--surface-dark);
+  border-color: var(--surface-dark);
+  color: #ffffff;
+}
+
+.calendar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.calendar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--surface-tile);
+  flex-wrap: wrap;
+}
+
+.calendar-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 240px;
+}
+
+.calendar-row-title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.calendar-row-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.calendar-row-sub {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.calendar-row-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.action-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.action-tag.tag-fixed {
+  background: #ecece8;
+  color: #555553;
+}
+
+.action-tag.tag-defer {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.action-tag.tag-collect {
+  background: var(--positive-soft);
+  color: var(--positive);
+}
+
+.action-tag.tag-flexible {
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.action-tag.tag-auto {
+  background: var(--surface);
+  color: var(--ink-muted);
+  border: 1px solid var(--hairline-strong);
+}
+
+/* --------------------------------------------------------------------------
+   6. "Can I Afford It?" Planned Expense Sandbox
+   -------------------------------------------------------------------------- */
+.afford-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) minmax(130px, 0.9fr) minmax(140px, 0.9fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.afford-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.afford-result {
+  margin-top: 14px;
+  padding: 16px 18px;
+  border-radius: var(--radius-tile);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: fadeInSoft 0.24s var(--ease-out) both;
+}
+
+.afford-result.is-safe {
+  background: var(--positive-soft);
+  border: 1px solid rgba(31, 138, 76, 0.22);
+}
+
+.afford-result.is-risky {
+  background: var(--danger-soft);
+  border: 1px solid rgba(217, 56, 58, 0.24);
+}
+
+.afford-result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.afford-result-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.afford-result-detail {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-secondary);
+}
+
+.afford-result-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+/* Visual progress bar for Credit Health factors */
+.factor-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.factor-mini-track {
+  width: 64px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-stone);
+  overflow: hidden;
+}
+
+.factor-mini-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+}
+
+/* --------------------------------------------------------------------------
+   Responsive adjustments
+   -------------------------------------------------------------------------- */
+@media (max-width: 860px) {
+  .signal-strip,
+  .workspace-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .breakdown-grid,
+  .donut-grid {
+    grid-template-columns: 1fr;
+  }
+  .afford-form {
+    grid-template-columns: 1fr 1fr;
+  }
+  .workspace-nav-wrap {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .signal-strip {
+    grid-template-columns: 1fr;
+  }
+  .workspace-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .afford-form {
+    grid-template-columns: 1fr;
+  }
+  .ws-tab {
+    padding: 10px 12px;
+    min-height: 52px;
+  }
+  .ws-tab-title {
+    font-size: 13.5px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Print / 1-Page Executive Brief (@media print)
+   -------------------------------------------------------------------------- */
+@media print {
+  body {
+    background: #ffffff !important;
+  }
+  .topbar-wrap,
+  .workspace-nav-wrap,
+  .autonomy-bar,
+  .chart-controls,
+  .day-strip,
+  .calendar-filters,
+  .footer-wrap,
+  .balance-edit-trigger,
+  .decision-buttons,
+  .afford-form,
+  .afford-presets,
+  .ask-form,
+  .ask-chips,
+  .delay-form,
+  .btn-list-toggle,
+  #setup-screen {
+    display: none !important;
+  }
+  .workspace-panel[hidden] {
+    display: flex !important;
+  }
+  .card,
+  .bento-frame,
+  .signal-tile {
+    box-shadow: none !important;
+    border: 1px solid #d8d8d3 !important;
+    break-inside: avoid;
+  }
+}

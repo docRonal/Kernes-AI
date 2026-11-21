@@ -30,8 +30,8 @@ import {
   renderOptimizePayments,
   renderStressTest,
   resetInsightsUi,
-} from "./js/insights.js?v=tc11";
-import { buildWhatIfCurve, addDaysIso } from "./js/predictions.js?v=tc20";
+} from "./js/insights.js?v=tc25";
+import { buildWhatIfCurve, addDaysIso } from "./js/predictions.js?v=history-chart";
 import { readProposal } from "./js/proposal.js?v=tc11";
 import {
   buildReminderTemplate,
@@ -40,6 +40,16 @@ import {
   renderLedgerAndChart,
   renderProposalPanel,
 } from "./js/render.js?v=history-chart";
+import {
+  buildCombinedWhatIfOverlay,
+  createWorkspaceController,
+  initAffordSandbox,
+  renderActiveSimsBar,
+  renderCashBreakdown,
+  renderSignalStripBase,
+  renderSmartCalendar,
+  updateSignalStripInsights,
+} from "./js/workspace.js?v=tc27";
 
 const HORIZON_DAYS = 14;
 const AMALFI_OPENING_BALANCE_MINOR = 3_326_635;
@@ -70,16 +80,17 @@ const resultsStatusBanner = document.querySelector("#results-status");
 const setupScreen = document.querySelector("#setup-screen");
 const resultsSection = document.querySelector("#results");
 const changeFileBtn = document.querySelector("#change-file-btn");
-const toggleAllDetailsBtn = document.querySelector("#toggle-all-details-btn");
-const detailAccordions = Array.from(document.querySelectorAll(".detail-accordion"));
-const accCompare = document.querySelector("#acc-compare");
-const accComparePill = document.querySelector("#acc-compare-pill");
-const accHealth = document.querySelector("#acc-health");
-const accHealthPill = document.querySelector("#acc-health-pill");
-const accOptimize = document.querySelector("#acc-optimize");
-const accOptimizePill = document.querySelector("#acc-optimize-pill");
-const accAnomalies = document.querySelector("#acc-anomalies");
-const accAnomaliesPill = document.querySelector("#acc-anomalies-pill");
+const printReportBtn = document.querySelector("#print-report-btn");
+const calendarFilterChips = Array.from(document.querySelectorAll("[data-cal-filter]"));
+const simAddPurchaseBtn = document.querySelector("#sim-add-purchase-btn");
+const simResetAllBtn = document.querySelector("#sim-reset-all-btn");
+const workspace = createWorkspaceController();
+const affordSandbox = initAffordSandbox({
+  getState: () => state,
+  onAddPurchase: (purchase) => addPlannedPurchase(purchase),
+  onJumpToChart: () => workspace.setWorkspace("overview", "#chart-heading"),
+  onJumpToBreakdown: () => workspace.setWorkspace("overview", "#breakdown-card"),
+});
 
 const adviceLoading = document.querySelector("#advice-loading");
 const adviceError = document.querySelector("#advice-error");
@@ -102,7 +113,7 @@ const askForm = document.querySelector("#ask-cfo-form");
 const askInput = document.querySelector("#ask-cfo-input");
 const askBtn = document.querySelector("#ask-cfo-btn");
 const askLoading = document.querySelector("#ask-loading");
-const askChips = document.querySelectorAll(".ask-chip");
+const askChips = document.querySelectorAll("#ask-cfo-card .ask-chip");
 const delayForm = document.querySelector("#delay-form");
 const delayTxSelect = document.querySelector("#delay-tx-select");
 const delayDaysInput = document.querySelector("#delay-days-input");
@@ -149,6 +160,10 @@ const state = {
   showForecast: true,
   showStress: false,
   whatIfOverlay: null,
+  plannedPurchases: [],
+  earlyPaySim: null,
+  customWhatIf: null,
+  calendarFilter: "all",
 };
 
 function showStatus(message, isError = false) {
@@ -160,22 +175,6 @@ function showStatus(message, isError = false) {
   activeBanner.hidden = !message;
 }
 
-function syncDetailToggleControls() {
-  const visible = detailAccordions.filter((acc) => !acc.hidden);
-  const allOpen = visible.length > 0 && visible.every((acc) => acc.open);
-
-  if (toggleAllDetailsBtn) {
-    toggleAllDetailsBtn.textContent = allOpen ? "Collapse all" : "Expand all";
-  }
-}
-
-function setAllAccordions(openBool) {
-  for (const acc of detailAccordions) {
-    acc.open = Boolean(openBool);
-  }
-  syncDetailToggleControls();
-}
-
 function showSetupScreen() {
   state.forecast = null;
   state.proposal = null;
@@ -185,6 +184,7 @@ function showSetupScreen() {
   setupScreen.hidden = false;
   resultsSection.hidden = true;
   changeFileBtn.hidden = true;
+  if (printReportBtn) printReportBtn.hidden = true;
   resultsStatusBanner.hidden = true;
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -200,13 +200,148 @@ function setActiveTab(tab) {
   panelWhatIf.hidden = isCredit;
 }
 
+function handleQuickTransactionAction(tx, actKey) {
+  if (!tx || !state.forecast || state.forecast.forecast_basis === "history") return;
+  const currency = state.forecast.currency ?? "EUR";
+  const party = tx.counterparty || tx.label;
+  const amountText = printMoney(Math.abs(tx.amount_minor), currency);
+
+  workspace.setWorkspace("actions");
+  setActiveTab("whatif");
+
+  if (actKey === "email_collect_early" && scenarioForm?.elements?.move_transaction_id) {
+    const optExists = Array.from(scenarioForm.elements.move_transaction_id.options).some(
+      (o) => o.value === tx.id,
+    );
+    if (optExists) {
+      scenarioForm.elements.move_transaction_id.value = tx.id;
+      state.draftEdited = false;
+      applyTemplateDraft({ force: true });
+    }
+  } else if (actKey === "email_defer_supplier") {
+    const refPart = tx.payment_reference ? ` (${tx.payment_reference})` : "";
+    reminderSubjectInput.value = `Short payment extension request: ${party}`;
+    draftTextarea.value = `Hello ${party},\n\nWe have an upcoming payment of ${amountText}${refPart} scheduled for ${tx.date}. Would it be possible to extend the due date by 3–4 days to align with our incoming receipts?\n\nThank you very much for your flexibility.\n\nBest regards,\nKERNES CFO`;
+    draftSourceNote.textContent = "Supplier extension draft · editable, sent manually by you";
+    state.draftEdited = true;
+    replayFade(draftTextarea);
+  }
+
+  requestAnimationFrame(() => {
+    document.querySelector("#actions-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
+function syncSimulationsAndRender() {
+  state.whatIfOverlay = buildCombinedWhatIfOverlay(state);
+  if (state.whatIfOverlay) {
+    if (whatIfChartLabel) whatIfChartLabel.textContent = `${state.whatIfOverlay.label} plotted on the cash chart.`;
+    if (whatIfChartBanner) whatIfChartBanner.hidden = false;
+  } else if (whatIfChartBanner) {
+    whatIfChartBanner.hidden = true;
+  }
+  if (state.forecast) renderAll();
+}
+
+function addPlannedPurchase({ name, amountMinor, date }) {
+  const existing = state.plannedPurchases.find(
+    (p) => p.name.toLowerCase() === name.toLowerCase() && p.date === date,
+  );
+  if (existing) {
+    existing.amountMinor = amountMinor;
+    existing.enabled = true;
+  } else {
+    state.plannedPurchases.push({
+      id: `buy-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name,
+      amountMinor,
+      date,
+      enabled: true,
+    });
+  }
+  syncSimulationsAndRender();
+}
+
+const simBarCallbacks = {
+  onTogglePurchase(id) {
+    const item = state.plannedPurchases.find((p) => p.id === id);
+    if (!item) return;
+    item.enabled = !item.enabled;
+    syncSimulationsAndRender();
+  },
+  onRemovePurchase(id) {
+    state.plannedPurchases = state.plannedPurchases.filter((p) => p.id !== id);
+    syncSimulationsAndRender();
+  },
+  onToggleEarlyPay() {
+    if (!state.earlyPaySim || !state.forecast) return;
+    state.earlyPaySim.enabled = !state.earlyPaySim.enabled;
+    state.forecast = {
+      ...state.forecast,
+      scenario: state.earlyPaySim.enabled ? state.earlyPaySim.scenario : null,
+    };
+    syncSimulationsAndRender();
+  },
+  onRemoveEarlyPay() {
+    state.earlyPaySim = null;
+    if (state.forecast) {
+      state.forecast = { ...state.forecast, scenario: null };
+    }
+    syncSimulationsAndRender();
+  },
+  onToggleCustomWhatIf() {
+    if (!state.customWhatIf) return;
+    state.customWhatIf.enabled = !state.customWhatIf.enabled;
+    syncSimulationsAndRender();
+  },
+  onRemoveCustomWhatIf() {
+    state.customWhatIf = null;
+    syncSimulationsAndRender();
+  },
+  onRemoveStress() {
+    state.showStress = false;
+    toggleStressBtn?.classList.remove("is-active");
+    toggleStressBtn?.setAttribute("aria-pressed", "false");
+    syncSimulationsAndRender();
+  },
+  onResetBuffer() {
+    state.simulationDecision = null;
+    state.simulationOutcome = null;
+    syncSimulationsAndRender();
+  },
+};
+
+simAddPurchaseBtn?.addEventListener("click", () => {
+  workspace.setWorkspace("whatif", "#afford-card");
+  requestAnimationFrame(() => document.querySelector("#afford-name-input")?.focus());
+});
+
+simResetAllBtn?.addEventListener("click", () => {
+  state.plannedPurchases = [];
+  state.earlyPaySim = null;
+  state.customWhatIf = null;
+  state.showStress = false;
+  toggleStressBtn?.classList.remove("is-active");
+  toggleStressBtn?.setAttribute("aria-pressed", "false");
+  state.simulationDecision = null;
+  state.simulationOutcome = null;
+  if (state.forecast) {
+    state.forecast = { ...state.forecast, scenario: null };
+  }
+  syncSimulationsAndRender();
+});
+
 function renderAll() {
   setupScreen.hidden = true;
   resultsSection.hidden = false;
   changeFileBtn.hidden = false;
+  if (printReportBtn) printReportBtn.hidden = false;
   renderKpis(state);
   renderLedgerAndChart(state);
+  renderCashBreakdown(state);
+  renderSmartCalendar(state, state.calendarFilter, handleQuickTransactionAction);
   renderProposalPanel(state);
+  renderActiveSimsBar(state, simBarCallbacks);
 }
 
 function applyTemplateDraft({ force = false } = {}) {
@@ -408,6 +543,12 @@ async function runBaselineForecast({ customOpeningMinor = null } = {}) {
     state.simulationDecision = null;
     state.simulationOutcome = null;
     state.whatIfOverlay = null;
+    state.plannedPurchases = [];
+    state.earlyPaySim = null;
+    state.customWhatIf = null;
+    state.showStress = false;
+    toggleStressBtn?.classList.remove("is-active");
+    toggleStressBtn?.setAttribute("aria-pressed", "false");
     state.advice = null;
     state.advicePreviewOnly = false;
     state.draftEdited = false;
@@ -420,7 +561,9 @@ async function runBaselineForecast({ customOpeningMinor = null } = {}) {
     populateIncomingPayments(state, scenarioForm);
     applyTemplateDraft({ force: true });
     setActiveTab(state.proposal ? "credit" : "whatif");
-    setAllAccordions(false);
+    workspace.setWorkspace("overview");
+    affordSandbox.syncDateBounds();
+    renderSignalStripBase(state);
     showStatus("");
     renderAll();
 
@@ -437,9 +580,24 @@ async function runBaselineForecast({ customOpeningMinor = null } = {}) {
       insightsPromise: combinedPromise,
       onOpenEmailTab: data.forecast_basis === "history"
         ? null
-        : () => {
+        : (step) => {
+            workspace.setWorkspace("actions");
             setActiveTab("whatif");
-            document.querySelector("#actions-heading")?.scrollIntoView({ behavior: "smooth", block: "center" });
+            if (step?.email_draft) {
+              draftTextarea.value = step.email_draft;
+              if (step.counterparty) {
+                reminderSubjectInput.value =
+                  step.email_kind === "defer_supplier"
+                    ? `Short payment extension request: ${step.counterparty}`
+                    : `Early payment request: ${step.counterparty}`;
+              }
+              draftSourceNote.textContent = "Drafted for your action plan · editable, sent manually by you";
+              state.draftEdited = true;
+              replayFade(draftTextarea);
+            }
+            requestAnimationFrame(() => {
+              document.querySelector("#actions-heading")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            });
           },
     });
   } catch (error) {
@@ -452,12 +610,28 @@ async function runBaselineForecast({ customOpeningMinor = null } = {}) {
   }
 }
 
-// Return to Step 1 (Upload / Settings)
+// Return to Step 1 (Upload / Settings) & Export Brief
 changeFileBtn.addEventListener("click", showSetupScreen);
+printReportBtn?.addEventListener("click", () => window.print());
 
 // Tabs
 tabCredit.addEventListener("click", () => setActiveTab("credit"));
 tabWhatIf.addEventListener("click", () => setActiveTab("whatif"));
+
+// Smart Cash Calendar Filters
+for (const chip of calendarFilterChips) {
+  chip.addEventListener("click", () => {
+    state.calendarFilter = chip.dataset.calFilter || "all";
+    for (const c of calendarFilterChips) {
+      const isMatch = c === chip;
+      c.classList.toggle("is-active", isMatch);
+      c.setAttribute("aria-pressed", String(isMatch));
+    }
+    if (state.forecast) {
+      renderSmartCalendar(state, state.calendarFilter, handleQuickTransactionAction);
+    }
+  });
+}
 
 // Load the backend insight milestones in parallel without blocking the main forecast
 function previewCollectAction(action) {
@@ -465,19 +639,17 @@ function previewCollectAction(action) {
   scenarioForm.elements.move_transaction_id.value = action.transaction_id;
   scenarioForm.elements.move_to_date.value = action.new_date;
   applyTemplateDraft();
+  workspace.setWorkspace("actions");
   setActiveTab("whatif");
-  document.querySelector("#actions-heading")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  requestAnimationFrame(() => {
+    document.querySelector("#actions-heading")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
   scenarioForm.requestSubmit();
 }
 
 async function loadInsights() {
   const reqId = ++state.insightsRequestId;
   resetInsightsUi();
-  if (accCompare) accCompare.hidden = true;
-  if (accHealth) accHealth.hidden = true;
-  if (accOptimize) accOptimize.hidden = true;
-  if (accAnomalies) accAnomalies.hidden = true;
-  syncDetailToggleControls();
 
   const payload = buildInsightPayload(state.forecast);
   if (!payload) return null;
@@ -503,21 +675,9 @@ async function loadInsights() {
 
   if (anomalies) {
     renderAnomalies(anomalies, currency);
-    if (accAnomalies) accAnomalies.hidden = false;
-    if (accAnomaliesPill) {
-      const count = anomalies.findings?.length || 0;
-      accAnomaliesPill.textContent = count > 0 ? `${count} flagged` : "Looks clean";
-      accAnomaliesPill.className = count > 0 ? "pill pill-warning" : "pill pill-success";
-    }
   }
   if (compare) {
     renderCompareOptions(compare, currency);
-    if (compare.options?.length > 0 && accCompare) {
-      accCompare.hidden = false;
-      if (accComparePill) {
-        accComparePill.textContent = `${compare.options.length} options`;
-      }
-    }
   }
   if (stress) {
     renderStressTest(stress, currency);
@@ -527,16 +687,6 @@ async function loadInsights() {
   } else if (credit) {
     renderCreditCheck(credit, currency);
   }
-  if (!hasShortfall || stress || credit) {
-    if (accHealth) accHealth.hidden = false;
-    if (accHealthPill) {
-      accHealthPill.textContent = !hasShortfall
-        ? "100 / 100 · Low risk"
-        : credit
-          ? `${credit.score} / 100 · ${credit.risk} risk`
-          : `Buffer ${printMoney(stress.recommended_limit_minor, currency)}`;
-    }
-  }
   if (optimize) {
     renderOptimizePayments(
       optimize,
@@ -544,14 +694,12 @@ async function loadInsights() {
       currency,
       previewCollectAction,
     );
-    if (accOptimize) accOptimize.hidden = false;
-    if (accOptimizePill) {
-      const moves = optimize.actions?.length || 0;
-      accOptimizePill.textContent = moves > 0 ? `${moves} moves` : "None needed";
-    }
   }
   populateDelayCandidates(state.forecast, currency);
-  syncDetailToggleControls();
+  updateSignalStripInsights({
+    forecast: state.forecast,
+    insights: { anomalies, compare, stress, credit, optimize },
+  });
   return { anomalies, compare, stress, credit, optimize };
 }
 
@@ -567,16 +715,14 @@ function setWhatIfMode(mode) {
 
 function showWhatIfOverlay(label, days) {
   if (!days) return;
-  state.whatIfOverlay = { label, days };
-  if (whatIfChartLabel) whatIfChartLabel.textContent = `${label} plotted on the cash chart above.`;
-  if (whatIfChartBanner) whatIfChartBanner.hidden = false;
-  if (state.forecast) renderLedgerAndChart(state);
+  state.customWhatIf = { label, days, enabled: true };
+  syncSimulationsAndRender();
 }
 
 function clearWhatIfOverlay() {
-  state.whatIfOverlay = null;
-  if (whatIfChartBanner) whatIfChartBanner.hidden = true;
-  if (state.forecast) renderLedgerAndChart(state);
+  state.plannedPurchases = [];
+  state.customWhatIf = null;
+  syncSimulationsAndRender();
 }
 
 whatIfModeAskBtn?.addEventListener("click", () => setWhatIfMode("ask"));
@@ -597,13 +743,13 @@ toggleStressBtn?.addEventListener("click", () => {
   state.showStress = !state.showStress;
   toggleStressBtn.classList.toggle("is-active", state.showStress);
   toggleStressBtn.setAttribute("aria-pressed", String(state.showStress));
-  if (state.forecast) renderLedgerAndChart(state);
+  syncSimulationsAndRender();
 });
 
 clearWhatIfOverlayBtn?.addEventListener("click", clearWhatIfOverlay);
 clearWhatIfCardBtn?.addEventListener("click", clearWhatIfOverlay);
 scrollToChartBtn?.addEventListener("click", () => {
-  document.querySelector("#chart-heading")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  workspace.setWorkspace("overview", "#chart-heading");
 });
 
 // Ask the CFO (Milestone 1)
@@ -752,17 +898,31 @@ scenarioForm.addEventListener("submit", async (event) => {
   btn.disabled = true;
   showStatus("Testing earlier payment date…");
   try {
+    const moveTxId = scenarioForm.elements.move_transaction_id.value;
+    const moveToDate = scenarioForm.elements.move_to_date.value;
     const data = await resolveForecast({
       csvFile: state.csvFile,
       openingBalanceMinor: state.openingBalanceMinor,
       startDate: state.startDate,
-      moveTransactionId: scenarioForm.elements.move_transaction_id.value,
-      moveToDate: scenarioForm.elements.move_to_date.value,
+      moveTransactionId: moveTxId,
+      moveToDate,
     });
     if (state.forecast?.baseline !== baseline) return;
     state.forecast = { ...data, history_days: recordedHistory };
+    const movedTx = (data.transactions || []).find((tx) => tx.id === moveTxId);
+    if (movedTx && data.scenario) {
+      state.earlyPaySim = {
+        txId: movedTx.id,
+        label: movedTx.counterparty || movedTx.label || moveTxId,
+        amountMinor: Math.max(0, Number(movedTx.amount_minor || 0)),
+        originalDate: movedTx.date,
+        newDate: moveToDate,
+        enabled: true,
+        scenario: data.scenario,
+      };
+    }
     showStatus("");
-    renderAll();
+    syncSimulationsAndRender();
   } catch (error) {
     if (state.forecast?.baseline === baseline) showStatus(error.message, true);
   } finally {
@@ -772,8 +932,9 @@ scenarioForm.addEventListener("submit", async (event) => {
 
 document.querySelector("#clear-scenario-btn").addEventListener("click", () => {
   if (!state.forecast) return;
+  state.earlyPaySim = null;
   state.forecast = { ...state.forecast, scenario: null };
-  renderAll();
+  syncSimulationsAndRender();
 });
 
 // Human decision simulation controls
@@ -954,16 +1115,3 @@ inlineBalanceForm?.addEventListener("submit", async (event) => {
     showStatus(error.message, true);
   }
 });
-
-// Screen 2 Progressive Disclosure Accordions
-for (const acc of detailAccordions) {
-  acc.addEventListener("toggle", syncDetailToggleControls);
-}
-
-toggleAllDetailsBtn?.addEventListener("click", () => {
-  const visible = detailAccordions.filter((acc) => !acc.hidden);
-  const allOpen = visible.length > 0 && visible.every((acc) => acc.open);
-  setAllAccordions(!allOpen);
-});
-
-syncDetailToggleControls();
