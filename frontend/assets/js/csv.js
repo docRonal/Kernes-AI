@@ -77,7 +77,9 @@ function reconstructOpening(rows) {
   if (new Set(rows.map((row) => row.currency)).size !== 1 || !rows[0].currency) return null;
   const byDate = (left, right) => left.iso.localeCompare(right.iso);
   const ordered = [...rows].sort(byDate);
-  const anchorDate = ordered.find((row) => row.balanceMinor !== null).iso;
+  const anchorRow = ordered.find((row) => row.balanceMinor !== null);
+  if (!anchorRow) return null;
+  const anchorDate = anchorRow.iso;
   const throughAnchor = ordered.filter((row) => row.iso <= anchorDate);
   if (throughAnchor.some((row) => row.amountMinor === null)) return null;
 
