@@ -11,6 +11,7 @@ from datetime import timedelta
 
 from .advice import day_name, pln
 from .forecast import ForecastInputError, propose, suggest_earlier_payments
+from .history_forecast import ESTIMATED_ID_PREFIX
 from .models import (
     AdviceRequest,
     CreditCheckResponse,
@@ -53,10 +54,11 @@ def _deepest(days: list[DailyBalance], balances: list[int]) -> Deficit | None:
     return Deficit(date=days[balances.index(lowest)].date, shortfall_minor=-lowest)  # index() keeps the earliest day
 
 
-def stress_test(request: InsightRequest) -> StressTestResponse:
-    """How much more credit the bad cases would need: clients paying late, costs rising."""
+def evaluate_stress(request: InsightRequest) -> tuple[StressTestResponse, int]:
+    """Credit needs and the lowest balance across the baseline and tested stresses."""
     days = request.baseline.days
-    proposed = max(0, -min(day.balance_minor for day in days))
+    lowest_balance = min(day.balance_minor for day in days)
+    proposed = max(0, -lowest_balance)
     window = [
         ((t.date - days[0].date).days, t.amount_minor)
         for t in request.transactions
@@ -76,7 +78,9 @@ def stress_test(request: InsightRequest) -> StressTestResponse:
     ]
     scenarios = []
     for name, description, changes in cases:
-        deepest = _deepest(days, _balances_after(days, changes))
+        balances = _balances_after(days, changes)
+        lowest_balance = min(lowest_balance, min(balances))
+        deepest = _deepest(days, balances)
         needed = deepest.shortfall_minor if deepest else 0
         scenarios.append(
             StressScenario(
@@ -87,12 +91,18 @@ def stress_test(request: InsightRequest) -> StressTestResponse:
             )
         )
     buffer = max(scenario.extra_needed_minor for scenario in scenarios)
-    return StressTestResponse(
+    result = StressTestResponse(
         proposed_limit_minor=proposed,
         scenarios=scenarios,
         buffer_minor=buffer,
         recommended_limit_minor=proposed + buffer,
     )
+    return result, lowest_balance
+
+
+def stress_test(request: InsightRequest) -> StressTestResponse:
+    result, _ = evaluate_stress(request)
+    return result
 
 
 def optimize_payments(request: InsightRequest) -> PaymentOptimizationResponse:
@@ -124,7 +134,7 @@ def optimize_payments(request: InsightRequest) -> PaymentOptimizationResponse:
         # A bill due after the deepest day can't lift it.
         if t.amount_minor >= 0 or not days[0].date <= t.date <= proposal.deepest_shortfall.date:
             continue
-        if _NOT_POSTPONABLE.search(t.label):
+        if t.id.startswith(ESTIMATED_ID_PREFIX) or _NOT_POSTPONABLE.search(t.label):
             continue
         at = (t.date - days[0].date).days
         best: tuple[int, int] | None = None

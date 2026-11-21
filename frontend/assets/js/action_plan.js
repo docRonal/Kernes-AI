@@ -88,37 +88,36 @@ function buildFallbackSteps({ forecast, insights, adviceData }) {
     (min, d) => (d.balance_minor < min.balance_minor ? d : min),
     baselineDays[0],
   );
-  const stressBuffer = stress?.buffer_minor ?? 0;
 
   steps.push({
     step_number: num++,
-    title: "Your baseline stays positive",
-    detail: `Lowest projected balance over ${baselineDays.length} days is ${money(lowestDay.balance_minor)} on ${printDate(lowestDay.date)} — no safety buffer needed.`,
+    title: "Projected cash stays at or above zero",
+    detail: `The lowest baseline balance over ${baselineDays.length} days is ${money(lowestDay.balance_minor)} on ${printDate(lowestDay.date)}.`,
     autonomy_level: "analyzed",
     action_kind: "none",
-    impact_minor: Math.max(0, lowestDay.balance_minor),
+    impact_minor: null,
     counterparty: null,
     email_kind: null,
   });
 
   if (stress) {
-    const worstScenario = (stress.scenarios || []).find((s) => s.extra_needed_minor > 0);
+    const hasStressedShortfall = stress.scenarios?.some((scenario) => scenario.deepest_shortfall);
     steps.push({
       step_number: num++,
-      title: "Reserve a safety cushion before reinvesting",
-      detail: worstScenario
-        ? `Even under a tougher week (${worstScenario.description}), your cash holds up${stressBuffer > 0 ? ` with a ${money(stressBuffer)} cushion` : ""}. Expand the What-If simulator below to test equipment purchases.`
-        : "Your cushion handles delay and revenue-dip checks cleanly. Expand the What-If simulator below to test any planned purchase.",
+      title: "Test a planned purchase",
+      detail: hasStressedShortfall
+        ? "At least one stress scenario projects a shortfall. Use the What-If simulator to see how a planned purchase would affect cash."
+        : "The tested stress scenarios stay at or above zero. Use the What-If simulator to see how a planned purchase would affect cash.",
       autonomy_level: "recommended",
       action_kind: "growth_buffer",
-      impact_minor: Math.max(0, lowestDay.balance_minor),
+      impact_minor: null,
       counterparty: null,
       email_kind: null,
     });
   }
 
   return {
-    headline: "Safe growth checklist",
+    headline: "Cash outlook and next steps",
     steps,
     model: "demo-deterministic",
     latency_ms: null,

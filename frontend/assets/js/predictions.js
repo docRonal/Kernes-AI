@@ -104,6 +104,32 @@ export function buildStressCurve(
 }
 
 /**
+ * Combined stress case within the forecast window: receipts five days later and costs 10% higher.
+ */
+export function buildWindowStressCurve(baselineDays, transactions) {
+  const firstDate = baselineDays[0].date;
+  const lastDate = baselineDays[baselineDays.length - 1].date;
+  const deltas = new Map();
+  const addDelta = (date, delta) => deltas.set(date, (deltas.get(date) ?? 0) + delta);
+
+  for (const { date, amount_minor } of transactions) {
+    if (date < firstDate || date > lastDate) continue;
+    if (amount_minor > 0) {
+      addDelta(date, -amount_minor);
+      addDelta(addDaysIso(date, 5), amount_minor);
+    } else {
+      addDelta(date, -Math.round(-amount_minor / 10));
+    }
+  }
+
+  let cumulativeDelta = 0;
+  return baselineDays.map(({ date, balance_minor }) => {
+    cumulativeDelta += deltas.get(date) ?? 0;
+    return { date, balance_minor: balance_minor + cumulativeDelta };
+  });
+}
+
+/**
  * Deterministic single-transaction what-if or late-payment curve over baselineDays.
  */
 export function buildWhatIfCurve(

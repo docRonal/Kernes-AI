@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/styles.css?v=tc22">
-  <script type="module" src="/assets/app.js?v=tc22"></script>
+  <link rel="stylesheet" href="/assets/styles.css?v=history-chart">
+  <script type="module" src="/assets/app.js?v=csv-opening-balance"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -38,7 +38,7 @@
         <div class="setup-hero">
           <h2 id="setup-heading">Will your business have enough cash ahead?</h2>
           <p class="setup-lead">
-            <strong>Tell us briefly what you do, then upload your bank CSV.</strong>
+            <strong>Tell us briefly what you do, then use the Amalfi sample or upload your bank CSV.</strong>
             We show the clear answer first and tuck extra financial analysis underneath until you want it.
           </p>
         </div>
@@ -92,7 +92,7 @@
             <div class="bento-tile">
               <div class="field-label-row">
                 <label for="csv-file">Your bank export (CSV file)</label>
-                <button type="button" class="btn-link" id="download-sample-btn">Download sample CSV</button>
+                <a class="btn-link" id="download-sample-link" href="/demo/amalfi-history.csv" download="pizzeria-amalfi-bank-statement-2025-v6.csv">Download sample CSV</a>
               </div>
               <div class="file-dropzone" id="file-dropzone">
                 <input id="csv-file" name="file" type="file" accept=".csv,text/csv">
@@ -104,16 +104,22 @@
                     </svg>
                   </span>
                   <div class="file-copy">
-                    <span class="file-name" id="file-name">Pizzeria Amalfi example (ready to use)</span>
-                    <span class="file-hint">Drop your bank export file here, or click Browse</span>
+                    <span class="file-name" id="file-name">Pizzeria Amalfi · Full 2025 statement</span>
+                    <span class="file-hint" id="sample-hint">Defaults to 1–14 January 2026 with the year-end balance of 33,266.35 EUR.</span>
                   </div>
                   <span class="file-action">Browse</span>
                 </div>
+              </div>
+              <div class="question-group" id="csv-opening-balance-group" hidden>
+                <label for="csv-opening-balance">Opening balance</label>
+                <input id="csv-opening-balance" inputmode="decimal" aria-describedby="csv-opening-balance-hint">
+                <span class="question-hint" id="csv-opening-balance-hint"></span>
               </div>
             </div>
 
             <div class="setup-actions">
               <button type="submit" class="btn btn-primary btn-lg" id="run-forecast-btn">Check my cash →</button>
+              <button type="button" class="btn-link" id="use-sample-btn" hidden>Use Amalfi sample</button>
             </div>
           </form>
 
@@ -145,11 +151,12 @@
             </div>
             <h2 class="hero-title" id="hero-title">Checking your cash…</h2>
             <p class="hero-summary" id="hero-summary"></p>
+            <p class="card-desc" id="forecast-basis" hidden>Estimated from past transactions. Forecast dates and amounts are approximate.</p>
           </div>
           <div class="hero-stats">
             <div class="hero-stat">
               <div class="hero-stat-label-row">
-                <span class="hero-stat-label">Cash today</span>
+                <span class="hero-stat-label">Opening balance</span>
                 <button type="button" class="btn-link balance-edit-trigger" id="edit-balance-btn">Edit</button>
               </div>
               <strong class="hero-stat-value" id="kpi-opening">—</strong>
@@ -196,14 +203,15 @@
             <div class="chart-controls">
               <div class="chart-pills-row">
                 <div class="overlay-pills" role="group" aria-label="Chart projections and overlays">
-                  <button type="button" class="overlay-pill is-active" id="toggle-forecast-btn" aria-pressed="true">Forecast</button>
+                  <button type="button" class="overlay-pill is-active" id="toggle-forecast-btn" aria-pressed="true">Project +14d</button>
                   <button type="button" class="overlay-pill" id="toggle-stress-btn" aria-pressed="false">Stress test</button>
                   <button type="button" class="overlay-pill is-clear" id="clear-whatif-overlay-btn" hidden>Clear what-if ×</button>
                 </div>
               </div>
               <div class="chart-legend" aria-label="Chart legend">
-                <span class="legend-item"><i class="dot dot-baseline"></i>Your cash</span>
-                <span class="legend-item" id="legend-forecast"><i class="dot dot-forecast"></i>Forecast</span>
+                <span class="legend-item" id="legend-history" hidden><i class="key-history"></i>Recorded balance</span>
+                <span class="legend-item"><i class="dot dot-baseline" id="legend-baseline-key"></i><span id="legend-baseline-label">Your cash</span></span>
+                <span class="legend-item" id="legend-forecast"><i class="dot dot-forecast"></i>Extra 14-day projection</span>
                 <span class="legend-item" id="legend-scenario" hidden><i class="dot dot-scenario"></i>If paid earlier</span>
                 <span class="legend-item" id="legend-whatif" hidden><i class="dot dot-whatif"></i><span id="legend-whatif-label">What-if</span></span>
                 <span class="legend-item" id="legend-stress" hidden><i class="dot dot-stress"></i>Stress case</span>

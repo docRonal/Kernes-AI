@@ -124,6 +124,13 @@ class EarlierPayment(BaseModel):
 class ForecastResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     currency: CurrencyCode = "EUR"
+    forecast_basis: Literal["history"] | None = Field(default=None, exclude_if=lambda basis: basis is None)
+    history_days: list[DailyBalance] | None = Field(
+        default=None,
+        max_length=HORIZON_DAYS,
+        exclude_if=lambda days: days is None,
+        description="End-of-day balances reconstructed from recorded movements and the supplied opening balance.",
+    )
     transactions: list[Transaction]
     baseline: Projection
     proposal: Proposal | None

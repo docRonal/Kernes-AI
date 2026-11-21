@@ -1,11 +1,7 @@
 import {
-  AMALFI_DEFAULT_OPENING_EUR,
-  AMALFI_SAMPLE_CSV,
-  AMALFI_SAMPLE_FILENAME,
-} from "./sample-amalfi.js?v=tc11";
-import {
   buildInsightPayload,
   formatCsvError,
+  request,
   requestAdvice,
   requestAnomalies,
   requestAskCfo,
@@ -18,8 +14,9 @@ import {
   requestStressTest,
   resolveForecast,
 } from "./js/api.js?v=tc16";
-import { renderActionPlan } from "./js/action_plan.js?v=tc16";
-import { printMoney, replayFade, toMinor } from "./js/format.js?v=tc11";
+import { renderActionPlan } from "./js/action_plan.js?v=amalfi-chat";
+import { extractCsvDefaults } from "./js/csv.js?v=1";
+import { printDate, printMoney, replayFade, toMinor } from "./js/format.js?v=tc11";
 import {
   populateDelayCandidates,
   renderAnomalies,
@@ -42,9 +39,11 @@ import {
   renderKpis,
   renderLedgerAndChart,
   renderProposalPanel,
-} from "./js/render.js?v=tc22";
+} from "./js/render.js?v=history-chart";
 
 const HORIZON_DAYS = 14;
+const AMALFI_OPENING_BALANCE_MINOR = 3_326_635;
+const AMALFI_FORECAST_START_DATE = "2026-01-01";
 
 const forecastForm = document.querySelector("#forecast-form");
 const businessTypeInput = document.querySelector("#business-type-input");
@@ -53,8 +52,14 @@ const promptChips = document.querySelectorAll(".prompt-chip");
 const scenarioForm = document.querySelector("#scenario-form");
 const fileInput = document.querySelector("#csv-file");
 const fileDropzone = document.querySelector("#file-dropzone");
+const csvOpeningBalanceGroup = document.querySelector("#csv-opening-balance-group");
+const csvOpeningBalance = document.querySelector("#csv-opening-balance");
+const csvOpeningBalanceHint = document.querySelector("#csv-opening-balance-hint");
 const fileNameEl = document.querySelector("#file-name");
-const downloadSampleBtn = document.querySelector("#download-sample-btn");
+const sampleFileLabel = fileNameEl.textContent;
+const sampleHint = document.querySelector("#sample-hint");
+const sampleDownloadLink = document.querySelector("#download-sample-link");
+const useSampleBtn = document.querySelector("#use-sample-btn");
 const editBalanceBtn = document.querySelector("#edit-balance-btn");
 const inlineBalanceForm = document.querySelector("#inline-balance-form");
 const inlineBalanceInput = document.querySelector("#inline-balance-input");
@@ -206,6 +211,11 @@ function renderAll() {
 
 function applyTemplateDraft({ force = false } = {}) {
   if (!state.forecast || (!force && state.draftEdited)) return;
+  if (state.forecast.forecast_basis === "history") {
+    reminderSubjectInput.value = "";
+    draftTextarea.value = "";
+    return;
+  }
   const { subject, body } = buildReminderTemplate(state, scenarioForm);
   reminderSubjectInput.value = subject;
   draftTextarea.value = body;
@@ -283,7 +293,7 @@ async function fetchAdvice({ forceDraft = false } = {}) {
     replayFade(explanationEl);
     adviceModelEl.textContent = data.model;
     adviceModelEl.hidden = !data.model;
-    if (data.email_draft && (forceDraft || !state.draftEdited)) {
+    if (state.forecast.forecast_basis !== "history" && data.email_draft && (forceDraft || !state.draftEdited)) {
       draftTextarea.value = data.email_draft;
       draftSourceNote.textContent = "Drafted by AI · editable, sent manually by you";
       replayFade(draftTextarea);
@@ -298,7 +308,7 @@ async function fetchAdvice({ forceDraft = false } = {}) {
       state.advicePreviewOnly = true;
       adviceError.className = "inline-alert inline-alert-soft";
       adviceError.textContent =
-        "AI explanation is not available for this forecast in preview mode. Your server cash numbers, decision preview, and editable email draft below are ready.";
+        "AI explanation is not available for this forecast in preview mode. You can still review the projected balances and test a decision.";
       adviceError.hidden = false;
       retryAdviceBtn.hidden = true;
     } else {
@@ -324,145 +334,33 @@ async function fetchAdvice({ forceDraft = false } = {}) {
   }
 }
 
-function splitSemicolonCsvLine(line) {
-  const cols = [];
-  let cur = "";
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        cur += '"';
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
+async function loadForecastSetup() {
+  const selectedFile = fileInput.files?.[0];
+  if (selectedFile) {
+    const csvText = await selectedFile.text();
+    validateCsvUpload(selectedFile, csvText);
+    const defaults = extractCsvDefaults(csvText, HORIZON_DAYS);
+    if (defaults.openingBalanceMinor === null) {
+      const instructions = `Enter the account balance before any payments on ${printDate(defaults.startDate)}.`;
+      csvOpeningBalanceHint.textContent = instructions;
+      csvOpeningBalanceGroup.hidden = false;
+      if (!csvOpeningBalance.value.trim()) {
+        csvOpeningBalance.focus();
+        throw new Error(`We couldn't reconstruct the opening balance from this CSV. ${instructions}`);
       }
-    } else if (ch === ";" && !inQuotes) {
-      cols.push(cur.trim());
-      cur = "";
-    } else {
-      cur += ch;
+      defaults.openingBalanceMinor = Number(toMinor(csvOpeningBalance.value));
+      defaults.balanceSourceLabel = "Custom balance";
     }
+    return { csvFile: selectedFile, ...defaults };
   }
-  cols.push(cur.trim());
-  return cols;
-}
 
-function parseBankDateIso(raw) {
-  const s = String(raw || "").trim();
-  const dot = /^(\d{2})\.(\d{2})\.(\d{2}|\d{4})$/.exec(s);
-  if (dot) {
-    const day = Number(dot[1]);
-    const month = Number(dot[2]);
-    const year = dot[3].length === 2 ? Number(`20${dot[3]}`) : Number(dot[3]);
-    const dt = new Date(Date.UTC(year, month - 1, day));
-    if (dt.getUTCFullYear() === year && dt.getUTCMonth() === month - 1 && dt.getUTCDate() === day) {
-      return dt.toISOString().slice(0, 10);
-    }
-    return null;
-  }
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    const dt = new Date(`${s}T00:00:00Z`);
-    if (!Number.isNaN(dt.getTime()) && dt.toISOString().slice(0, 10) === s) {
-      return s;
-    }
-  }
-  return null;
-}
-
-function parseBankMinorSafe(raw) {
-  const normalized = String(raw || "")
-    .trim()
-    .replace(/[\s\u00a0]/g, "")
-    .replace(/\.(?=\d{3}(?:,|$))/g, "")
-    .replace(",", ".");
-  if (!/^[+-]?\d+(?:\.\d{1,2})?$/.test(normalized)) return null;
-  try {
-    return BigInt(toMinor(normalized));
-  } catch {
-    return null;
-  }
-}
-
-function extractCsvDefaults(csvText, { isSample = false } = {}) {
-  const lines = String(csvText || "")
-    .replace(/^\uFEFF/, "")
-    .split(/\r?\n/)
-    .filter((line) => line.trim() !== "");
-  const headers = lines.length > 0 ? splitSemicolonCsvLine(lines[0]).map((h) => h.toLowerCase()) : [];
-
-  const idxOf = (...candidates) => {
-    for (const c of candidates) {
-      const idx = headers.indexOf(c);
-      if (idx !== -1) return idx;
-    }
-    return -1;
+  const response = await request(sampleDownloadLink.href);
+  return {
+    csvFile: new File([await response.blob()], sampleDownloadLink.download, { type: "text/csv" }),
+    openingBalanceMinor: AMALFI_OPENING_BALANCE_MINOR,
+    startDate: AMALFI_FORECAST_START_DATE,
+    balanceSourceLabel: "2025 closing balance",
   };
-
-  const valDateIdx = idxOf("value date");
-  const bookDateIdx = idxOf("booking date");
-  const amountIdx = idxOf("amount");
-  const balanceIdx = idxOf("balance", "saldo", "closing balance", "running balance");
-
-  const rows = [];
-  let latestDateIso = null;
-
-  for (let i = 1; i < lines.length; i += 1) {
-    const cols = splitSemicolonCsvLine(lines[i]);
-    const iso =
-      (valDateIdx !== -1 ? parseBankDateIso(cols[valDateIdx]) : null) ||
-      (bookDateIdx !== -1 ? parseBankDateIso(cols[bookDateIdx]) : null);
-    if (!iso) continue;
-
-    if (!latestDateIso || iso > latestDateIso) {
-      latestDateIso = iso;
-    }
-    rows.push({
-      iso,
-      amountMinor: amountIdx !== -1 ? parseBankMinorSafe(cols[amountIdx]) : null,
-      balanceMinor: balanceIdx !== -1 ? parseBankMinorSafe(cols[balanceIdx]) : null,
-    });
-  }
-
-  // Anchor the 14-day window so its last day always equals the latest CSV date (chart divider).
-  const startDate = latestDateIso
-    ? addDaysIso(latestDateIso, -(HORIZON_DAYS - 1))
-    : new Date().toISOString().slice(0, 10);
-  const endDate = latestDateIso || addDaysIso(startDate, HORIZON_DAYS - 1);
-
-  let openingBalanceMinor = null;
-  let balanceSourceLabel = "";
-
-  // 1. Prefer an explicit Balance/Saldo column if the bank CSV includes one.
-  const preWindowRows = rows.filter((r) => r.iso < startDate && r.balanceMinor !== null);
-  const windowBalanceRows = rows.filter((r) => r.balanceMinor !== null);
-  if (preWindowRows.length > 0) {
-    preWindowRows.sort((a, b) => (a.iso < b.iso ? -1 : a.iso > b.iso ? 1 : 0));
-    openingBalanceMinor = Number(preWindowRows[preWindowRows.length - 1].balanceMinor);
-    balanceSourceLabel = "From CSV balance";
-  } else if (windowBalanceRows.length > 0) {
-    openingBalanceMinor = Number(windowBalanceRows[0].balanceMinor);
-    balanceSourceLabel = "From CSV balance";
-  } else if (isSample) {
-    // 2. Canonical bundled Amalfi sample synced opening balance.
-    openingBalanceMinor = Number(toMinor(AMALFI_DEFAULT_OPENING_EUR));
-    balanceSourceLabel = "Synced demo balance";
-  } else {
-    // 3. Auto-estimate an opening liquidity cushion (50% of 14-day inflows, rounded to 500.00, min 1,000.00).
-    let inflowsMinor = 0n;
-    for (const r of rows) {
-      if (r.iso >= startDate && r.iso <= endDate && r.amountMinor !== null && r.amountMinor > 0n) {
-        inflowsMinor += r.amountMinor;
-      }
-    }
-    const half = inflowsMinor / 2n;
-    const rounded = ((half + 25_000n) / 50_000n) * 50_000n;
-    const clamped = rounded < 100_000n ? 100_000n : rounded;
-    openingBalanceMinor = Number(clamped);
-    balanceSourceLabel = "Auto-estimated balance";
-  }
-
-  return { startDate, openingBalanceMinor, balanceSourceLabel };
 }
 
 async function runBaselineForecast({ customOpeningMinor = null } = {}) {
@@ -471,25 +369,20 @@ async function runBaselineForecast({ customOpeningMinor = null } = {}) {
   showStatus("Checking your upcoming cash…");
 
   try {
-    if (customOpeningMinor !== null && state.csvFile) {
-      state.openingBalanceMinor = customOpeningMinor;
-      state.balanceSourceLabel = "Custom balance";
-    } else {
-      const selectedFile = fileInput.files?.[0] || null;
-      const isSample = !selectedFile;
-      const csvText = selectedFile ? await selectedFile.text() : AMALFI_SAMPLE_CSV;
-      if (selectedFile) {
-        validateCsvUpload(selectedFile, csvText);
-      }
-      state.csvFile =
-        selectedFile || new File([AMALFI_SAMPLE_CSV], AMALFI_SAMPLE_FILENAME, { type: "text/csv" });
+    const editingBalance = customOpeningMinor !== null && state.csvFile;
+    const recordedHistory = state.forecast?.history_days;
+    const setup = editingBalance
+      ? {
+          csvFile: state.csvFile,
+          startDate: state.startDate,
+          openingBalanceMinor: customOpeningMinor,
+          balanceSourceLabel: "Custom balance",
+        }
+      : await loadForecastSetup();
+    const data = await resolveForecast(setup);
+    if (editingBalance) data.history_days = recordedHistory;
 
-      const resolved = extractCsvDefaults(csvText, { isSample });
-      state.openingBalanceMinor = resolved.openingBalanceMinor;
-      state.balanceSourceLabel = resolved.balanceSourceLabel;
-      state.startDate = resolved.startDate;
-    }
-
+    Object.assign(state, setup);
     state.profile = {
       business_type: businessTypeInput?.value.trim() || "",
       goal: businessGoalInput?.value.trim() || "",
@@ -498,14 +391,11 @@ async function runBaselineForecast({ customOpeningMinor = null } = {}) {
     state.horizonDays = HORIZON_DAYS;
     if (inlineBalanceForm) inlineBalanceForm.hidden = true;
     if (editBalanceBtn) editBalanceBtn.hidden = false;
-
-    const data = await resolveForecast({
-      csvFile: state.csvFile,
-      openingBalanceMinor: state.openingBalanceMinor,
-      startDate: state.startDate,
-    });
-
     state.forecast = data;
+    const estimatedFromHistory = data.forecast_basis === "history";
+    setForecastOverlay(!estimatedFromHistory);
+    toggleForecastBtn.hidden = estimatedFromHistory;
+    toggleForecastBtn.disabled = estimatedFromHistory;
     state.adviceRequestId += 1;
     adviceLoading.hidden = true;
     adviceError.hidden = true;
@@ -545,10 +435,12 @@ async function runBaselineForecast({ customOpeningMinor = null } = {}) {
     renderActionPlan({
       state,
       insightsPromise: combinedPromise,
-      onOpenEmailTab: () => {
-        setActiveTab("whatif");
-        document.querySelector("#actions-heading")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      },
+      onOpenEmailTab: data.forecast_basis === "history"
+        ? null
+        : () => {
+            setActiveTab("whatif");
+            document.querySelector("#actions-heading")?.scrollIntoView({ behavior: "smooth", block: "center" });
+          },
     });
   } catch (error) {
     showStatus(formatCsvError(error.message), true);
@@ -594,7 +486,7 @@ async function loadInsights() {
   const hasShortfall = Boolean(payload.baseline.first_deficit);
 
   const [anomaliesRes, compareRes, stressRes, creditRes, optimizeRes] = await Promise.allSettled([
-    requestAnomalies(payload),
+    state.forecast.forecast_basis === "history" ? Promise.resolve(null) : requestAnomalies(payload),
     requestCompareOptions(payload),
     requestStressTest(payload),
     hasShortfall ? requestCreditCheck(payload) : Promise.resolve(null),
@@ -690,10 +582,14 @@ function clearWhatIfOverlay() {
 whatIfModeAskBtn?.addEventListener("click", () => setWhatIfMode("ask"));
 whatIfModeDelayBtn?.addEventListener("click", () => setWhatIfMode("delay"));
 
-toggleForecastBtn?.addEventListener("click", () => {
-  state.showForecast = !state.showForecast;
-  toggleForecastBtn.classList.toggle("is-active", state.showForecast);
-  toggleForecastBtn.setAttribute("aria-pressed", String(state.showForecast));
+function setForecastOverlay(enabled) {
+  state.showForecast = enabled;
+  toggleForecastBtn.classList.toggle("is-active", enabled);
+  toggleForecastBtn.setAttribute("aria-pressed", String(enabled));
+}
+
+toggleForecastBtn.addEventListener("click", () => {
+  setForecastOverlay(!state.showForecast);
   if (state.forecast) renderLedgerAndChart(state);
 });
 
@@ -812,9 +708,19 @@ delayForm.addEventListener("submit", async (event) => {
 // File upload & drag-and-drop
 fileInput.addEventListener("change", () => {
   const file = fileInput.files?.[0];
+  csvOpeningBalance.value = "";
+  csvOpeningBalanceGroup.hidden = true;
+  sampleHint.hidden = Boolean(file);
+  useSampleBtn.hidden = !file;
   fileNameEl.textContent = file
     ? `${file.name} (${Math.max(1, Math.round(file.size / 1024))} KB)`
-    : "Pizzeria Amalfi example (ready to use)";
+    : sampleFileLabel;
+});
+
+useSampleBtn.addEventListener("click", () => {
+  fileInput.value = "";
+  fileInput.dispatchEvent(new Event("change"));
+  showStatus("");
 });
 
 ["dragenter", "dragover"].forEach((evt) => {
@@ -830,20 +736,6 @@ fileInput.addEventListener("change", () => {
   });
 });
 
-// Download Red Hat sample CSV
-function downloadSampleCsv() {
-  const blob = new Blob([AMALFI_SAMPLE_CSV], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = AMALFI_SAMPLE_FILENAME;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
-downloadSampleBtn.addEventListener("click", downloadSampleCsv);
-
 // Forecast controls
 forecastForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -855,7 +747,7 @@ scenarioForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!state.forecast) return;
 
-  const baseline = state.forecast.baseline;
+  const { baseline, history_days: recordedHistory } = state.forecast;
   const btn = document.querySelector("#compare-dates-btn");
   btn.disabled = true;
   showStatus("Testing earlier payment date…");
@@ -868,7 +760,7 @@ scenarioForm.addEventListener("submit", async (event) => {
       moveToDate: scenarioForm.elements.move_to_date.value,
     });
     if (state.forecast?.baseline !== baseline) return;
-    state.forecast = data;
+    state.forecast = { ...data, history_days: recordedHistory };
     showStatus("");
     renderAll();
   } catch (error) {
@@ -1036,7 +928,7 @@ for (const chip of promptChips) {
   });
 }
 
-// Screen 2 Inline "Cash today" Editor
+// Screen 2 inline opening balance editor
 editBalanceBtn?.addEventListener("click", () => {
   if (!inlineBalanceForm || !inlineBalanceInput) return;
   const currentMinor = state.openingBalanceMinor ?? 500_000;
