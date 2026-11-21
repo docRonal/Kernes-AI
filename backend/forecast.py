@@ -16,6 +16,7 @@ from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
 
+from .currency import current_currency
 from .models import (
     HORIZON_DAYS,
     MAX_ABS_MINOR,
@@ -116,7 +117,7 @@ def _read_row(values: dict[str, str], line: int) -> Transaction:
 
     if not _WHOLE_NUMBER.fullmatch(values["amount_minor"]):
         raise ForecastInputError(
-            f"Line {line}: amount_minor must be a whole number of cents, for example -1100000 for -EUR 11,000.00."
+            f"Line {line}: amount_minor must be a whole number of cents, for example -1100000 for -11,000.00."
         )
     amount = int(values["amount_minor"])
     if abs(amount) > MAX_ABS_MINOR:
@@ -264,6 +265,7 @@ def build_forecast(
 
     proposal = propose(baseline, transactions)
     return ForecastResponse(
+        currency=current_currency(),
         transactions=transactions,
         baseline=baseline,
         proposal=proposal,
@@ -351,6 +353,7 @@ async def get_forecast(
     result = json.loads((DEMO_DIR / "forecast.example.json").read_text(encoding="utf-8"))
     if scenario == (None, None):
         result["scenario"] = None
+    result["currency"] = current_currency()
     return result
 
 

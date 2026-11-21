@@ -14,6 +14,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import HTTPException
 
+from .currency import current_currency
 from . import advice
 from .advice import ATTEMPTS, ModelConfig, ModelError, cited_amounts, day_name, pln
 from .forecast import ForecastInputError, propose
@@ -299,7 +300,7 @@ def ask_cfo(*, mode: str, request: AskRequest) -> AskResponse:
         try:
             data, _ = _ask_model(
                 [
-                    {"role": "system", "content": WHAT_IF_PROMPT},
+                    {"role": "system", "content": WHAT_IF_PROMPT.replace("EUR", current_currency())},
                     {"role": "user", "content": f"Transactions:\n{listed}\n\nQuestion: {request.question}"},
                 ],
                 WHAT_IF_SCHEMA,

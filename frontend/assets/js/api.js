@@ -47,6 +47,7 @@ export async function resolveForecast({
   horizonDays,
   moveTransactionId = null,
   moveToDate = null,
+  currency = "EUR",
 }) {
   // Bank statements are analyzed locally in EUR, including the longer horizons.
   if (parsedCsv) {
@@ -64,6 +65,7 @@ export async function resolveForecast({
   formData.set("file", csvFile, csvFile.name);
   formData.set("starting_balance_minor", String(openingBalanceMinor));
   formData.set("start_date", startDate);
+  formData.set("currency", currency);
   if (moveTransactionId && moveToDate) {
     formData.set("move_transaction_id", moveTransactionId);
     formData.set("move_to_date", moveToDate);
@@ -111,15 +113,21 @@ export function buildInsightPayload(forecast) {
   return {
     baseline: { days, first_deficit },
     transactions,
+    ...apiCurrency(forecast.currency),
   };
 }
 
-export function requestAdvice({ baseline, transactions }) {
-  return post("/api/advice", { baseline, transactions });
+export function requestAdvice({ baseline, transactions, currency }) {
+  return post("/api/advice", { baseline, transactions, ...apiCurrency(currency) });
 }
 
-export function requestDecision({ baseline, decision }) {
-  return post("/api/decision", { baseline, decision });
+export function requestDecision({ baseline, decision, currency }) {
+  return post("/api/decision", { baseline, decision, ...apiCurrency(currency) });
+}
+
+// Only EU currencies go to the API; anything else falls back to its default (EUR).
+function apiCurrency(currency) {
+  return EU_CURRENCIES.includes(currency) ? { currency } : {};
 }
 
 export function requestAnomalies(payload) {

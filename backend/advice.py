@@ -21,6 +21,7 @@ from pathlib import Path
 
 from fastapi import HTTPException
 
+from .currency import amount_markers, money
 from .forecast import horizon, propose
 from .models import (
     AdviceRequest,
@@ -43,8 +44,10 @@ log = logging.getLogger("autonomous_cfo.advice")
 # Thousands separators: comma, no-break space and narrow no-break space. A plain
 # space is left out so "November 27, 5,000 PLN" isn't read as 275,000.
 _DIGITS = r"\d[\d,\u00a0\u202f]*(?:\.\d{1,2})?"
+# Any EU currency code or local symbol, before or after the number.
+_MARKERS = amount_markers()
 _AMOUNT = re.compile(
-    rf"(?:EUR|€|PLN|zł|zl)\s*[-−]?\s*({_DIGITS})|({_DIGITS})\s*(?:EUR|€|PLN|zł|zl)\b",
+    rf"(?<![A-Za-z])(?:{_MARKERS})\s*[-−]?\s*({_DIGITS})|({_DIGITS})\s*(?:{_MARKERS})(?![A-Za-z])",
     re.IGNORECASE,
 )
 
@@ -80,6 +83,14 @@ class ModelError(RuntimeError):
     """The model is unreachable or its answer can't be used."""
 
 
+def _parse_timeout(raw: str, default: float) -> float:
+    try:
+        value = float(raw) if raw.strip() else default
+        return value if value > 0 else default
+    except ValueError:
+        return default
+
+
 @dataclass(frozen=True)
 class ModelConfig:
     url: str
@@ -95,12 +106,7 @@ class ModelConfig:
         if not url.startswith(("http://", "https://")) or not name:
             raise ModelError("The model endpoint isn't configured. Set CFO_MODEL_URL and CFO_MODEL_NAME.")
         raw_timeout = os.environ.get("CFO_MODEL_TIMEOUT") or os.environ.get("CFO_MODEL_TIMEOUT_SECONDS") or ""
-        try:
-            timeout = float(raw_timeout) if raw_timeout.strip() else DEFAULT_TIMEOUT_SECONDS
-            if timeout <= 0:
-                timeout = DEFAULT_TIMEOUT_SECONDS
-        except ValueError:
-            timeout = DEFAULT_TIMEOUT_SECONDS
+        timeout = _parse_timeout(raw_timeout, DEFAULT_TIMEOUT_SECONDS)
         ca_bundle = os.environ.get("CFO_CA_BUNDLE", "").strip()
         ssl_context: ssl.SSLContext | None = None
         if ca_bundle:
@@ -122,11 +128,12 @@ class ModelConfig:
         name = os.environ.get("CFO_FALLBACK_MODEL_NAME", "").strip()
         if not url.startswith(("http://", "https://")) or not name:
             return None
+        fallback_timeout = _parse_timeout(os.environ.get("CFO_FALLBACK_MODEL_TIMEOUT", ""), timeout)
         return cls(
             url=url,
             name=name,
             token=os.environ.get("CFO_FALLBACK_MODEL_TOKEN") or os.environ.get("CFO_MODEL_TOKEN") or None,
-            timeout=timeout,
+            timeout=fallback_timeout,
             ssl_context=ssl_context,
         )
 
@@ -135,9 +142,8 @@ class ModelConfig:
 
 
 def pln(minor: int) -> str:
-    sign = "-" if minor < 0 else ""
-    whole, cents = divmod(abs(minor), 100)
-    return f"{sign}EUR {whole:,}.{cents:02d}"
+    """Kept under its first name for the modules that import it; writes the request's currency."""
+    return money(minor)
 
 
 def day_name(day: date) -> str:
@@ -207,6 +213,50 @@ def _predict_delay_impact(
     return delay_lines, extra_allowed
 
 
+_FIXED_OBLIGATION_RE = re.compile(
+    r"\b(rent|payroll|salar\w*|wage\w*|lease|utilit\w*|insur\w*|tax\w*|miete|gehalt|lohn|czynsz|wynagrodz\w*)\b",
+    re.IGNORECASE,
+)
+
+
+def _recurring_expense_note(transactions: list[Transaction], window: list[date]) -> tuple[str | None, set[int]]:
+    """Summarize recurring or fixed obligations (e.g. rent, payroll) that continue even during quiet revenue periods."""
+    in_window = [t for t in transactions if window[0] <= t.date <= window[-1]]
+    outflows = [t for t in in_window if t.amount_minor < 0]
+    if not outflows:
+        return None, set()
+
+    label_counts: dict[str, int] = {}
+    for t in transactions:
+        if t.amount_minor < 0:
+            key = t.label.strip().lower()
+            label_counts[key] = label_counts.get(key, 0) + 1
+
+    recurring = [
+        t for t in outflows
+        if _FIXED_OBLIGATION_RE.search(t.label) or label_counts.get(t.label.strip().lower(), 0) > 1
+    ]
+    if not recurring:
+        return None, set()
+
+    total_recurring = sum(-t.amount_minor for t in recurring)
+    names = list(dict.fromkeys(t.label.strip() for t in recurring))
+    inflows_before_last_out = any(
+        t.amount_minor > 0 and t.date <= max(r.date for r in recurring)
+        for t in in_window
+    )
+    context = (
+        "even when incoming revenue pauses (e.g. during a closure or vacation)"
+        if not inflows_before_last_out
+        else "alongside scheduled receipts"
+    )
+    note = (
+        f"Ongoing regular obligations ({', '.join(names)}) continue {context}, "
+        f"totaling {pln(total_recurring)}."
+    )
+    return note, {total_recurring}
+
+
 def build_facts(request: AdviceRequest) -> Facts:
     baseline = request.baseline
     window = horizon(baseline.days[0].date)
@@ -248,6 +298,9 @@ def build_facts(request: AdviceRequest) -> Facts:
     day_totals = _same_day_outgoing_totals(relevant)
     for day, total in day_totals.items():
         lines.append(f"Outgoing payments on {day_name(day)} total {pln(total)}.")
+    recurring_note, recurring_allowed = _recurring_expense_note(request.transactions, window)
+    if recurring_note:
+        lines.append(recurring_note)
 
     reminder = _reminder_target(request.transactions, first.date, window)
     delay_lines, extra_allowed = _predict_delay_impact(request, window, proposal.limit_minor)
@@ -258,6 +311,7 @@ def build_facts(request: AdviceRequest) -> Facts:
     allowed |= {abs(t.amount_minor) for t in request.transactions}
     allowed |= extra_allowed
     allowed |= set(day_totals.values())
+    allowed |= recurring_allowed
     return Facts(
         proposal=proposal,
         lines=lines,
@@ -298,9 +352,9 @@ def build_messages(facts: Facts) -> list[dict[str, str]]:
         "Task 1, explanation: write exactly 3 sentences about the forecast, in the future tense "
         '("is projected to"). Sentence 1: when the balance first goes below zero and the size of that gap, and the '
         "deepest point and its gap if it is a different day. Take the gap amounts from the facts, never from a "
-        "transaction. Sentence 2: which transactions cause the gap and when money "
-        f"comes back. Sentence 3: why a credit facility of {limit} covers the gap, and that the owner can "
-        "approve or reject this proposal. Do not mention any email.",
+        "transaction. Sentence 2: which transactions cause the gap (noting ongoing regular obligations like "
+        "rent or payroll if listed) and when money comes back. Sentence 3: why a credit facility of "
+        f"{limit} covers the gap, and that the owner can approve or reject this proposal. Do not mention any email.",
     ]
     if facts.reminder:
         task.append(
@@ -535,7 +589,7 @@ def get_advice(*, mode: str, request: AdviceRequest) -> AdviceResponse:
 
     forecast = json.loads((DEMO_DIR / "forecast.example.json").read_text(encoding="utf-8"))
     expected = {"baseline": forecast["baseline"], "transactions": forecast["transactions"]}
-    if request.model_dump(mode="json", exclude_none=True) != expected:
+    if request.model_dump(mode="json", exclude_none=True, exclude={"currency"}) != expected:
         raise HTTPException(422, "Submit the bundled baseline forecast in demo mode.")
 
     return AdviceResponse.model_validate_json((DEMO_DIR / "advice.example.json").read_text(encoding="utf-8"))
@@ -549,3 +603,49 @@ def send_reminder(request: ReminderSendRequest) -> ReminderSendResponse:
         subject=request.subject,
         message="Simulation only: nothing was sent. Copy the draft and send it from your own email.",
     )
+
+
+
+def _probe_model(config: ModelConfig, *, probe_timeout: float = 2.5) -> dict:
+    models_url = re.sub(r"/chat/completions/?$", "/models", config.url)
+    headers = {"Accept": "application/json"}
+    if config.token:
+        headers["Authorization"] = f"Bearer {config.token}"
+    req = urllib.request.Request(models_url, headers=headers, method="GET")
+    started = time.monotonic()
+    try:
+        with urllib.request.urlopen(req, timeout=probe_timeout, context=config.ssl_context) as resp:
+            ok = 200 <= resp.status < 300
+        return {
+            "model": config.name,
+            "reachable": ok,
+            "timeout_seconds": config.timeout,
+            "latency_ms": round((time.monotonic() - started) * 1000),
+        }
+    except Exception as exc:
+        return {
+            "model": config.name,
+            "reachable": False,
+            "timeout_seconds": config.timeout,
+            "error": str(exc),
+        }
+
+
+def check_ai_health() -> dict:
+    """Check reachability of configured OpenShift AI primary and fallback models."""
+    try:
+        primary = ModelConfig.from_env()
+    except ModelError as exc:
+        return {"status": "unconfigured", "detail": str(exc), "primary": None, "fallback": None}
+
+    primary_status = _probe_model(primary)
+    fallback = ModelConfig.fallback_from_env(timeout=primary.timeout, ssl_context=primary.ssl_context)
+    fallback_status = _probe_model(fallback) if fallback else None
+
+    if primary_status["reachable"]:
+        overall = "ok"
+    elif fallback_status and fallback_status["reachable"]:
+        overall = "degraded"
+    else:
+        overall = "unavailable"
+    return {"status": overall, "primary": primary_status, "fallback": fallback_status}

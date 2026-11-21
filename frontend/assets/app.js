@@ -103,6 +103,7 @@ const copyFeedback = document.querySelector("#copy-feedback");
 let selectedSample = null;
 
 const state = {
+  currency: "EUR",
   openingBalanceMinor: null,
   startDate: AMALFI_DEFAULT_START_DATE,
   horizonDays: 14,
@@ -310,6 +311,11 @@ async function runBaselineForecast() {
     const header = csvText.trimStart().split(/\r?\n/, 1)[0];
     state.parsedCsv = header.includes(";") ? parseRedHatBankCsv(csvText) : null;
     if (!state.parsedCsv) horizonSelect.value = "14";
+    // A bank statement names its own currency; a transaction CSV uses the one the owner picked.
+    if (EU_CURRENCIES.includes(state.parsedCsv?.currency)) {
+      forecastForm.elements.currency.value = state.parsedCsv.currency;
+    }
+    state.currency = forecastForm.elements.currency.value;
     state.openingBalanceMinor = Number(toMinor(forecastForm.elements.opening_balance.value));
     state.startDate = forecastForm.elements.start_date.value;
     state.horizonDays = horizonSelect.value === "all" ? "all" : Number(horizonSelect.value);
@@ -318,6 +324,7 @@ async function runBaselineForecast() {
       csvFile: state.csvFile,
       parsedCsv: state.parsedCsv,
       openingBalanceMinor: state.openingBalanceMinor,
+      currency: state.currency,
       startDate: state.startDate,
       horizonDays: state.horizonDays,
     });
@@ -608,6 +615,7 @@ loadKernesSampleBtn.addEventListener("click", async () => {
     fileInput.value = "";
     fileNameEl.textContent = "Kernes demo (EUR)";
     forecastForm.elements.opening_balance.value = "12000.00";
+    forecastForm.elements.currency.value = "EUR";
     forecastForm.elements.start_date.value = "2026-11-23";
     horizonSelect.value = "14";
     await runBaselineForecast();
@@ -632,6 +640,7 @@ scenarioForm.addEventListener("submit", async (event) => {
       csvFile: state.csvFile,
       parsedCsv: state.parsedCsv,
       openingBalanceMinor: state.openingBalanceMinor,
+      currency: state.currency,
       startDate: state.startDate,
       horizonDays: state.horizonDays,
       moveTransactionId: scenarioForm.elements.move_transaction_id.value,

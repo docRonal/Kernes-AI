@@ -333,3 +333,107 @@ def test_same_day_payments_come_with_their_total(live):
     response = client.post("/api/advice", json=advice_payload(client))
     assert response.status_code == 200
     assert "Outgoing payments on Friday, November 27 total EUR 17,000.00." in model.requests[0]["messages"][1]["content"]
+
+
+@pytest.mark.parametrize("currency, symbol", [("PLN", "zł"), ("HUF", "Ft"), ("SEK", "kr")])
+def test_amounts_follow_the_request_currency(live, currency, symbol):
+    answer = {
+        "explanation": (
+            f"The balance falls to -{currency} 5,000.00 on Friday, November 27, a gap of 5,000.00 {symbol}. "
+            f"A credit facility of {currency} 5,000.00 covers it."
+        ),
+        "email_draft": f"Hello, could you pay INV-001 for {currency} 9,000.00 by Thursday, November 26?",
+    }
+    client, model = live([answer])
+    forecast = client.post(
+        "/api/forecast",
+        data={**BASE_INPUT, "currency": currency},
+        files={"file": ("transactions.csv", (DEMO / "transactions.csv").read_bytes(), "text/csv")},
+    )
+    assert forecast.status_code == 200
+    body = forecast.json()
+    assert body["currency"] == currency
+
+    payload = {"baseline": body["baseline"], "transactions": body["transactions"], "currency": currency}
+    response = client.post("/api/advice", json=payload)
+    assert response.status_code == 200
+    prompt = model.requests[0]["messages"][1]["content"]
+    assert f"-{currency} 5,000.00" in prompt
+    assert "EUR" not in prompt
+
+
+def test_a_currency_outside_the_eu_is_refused(live):
+    client, model = live([GOOD])
+    payload = {**advice_payload(client), "currency": "USD"}
+    assert client.post("/api/advice", json=payload).status_code == 422
+    assert model.requests == []
+
+
+def test_currency_does_not_leak_between_requests(live):
+    client, model = live([GOOD])
+    client.post("/api/advice", json={**advice_payload(client), "currency": "CZK"})
+    client.post("/api/advice", json=advice_payload(client))  # no currency: EUR
+    assert "CZK 5,000.00" in model.requests[0]["messages"][1]["content"]
+    assert "EUR 5,000.00" in model.requests[1]["messages"][1]["content"]
+
+
+def test_amalfi_recurring_obligations_noted_when_inflows_pause(live):
+    client, model = live([GOOD])
+    payload = advice_payload(client)
+    response = client.post("/api/advice", json=payload)
+    assert response.status_code == 200
+    prompt = model.requests[0]["messages"][1]["content"]
+    assert "Ongoing regular obligations (Payroll, Office rent)" in prompt
+    assert "closure or vacation" in prompt
+
+
+def test_fallback_model_uses_separate_timeout_from_env(monkeypatch):
+    from backend.advice import ModelConfig
+
+    monkeypatch.setenv("CFO_MODEL_URL", "http://primary.local:8080/v1/chat/completions")
+    monkeypatch.setenv("CFO_MODEL_NAME", "kernes-qwen-7b")
+    monkeypatch.setenv("CFO_MODEL_TIMEOUT", "30")
+    monkeypatch.setenv("CFO_FALLBACK_MODEL_URL", "http://fallback.local:8080/v1/chat/completions")
+    monkeypatch.setenv("CFO_FALLBACK_MODEL_NAME", "kernes-qwen")
+    monkeypatch.setenv("CFO_FALLBACK_MODEL_TIMEOUT", "60")
+
+    primary = ModelConfig.from_env()
+    fallback = ModelConfig.fallback_from_env(timeout=primary.timeout, ssl_context=primary.ssl_context)
+    assert primary.timeout == 30.0
+    assert fallback is not None
+    assert fallback.timeout == 60.0
+
+
+def test_health_ai_reports_unconfigured_and_degraded(monkeypatch):
+    monkeypatch.delenv("CFO_MODEL_URL", raising=False)
+    monkeypatch.delenv("CFO_MODEL_NAME", raising=False)
+    unconfigured = TestClient(create_app("demo")).get("/health/ai")
+    assert unconfigured.status_code == 200
+    assert unconfigured.json()["status"] == "unconfigured"
+
+    monkeypatch.setenv("CFO_MODEL_URL", "http://primary.local:8080/v1/chat/completions")
+    monkeypatch.setenv("CFO_MODEL_NAME", "kernes-qwen-7b")
+    monkeypatch.setenv("CFO_FALLBACK_MODEL_URL", "http://fallback.local:8080/v1/chat/completions")
+    monkeypatch.setenv("CFO_FALLBACK_MODEL_NAME", "kernes-qwen")
+
+    class _OkResp:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    def fake_urlopen(req, timeout=None, context=None):
+        if "primary.local" in req.full_url:
+            raise TimeoutError("primary timed out")
+        return _OkResp()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    degraded = TestClient(create_app("live")).get("/health/ai")
+    assert degraded.status_code == 200
+    body = degraded.json()
+    assert body["status"] == "degraded"
+    assert body["primary"]["reachable"] is False
+    assert body["fallback"]["reachable"] is True

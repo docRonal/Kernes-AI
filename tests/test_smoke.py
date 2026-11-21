@@ -82,7 +82,7 @@ def test_demo_baseline_scenario_and_draft():
         ({**BASE_INPUT, "starting_balance_minor": "123"}, None),
         ({**BASE_INPUT, "move_transaction_id": "INV-001"}, None),
         ({**BASE_INPUT, **MOVE, "move_to_date": "2026-11-25"}, None),
-        ({**BASE_INPUT, "currency": "EUR"}, None),
+        ({**BASE_INPUT, "currency": "USD"}, None),  # not an EU currency
         (BASE_INPUT, b"id,date,amount_minor,label\n"),
         (BASE_INPUT, b"\xff"),
     ],

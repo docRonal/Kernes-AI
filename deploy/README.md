@@ -93,7 +93,7 @@ oc process --local -f deploy/openshift-template.yaml \
 oc -n kernes-ai rollout status deployment/autonomous-cfo
 ```
 
-The Route allows 240 seconds per request and the app waits up to `CFO_MODEL_TIMEOUT` seconds (default 90) for each model answer. The app checks every PLN amount in the explanation against the calculation. It retries once if the explanation misquotes a figure, then returns HTTP 503 and the UI keeps the forecast and proposal on screen.
+The Route allows 240 seconds per request and the app waits up to `CFO_MODEL_TIMEOUT` seconds (default 90) for each model answer. The app checks every amount in the explanation against the calculation. It retries once if the explanation misquotes a figure, then returns HTTP 503 and the UI keeps the forecast and proposal on screen.
 
 Run the full forecast, live explanation, and both simulated decisions at the deployed URL. Each model call writes one log line with the model name, attempts, and latency, but never the prompt or the token. Save those lines with the commit SHA as evidence of live inference.
 
