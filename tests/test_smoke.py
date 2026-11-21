@@ -261,6 +261,11 @@ def test_live_parses_amalfi_semicolon_bank_statement():
             "date": "2025-12-31",
             "amount_minor": 27_535,
             "label": "Pizzeria Amalfi Customers",
+            "transaction_type": "CARD SETTLEMENT (DEBIT)",
+            "counterparty": "Pizzeria Amalfi Customers",
+            "payment_reference": "Daily Debit Card Revenue Settlement",
+            "category": "retail_card",
+            "actionability": "retail_non_contactable",
         }
     ]
 

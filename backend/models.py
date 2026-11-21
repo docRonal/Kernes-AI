@@ -43,12 +43,38 @@ class ForecastRequest(BaseModel):
     move_to_date: date | None = None
 
 
+TransactionCategory = Literal[
+    "retail_card",
+    "card_acquirer",
+    "b2b_client",
+    "b2b_supplier",
+    "rent",
+    "owner_draw",
+    "staff_payroll",
+    "tax_social",
+    "utility",
+    "other",
+]
+TransactionActionability = Literal[
+    "email_collect_early",
+    "email_defer_supplier",
+    "owner_draw_flexible",
+    "fixed_mandatory",
+    "retail_non_contactable",
+]
+
+
 class Transaction(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: str = Field(min_length=1, max_length=MAX_ID_LENGTH, pattern=NO_CONTROL_CHARACTERS)
     date: date
     amount_minor: StrictInt = Field(ge=-MAX_ABS_MINOR, le=MAX_ABS_MINOR)
     label: str = Field(min_length=1, max_length=MAX_LABEL_LENGTH, pattern=NO_CONTROL_CHARACTERS)
+    transaction_type: str | None = Field(default=None, max_length=MAX_LABEL_LENGTH, pattern=NO_CONTROL_CHARACTERS)
+    counterparty: str | None = Field(default=None, max_length=MAX_LABEL_LENGTH, pattern=NO_CONTROL_CHARACTERS)
+    payment_reference: str | None = Field(default=None, max_length=300, pattern=NO_CONTROL_CHARACTERS)
+    category: TransactionCategory | None = None
+    actionability: TransactionActionability | None = None
 
 
 class Deficit(BaseModel):
@@ -316,5 +342,40 @@ class CompareOptionsResponse(BaseModel):
     options: list[FinancingOption]
     recommended_option: Literal["credit_facility", "invoice_factoring", "defer_outflow", "none_needed"]
     explanation: str = Field(min_length=1)
+    model: str
+    latency_ms: NonNegativeInt | None
+
+
+class UserProfile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    business_type: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)] = "Small business"
+    goal: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=240)] = "Keep cash flow healthy"
+    experience_level: Literal["beginner", "advanced"] = "beginner"
+
+
+class ActionPlanRequest(InsightRequest):
+    profile: UserProfile = Field(default_factory=UserProfile)
+
+
+class ActionPlanStep(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    step_number: int = Field(ge=1, le=5)
+    title: str
+    detail: str
+    autonomy_level: Literal["analyzed", "recommended", "requires_approval", "simulation_only"]
+    action_kind: Literal["review_anomaly", "shift_payment", "credit_facility", "growth_buffer", "none"]
+    impact_minor: NonNegativeInt = 0
+    counterparty: str | None = None
+    email_kind: Literal["collect_early", "defer_supplier"] | None = None
+    email_draft: str | None = None
+
+
+class ActionPlanResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mode: Literal["survival", "growth"]
+    headline: str
+    summary: str
+    steps: list[ActionPlanStep] = Field(min_length=1, max_length=4)
+    suggested_questions: list[str]
     model: str
     latency_ms: NonNegativeInt | None

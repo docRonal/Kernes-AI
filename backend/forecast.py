@@ -34,6 +34,8 @@ from .models import (
     Projection,
     Proposal,
     Transaction,
+    TransactionActionability,
+    TransactionCategory,
 )
 
 
@@ -122,6 +124,70 @@ def _clean_text(raw: str, fallback: str, max_len: int) -> str:
     return cleaned[:max_len]
 
 
+def classify_transaction(
+    transaction_type: str,
+    counterparty: str,
+    payment_reference: str,
+    amount_minor: int,
+) -> tuple[TransactionCategory, TransactionActionability]:
+    """Deterministically tag transaction category and safe SME actionability."""
+    ttype = (transaction_type or "").lower()
+    party = (counterparty or "").lower()
+    ref = (payment_reference or "").lower()
+    combined = f"{ttype} {party} {ref}"
+
+    if amount_minor > 0:
+        if any(tok in combined for tok in ("credit card payout", "global pay", "card acquirer", "acquirer")):
+            return "card_acquirer", "retail_non_contactable"
+        if any(
+            tok in combined
+            for tok in ("card settlement", "customers (debit)", "debit card", "polcard", "stripe pos", "pos settlement")
+        ):
+            return "retail_card", "retail_non_contactable"
+        return "b2b_client", "email_collect_early"
+
+    if any(tok in ttype for tok in ("giro card", "debit card", "card payment")) or "pos purchase" in combined:
+        return "retail_card", "retail_non_contactable"
+
+    if any(
+        tok in combined
+        for tok in (
+            "tax office",
+            "tax payment",
+            "finanzamt",
+            "social security",
+            "krankenkasse",
+            "health fund",
+            "income tax",
+            "wage tax",
+            "vat",
+            "zus",
+            "pit",
+            "tax",
+        )
+    ):
+        return "tax_social", "fixed_mandatory"
+
+    if any(tok in combined for tok in ("salary", "payroll", "wynagrodzen", "wages")):
+        if "owner" in ref or "owner" in ttype:
+            return "owner_draw", "owner_draw_flexible"
+        return "staff_payroll", "fixed_mandatory"
+
+    if any(tok in combined for tok in ("utility", "utilities", "energy", "gas", "electric", "water", "stadtwerke")):
+        return "utility", "fixed_mandatory"
+
+    if any(tok in combined for tok in ("rent payment", "rent", "real estate", "czynsz", "property", "realty", "lease")):
+        return "rent", "email_defer_supplier"
+
+    if any(
+        tok in combined
+        for tok in ("supplier payment", "supplier", "wholesale", "invoice", "faktura", "makro", "depot", "equipment")
+    ):
+        return "b2b_supplier", "email_defer_supplier"
+
+    return "other", "fixed_mandatory"
+
+
 def _parse_bank_statement_csv(text: str) -> tuple[list[Transaction], str]:
     """Parse a German MT940-style semicolon-delimited bank export and auto-detect statement currency."""
     reader = csv.reader(io.StringIO(text, newline=""), delimiter=";")
@@ -139,7 +205,7 @@ def _parse_bank_statement_csv(text: str) -> tuple[list[Transaction], str]:
             idx = col_index[col]
             return row[idx].strip() if idx < len(row) else ""
 
-        parsed_rows: list[tuple[int, int, date, str, int, str, str]] = []
+        parsed_rows: list[tuple[int, int, date, str, int, str, str, str, str, str]] = []
         row_seq = 0
         for row in reader:
             line = reader.line_num
@@ -159,10 +225,14 @@ def _parse_bank_statement_csv(text: str) -> tuple[list[Transaction], str]:
             if raw_currency not in SUPPORTED_CURRENCIES:
                 raise ForecastInputError(f"Line {line}: unsupported or unknown currency '{raw_currency}'.")
             original_minor = _parse_decimal_amount_minor(cell(row, "Amount"), line)
-            reference = cell(row, "Payment Reference")
-            tx_type = cell(row, "Transaction Type") or "TRANSFER"
-            label = _clean_text(cell(row, "Beneficiary/Payer"), tx_type, MAX_LABEL_LENGTH)
-            parsed_rows.append((line, row_seq, tx_date, raw_currency, original_minor, reference, label))
+            raw_ref = cell(row, "Payment Reference")
+            tx_type = _clean_text(cell(row, "Transaction Type"), "TRANSFER", MAX_LABEL_LENGTH)
+            counterparty_clean = _clean_text(cell(row, "Beneficiary/Payer"), "", MAX_LABEL_LENGTH)
+            ref_clean = _clean_text(raw_ref, "", 300)
+            label = counterparty_clean or tx_type[:MAX_LABEL_LENGTH]
+            parsed_rows.append(
+                (line, row_seq, tx_date, raw_currency, original_minor, raw_ref, label, tx_type, counterparty_clean, ref_clean)
+            )
     except csv.Error as exc:
         raise ForecastInputError(f"Line {reader.line_num}: the CSV can't be read ({exc}).") from exc
 
@@ -177,11 +247,11 @@ def _parse_bank_statement_csv(text: str) -> tuple[list[Transaction], str]:
     primary_currency = max(counts, key=lambda cur: (counts[cur], -first_seen[cur]))
 
     transactions: list[Transaction] = []
-    for line, row_seq, tx_date, row_currency, original_minor, reference, label in parsed_rows:
+    for line, row_seq, tx_date, row_currency, original_minor, raw_ref, label, tx_type, counterparty_clean, ref_clean in parsed_rows:
         if row_currency == primary_currency:
             amount_minor = original_minor
         else:
-            rate = _extract_fx_rate(reference, primary_currency, row_currency)
+            rate = _extract_fx_rate(raw_ref, primary_currency, row_currency)
             if rate is None:
                 raise ForecastInputError(
                     f"Line {line}: mixed currency '{row_currency}' in a {primary_currency} statement "
@@ -192,12 +262,18 @@ def _parse_bank_statement_csv(text: str) -> tuple[list[Transaction], str]:
         if abs(amount_minor) > MAX_ABS_MINOR:
             raise ForecastInputError(f"Line {line}: the amount is out of range.")
 
+        category, actionability = classify_transaction(tx_type, counterparty_clean or label, ref_clean, amount_minor)
         transactions.append(
             Transaction(
                 id=f"TX-{row_seq:04d}",
                 date=tx_date,
                 amount_minor=amount_minor,
                 label=label,
+                transaction_type=tx_type,
+                counterparty=counterparty_clean or None,
+                payment_reference=ref_clean or None,
+                category=category,
+                actionability=actionability,
             )
         )
 

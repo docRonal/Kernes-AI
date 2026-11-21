@@ -125,7 +125,17 @@ def test_bom_quotes_header_order_and_blank_lines_are_accepted(client):
     )
     result = forecast(client, csv_text.encode("utf-8"), opening="0").json()
     assert result["transactions"] == [
-        {"id": "TX-0001", "date": "2026-11-24", "amount_minor": -1000, "label": "Rent; office, GmbH"}
+        {
+            "id": "TX-0001",
+            "date": "2026-11-24",
+            "amount_minor": -1000,
+            "label": "Rent; office, GmbH",
+            "transaction_type": "RENT",
+            "counterparty": "Rent; office, GmbH",
+            "payment_reference": "Nov rent",
+            "category": "rent",
+            "actionability": "email_defer_supplier",
+        }
     ]
 
 

@@ -7,12 +7,15 @@ from fastapi import FastAPI, File
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from .action_plan import build_action_plan
 from .advice import check_ai_health, get_advice, predict_delays, send_reminder, use_currency
 from .advisory_extras import compare_financing_options, detect_anomalies
 from .consultant import ask_cfo, credit_check
 from .forecast import AMALFI_DEMO_FILE, get_decision, get_forecast
 from .insights import optimize_payments, stress_test
 from .models import (
+    ActionPlanRequest,
+    ActionPlanResponse,
     AdviceRequest,
     AdviceResponse,
     AnomalyDetectRequest,
@@ -136,6 +139,11 @@ def create_app(mode: str | None = None) -> FastAPI:
     def compare_options(request: CompareOptionsRequest) -> CompareOptionsResponse:
         with use_currency(request.currency):
             return compare_financing_options(mode=mode, request=request)
+
+    @app.post("/api/action-plan", response_model=ActionPlanResponse)
+    def action_plan(request: ActionPlanRequest) -> ActionPlanResponse:
+        with use_currency(request.currency):
+            return build_action_plan(mode=mode, request=request)
 
     return app
 
