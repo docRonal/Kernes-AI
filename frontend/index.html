@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/styles.css?v=tc11">
+  <link rel="stylesheet" href="/assets/styles.css?v=tc13">
   <script type="module" src="/assets/app.js?v=tc12"></script>
 </head>
 <body>
@@ -154,13 +154,15 @@
               <p class="card-desc" id="shortfall">Hover or tap any day on the graph to see what's coming in or going out.</p>
             </div>
             <div class="chart-controls">
-              <div class="horizon-pills" role="group" aria-label="Days to analyze">
-                <button type="button" class="horizon-pill is-active" data-horizon="14">14 days</button>
-              </div>
-              <div class="overlay-pills" role="group" aria-label="Chart projections and overlays">
-                <button type="button" class="overlay-pill is-active" id="toggle-forecast-btn" aria-pressed="true">+7d Forecast</button>
-                <button type="button" class="overlay-pill" id="toggle-stress-btn" aria-pressed="false">Stress test</button>
-                <button type="button" class="overlay-pill is-clear" id="clear-whatif-overlay-btn" hidden>Clear what-if ×</button>
+              <div class="chart-pills-row">
+                <div class="horizon-pills" role="group" aria-label="Days to analyze">
+                  <button type="button" class="horizon-pill is-active" data-horizon="14">14 days</button>
+                </div>
+                <div class="overlay-pills" role="group" aria-label="Chart projections and overlays">
+                  <button type="button" class="overlay-pill is-active" id="toggle-forecast-btn" aria-pressed="true">+7d Forecast</button>
+                  <button type="button" class="overlay-pill" id="toggle-stress-btn" aria-pressed="false">Stress test</button>
+                  <button type="button" class="overlay-pill is-clear" id="clear-whatif-overlay-btn" hidden>Clear what-if ×</button>
+                </div>
               </div>
               <div class="chart-legend" aria-label="Chart legend">
                 <span class="legend-item"><i class="dot dot-baseline"></i>Your cash</span>

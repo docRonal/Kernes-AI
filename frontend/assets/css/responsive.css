@@ -1,5 +1,18 @@
 /* Tablet & Narrow Laptop (<= 860px) */
 @media (max-width: 860px) {
+  .chart-card .card-header {
+    flex-wrap: wrap;
+  }
+  .chart-controls {
+    align-items: flex-start;
+    width: 100%;
+  }
+  .chart-pills-row,
+  .chart-legend {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
   .story-grid,
   .credit-panel-grid,
   .whatif-grid,
