@@ -308,15 +308,37 @@ def horizon(start: date) -> list[date]:
     return [start + timedelta(days=offset) for offset in range(HORIZON_DAYS)]
 
 
+def _daily_movements(transactions: list[Transaction]) -> dict[date, int]:
+    movement: dict[date, int] = defaultdict(int)
+    for transaction in transactions:
+        movement[transaction.date] += transaction.amount_minor
+    return movement
+
+
+def _reconstruct_history(
+    transactions: list[Transaction], opening_minor: int, start: date
+) -> list[DailyBalance] | None:
+    """Walk back from the opening balance using recorded net movements in the prior window."""
+    if (start - transactions[-1].date).days != 1:
+        return None
+
+    days_back = min(HORIZON_DAYS, (start - transactions[0].date).days)
+    movement = _daily_movements(transactions)
+    balance = opening_minor
+    days: list[DailyBalance] = []
+    for offset in range(1, days_back + 1):
+        day = start - timedelta(days=offset)
+        days.append(DailyBalance(date=day, balance_minor=balance))
+        balance -= movement.get(day, 0)
+    return list(reversed(days))
+
+
 def project(transactions: list[Transaction], opening_minor: int, start: date) -> Projection:
     """End-of-day balances for 14 days. The opening balance comes before the first day's movements.
 
     Rows dated outside the window don't move the balance.
     """
-    movement: dict[date, int] = defaultdict(int)
-    for transaction in transactions:
-        movement[transaction.date] += transaction.amount_minor
-
+    movement = _daily_movements(transactions)
     balance = opening_minor
     days: list[DailyBalance] = []
     first_deficit: Deficit | None = None
@@ -431,6 +453,7 @@ def build_forecast(
 
     transactions, detected_currency = parse_transactions(raw)
     from_history = start > transactions[-1].date
+    history_days = _reconstruct_history(transactions, opening_minor, start) if from_history else None
     if from_history:
         try:
             estimates = estimate_transactions(transactions, horizon(start))
@@ -448,6 +471,7 @@ def build_forecast(
     return ForecastResponse(
         currency=detected_currency,
         forecast_basis="history" if from_history else None,
+        history_days=history_days,
         transactions=transactions,
         baseline=baseline,
         proposal=proposal,

@@ -1,6 +1,6 @@
-import { renderCashflowChart } from "../chart.js?v=tc22";
+import { renderCashflowChart } from "../chart.js?v=history-chart";
 import { printDate, printMoney, replayFade } from "./format.js?v=tc10";
-import { buildForwardForecast, buildStressCurve } from "./predictions.js?v=tc20";
+import { buildForwardForecast, buildStressCurve, buildWindowStressCurve } from "./predictions.js?v=history-chart";
 import { groupTransactionsByDate } from "./proposal.js?v=tc10";
 
 export function renderKpis(state) {
@@ -35,8 +35,6 @@ export function renderKpis(state) {
   const heroSummary = document.querySelector("#hero-summary");
   const estimatedFromHistory = forecast.forecast_basis === "history";
   document.querySelector("#forecast-basis").hidden = !estimatedFromHistory;
-  document.querySelector("#legend-baseline-label").textContent =
-    estimatedFromHistory ? "Estimated cash" : "Your cash";
   const prevTitle = heroTitle.textContent;
 
   const firstCard = document.querySelector("#kpi-first-card");
@@ -116,21 +114,28 @@ export function renderLedgerAndChart(state) {
   const baseline = forecast.baseline;
   const scenario = forecast.scenario;
   const txByDate = groupTransactionsByDate(forecast.transactions);
+  const estimatedFromHistory = forecast.forecast_basis === "history";
+  const historyDays = estimatedFromHistory ? forecast.history_days ?? [] : [];
 
   const shortfallEl = document.querySelector("#shortfall");
-  shortfallEl.textContent = baseline.first_deficit
-    ? "Red dots mark days below zero. Hover or tap any day to see the payments."
-    : "Your balance stays at or above zero every day. Hover or tap any day for details.";
+  shortfallEl.textContent = estimatedFromHistory
+    ? "Hover or tap a day to see its balance and any estimated payments."
+    : baseline.first_deficit
+      ? "Red dots mark days below zero. Hover or tap any day to see the payments."
+      : "Your balance stays at or above zero every day. Hover or tap any day for details.";
 
-  const forecastDays = state.showForecast
+  const forecastDays = !estimatedFromHistory && state.showForecast
     ? buildForwardForecast(baseline.days, forecast.transactions, 14).days
     : null;
-  const stressDays = state.showStress
-    ? buildStressCurve(baseline.days, forecast.transactions, { extraDays: 14 })
-    : null;
+  const buildStress = estimatedFromHistory ? buildWindowStressCurve : buildStressCurve;
+  const stressDays = state.showStress ? buildStress(baseline.days, forecast.transactions) : null;
   const whatIfDays = state.whatIfOverlay?.days ?? null;
   const whatIfLabel = state.whatIfOverlay?.label ?? "What-if";
 
+  document.querySelector("#legend-history").hidden = historyDays.length === 0;
+  document.querySelector("#legend-baseline-key").classList.toggle("key-estimate", estimatedFromHistory);
+  document.querySelector("#legend-baseline-label").textContent =
+    estimatedFromHistory ? "Estimated forecast" : "Your cash";
   document.querySelector("#legend-forecast").hidden = !forecastDays;
   document.querySelector("#legend-scenario").hidden = !scenario;
   document.querySelector("#legend-whatif").hidden = !whatIfDays;
@@ -142,6 +147,8 @@ export function renderLedgerAndChart(state) {
   if (clearOverlayBtn) clearOverlayBtn.hidden = !whatIfDays;
 
   renderCashflowChart(document.querySelector("#chart-container"), {
+    historyDays,
+    estimatedFromHistory,
     baselineDays: baseline.days,
     scenarioDays: scenario ? scenario.days : null,
     decisionDays: simulationOutcome?.days ?? null,

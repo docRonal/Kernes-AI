@@ -80,7 +80,7 @@ The configurations are in `.codex/agents/`, `.claude/agents/`, and `.agents/agen
 
 ## Verify before the demo
 
-Start with **Check my cash** on the built-in Amalfi example. This uses the full 2025 statement, with EUR 33,266.35 as the opening balance on 1 January 2026. The projected dates are 1–14 January. The estimates use recurring payments and recent average cash movements. For the separate known-payment example below, use the [26-row Amalfi CSV](demo/pizzeria_amalfi_sample.csv).
+Start with **Check my cash** on the built-in Amalfi example. This uses the full 2025 statement, with EUR 33,266.35 as the opening balance on 1 January 2026. On the chart, recorded balances for 18–31 December appear before the forecast for 1–14 January. The estimates use recurring payments and recent average cash movements. For the separate known-payment example below, use the [26-row Amalfi CSV](demo/pizzeria_amalfi_sample.csv).
 
 1. Upload the 26-row sample, enter EUR 5,000 and choose 22 June 2025. The first shortfall is EUR 6,250 on 28 June. The suggested limit covers the deepest gap of EUR 8,248.91 on 3 July.
 2. Preview both credit decisions. Approval covers the full gap, and rejection leaves EUR 8,248.91 uncovered.

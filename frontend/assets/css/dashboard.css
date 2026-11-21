@@ -237,6 +237,22 @@
   background: var(--ink);
 }
 
+.key-history,
+.key-estimate {
+  width: 18px;
+  height: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.key-history {
+  border-top: 2.5px solid var(--ink);
+}
+
+.key-estimate {
+  border-top: 2.5px dashed #4f46e5;
+}
+
 .dot-scenario {
   background: var(--accent);
 }
@@ -287,6 +303,25 @@
   stroke-width: 2.5;
   stroke-linejoin: round;
   stroke-linecap: round;
+}
+
+.line-estimate {
+  stroke: #4f46e5;
+  stroke-width: 2.5;
+  stroke-dasharray: 6 4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart-period-label {
+  fill: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.chart-period-estimate {
+  fill: #4338ca;
 }
 
 .line-scenario {

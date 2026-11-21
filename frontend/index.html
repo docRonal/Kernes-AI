@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/styles.css?v=tc22">
-  <script type="module" src="/assets/app.js?v=amalfi-chat"></script>
+  <link rel="stylesheet" href="/assets/styles.css?v=history-chart">
+  <script type="module" src="/assets/app.js?v=history-chart"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -204,7 +204,8 @@
                 </div>
               </div>
               <div class="chart-legend" aria-label="Chart legend">
-                <span class="legend-item"><i class="dot dot-baseline"></i><span id="legend-baseline-label">Your cash</span></span>
+                <span class="legend-item" id="legend-history" hidden><i class="key-history"></i>Recorded balance</span>
+                <span class="legend-item"><i class="dot dot-baseline" id="legend-baseline-key"></i><span id="legend-baseline-label">Your cash</span></span>
                 <span class="legend-item" id="legend-forecast"><i class="dot dot-forecast"></i>Extra 14-day projection</span>
                 <span class="legend-item" id="legend-scenario" hidden><i class="dot dot-scenario"></i>If paid earlier</span>
                 <span class="legend-item" id="legend-whatif" hidden><i class="dot dot-whatif"></i><span id="legend-whatif-label">What-if</span></span>

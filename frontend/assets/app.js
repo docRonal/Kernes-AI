@@ -38,7 +38,7 @@ import {
   renderKpis,
   renderLedgerAndChart,
   renderProposalPanel,
-} from "./js/render.js?v=amalfi-chat";
+} from "./js/render.js?v=history-chart";
 
 const HORIZON_DAYS = 14;
 const AMALFI_OPENING_BALANCE_MINOR = 3_326_635;
@@ -490,7 +490,9 @@ async function runBaselineForecast({ customOpeningMinor = null } = {}) {
   showStatus("Checking your upcoming cash…");
 
   try {
-    const setup = customOpeningMinor !== null && state.csvFile
+    const editingBalance = customOpeningMinor !== null && state.csvFile;
+    const recordedHistory = state.forecast?.history_days;
+    const setup = editingBalance
       ? {
           csvFile: state.csvFile,
           startDate: state.startDate,
@@ -499,6 +501,7 @@ async function runBaselineForecast({ customOpeningMinor = null } = {}) {
         }
       : await loadForecastSetup();
     const data = await resolveForecast(setup);
+    if (editingBalance) data.history_days = recordedHistory;
 
     Object.assign(state, setup);
     state.profile = {
@@ -510,7 +513,10 @@ async function runBaselineForecast({ customOpeningMinor = null } = {}) {
     if (inlineBalanceForm) inlineBalanceForm.hidden = true;
     if (editBalanceBtn) editBalanceBtn.hidden = false;
     state.forecast = data;
-    setForecastOverlay(data.forecast_basis !== "history");
+    const estimatedFromHistory = data.forecast_basis === "history";
+    setForecastOverlay(!estimatedFromHistory);
+    toggleForecastBtn.hidden = estimatedFromHistory;
+    toggleForecastBtn.disabled = estimatedFromHistory;
     state.adviceRequestId += 1;
     adviceLoading.hidden = true;
     adviceError.hidden = true;
@@ -860,7 +866,7 @@ scenarioForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!state.forecast) return;
 
-  const baseline = state.forecast.baseline;
+  const { baseline, history_days: recordedHistory } = state.forecast;
   const btn = document.querySelector("#compare-dates-btn");
   btn.disabled = true;
   showStatus("Testing earlier payment date…");
@@ -873,7 +879,7 @@ scenarioForm.addEventListener("submit", async (event) => {
       moveToDate: scenarioForm.elements.move_to_date.value,
     });
     if (state.forecast?.baseline !== baseline) return;
-    state.forecast = data;
+    state.forecast = { ...data, history_days: recordedHistory };
     showStatus("");
     renderAll();
   } catch (error) {

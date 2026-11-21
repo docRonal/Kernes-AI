@@ -512,6 +512,7 @@ def test_history_forecast_infers_recurrences_and_daily_amounts(client):
     scheduled = forecast(client, statement, opening="0", start="2025-04-14")
     assert scheduled.status_code == 200, scheduled.text
     assert "forecast_basis" not in scheduled.json()
+    assert "history_days" not in scheduled.json()
     assert balance_on(scheduled.json()["baseline"], "2025-04-14") == 7_000
 
     response = forecast(client, statement, opening="0", start="2025-04-15")
@@ -519,6 +520,8 @@ def test_history_forecast_infers_recurrences_and_daily_amounts(client):
     body = response.json()
     assert body["forecast_basis"] == "history"
     assert body["currency"] == "PLN"
+    assert [day["date"] for day in body["history_days"]] == [f"2025-04-{day:02d}" for day in range(1, 15)]
+    assert body["history_days"][-1]["balance_minor"] == 0
     assert balance_on(body["baseline"], "2025-04-21") == 7_700
     assert body["baseline"]["first_deficit"] == {"date": "2025-04-25", "shortfall_minor": 19_900}
     assert balance_on(body["baseline"], "2025-04-28") == -12_600
@@ -542,6 +545,7 @@ def test_history_forecast_infers_recurrences_and_daily_amounts(client):
     )
     assert moved.status_code == 200, moved.text
     assert moved.json()["baseline"] == body["baseline"]
+    assert moved.json()["history_days"] == body["history_days"]
     assert moved.json()["scenario"]["first_deficit"]["shortfall_minor"] == 12_900
 
 
@@ -564,3 +568,23 @@ def test_history_forecast_dates_stay_inside_calendar():
     estimates = estimate_transactions([earliest], horizon(date(1, 1, 2)))
     assert len(estimates) == 14
     assert all(row.amount_minor == 100 for row in estimates)
+
+
+def test_history_balances_are_anchored_and_limited_to_observed_dates(client):
+    statement = amalfi_csv(
+        ("2025-12-29", "Sales", 50),
+        ("2025-12-31", "Sales", 100),
+        ("2025-12-31", "Rent", -40),
+    )
+    next_day = forecast(client, statement, opening="1000", start="2026-01-01")
+    assert next_day.status_code == 200, next_day.text
+    assert next_day.json()["history_days"] == [
+        {"date": "2025-12-29", "balance_minor": 940},
+        {"date": "2025-12-30", "balance_minor": 940},
+        {"date": "2025-12-31", "balance_minor": 1000},
+    ]
+
+    gap = forecast(client, statement, opening="1000", start="2026-01-02")
+    assert gap.status_code == 200, gap.text
+    assert gap.json()["forecast_basis"] == "history"
+    assert "history_days" not in gap.json()

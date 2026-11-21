@@ -1620,6 +1620,22 @@
               }
             ],
             "title": "Forecast Basis"
+          },
+          "history_days": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DailyBalance"
+                },
+                "type": "array",
+                "maxItems": 14
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "History Days",
+            "description": "End-of-day balances reconstructed from recorded movements and the supplied opening balance."
           }
         },
         "additionalProperties": false,

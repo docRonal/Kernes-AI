@@ -73,6 +73,10 @@ def test_full_statement_forecasts_january_beyond_the_imported_dates():
     result = response.json()
     days = result["baseline"]["days"]
     assert result["forecast_basis"] == "history"
+    recorded = result["history_days"]
+    assert [row["date"] for row in recorded] == [f"2025-12-{day:02d}" for day in range(18, 32)]
+    assert recorded[0]["balance_minor"] == 3_053_328
+    assert recorded[-1]["balance_minor"] == 3_326_635
     assert [row["date"] for row in days] == [f"2026-01-{day:02d}" for day in range(1, 15)]
     assert len({day["balance_minor"] for day in days}) > 1
     assert result["transactions"]
