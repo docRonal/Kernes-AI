@@ -112,15 +112,62 @@ def test_live_advice_grounds_the_model_in_calculated_facts(live):
     assert "secret-token" not in prompt
 
 
+PEAK_GOOD = {
+    **GOOD,
+    "explanation": (
+        "The balance is projected to go below zero on Tuesday, November 24, with a gap of EUR 200.00, and to "
+        "reach its deepest point of -EUR 700.00 on Thursday, November 26. A EUR 700.00 facility covers it."
+    ),
+}
+# What Llama 3.2 3B wrote on the cluster: the equipment payment posing as the first gap.
+PEAK_TRANSACTION_AS_GAP = {
+    **GOOD,
+    "explanation": (
+        "The balance is projected to go below zero on Tuesday, November 24, by EUR 1,200.00. The deepest gap is "
+        "EUR 700.00 on Thursday, November 26, and after it a EUR 200.00 overdraft... A EUR 700.00 facility covers it."
+    ),
+}
+
+
 def test_peak_case_prompt_separates_first_and_deepest_shortfall(live):
-    client, model = live([{**GOOD, "explanation": "The gap peaks at -EUR 700.00, so a EUR 700.00 facility covers it."}])
+    client, model = live([PEAK_GOOD])
     response = client.post("/api/advice", json=advice_payload(client, "credit_peak_case.csv", "100000"))
 
     assert response.status_code == 200
     prompt = model.requests[0]["messages"][1]["content"]
-    assert "First day below zero: Tuesday, November 24, balance -EUR 200.00." in prompt
-    assert "Deepest point: Thursday, November 26, balance -EUR 700.00." in prompt
+    assert "First day below zero: Tuesday, November 24. The balance that day is -EUR 200.00, a gap of EUR 200.00." in prompt
+    assert "Deepest point: Thursday, November 26. The balance that day is -EUR 700.00, a gap of EUR 700.00." in prompt
     assert "Proposed credit facility limit: EUR 700.00." in prompt
+
+
+@pytest.mark.parametrize(
+    "explanation",
+    [
+        PEAK_TRANSACTION_AS_GAP["explanation"],
+        # Only the peak: the owner can't tell the first gap from the deepest one.
+        "The gap peaks at -PLN 700.00 on Thursday, November 26, so a PLN 700.00 facility covers it.",
+    ],
+)
+def test_peak_case_rejects_a_wrong_or_missing_first_gap(live, explanation):
+    client, model = live([{**GOOD, "explanation": explanation}])
+    response = client.post("/api/advice", json=advice_payload(client, "credit_peak_case.csv", "100000"))
+    assert response.status_code == 503
+    assert len(model.requests) == 2  # one retry, then a clear error
+
+
+def test_falls_back_to_the_second_model_when_the_first_misquotes(live, monkeypatch):
+    client, primary = live([PEAK_TRANSACTION_AS_GAP])
+    fallback = FakeModel([PEAK_GOOD])
+    try:
+        monkeypatch.setenv("CFO_FALLBACK_MODEL_URL", fallback.url)
+        monkeypatch.setenv("CFO_FALLBACK_MODEL_NAME", "kernes-qwen-fallback")
+        response = client.post("/api/advice", json=advice_payload(client, "credit_peak_case.csv", "100000"))
+    finally:
+        fallback.close()
+    assert response.status_code == 200
+    assert response.json()["model"] == "kernes-qwen-fallback"
+    assert response.json()["explanation"] == PEAK_GOOD["explanation"]
+    assert len(primary.requests) == 2
 
 
 def test_retries_once_when_the_model_misquotes_a_figure(live):
@@ -277,3 +324,12 @@ def test_send_reminder_is_always_simulated(live, monkeypatch):
     assert response.status_code == 200
     assert response.json()["status"] == "simulated"
     assert response.json()["recipient"] == "billing@acme.example"
+
+
+def test_same_day_payments_come_with_their_total(live):
+    # Qwen 7B summed payroll and rent on its own; the total is now a fact it can quote.
+    total = {**GOOD, "explanation": GOOD["explanation"] + " Payments of EUR 17,000.00 leave on Friday."}
+    client, model = live([total])
+    response = client.post("/api/advice", json=advice_payload(client))
+    assert response.status_code == 200
+    assert "Outgoing payments on Friday, November 27 total EUR 17,000.00." in model.requests[0]["messages"][1]["content"]
