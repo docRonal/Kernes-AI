@@ -333,3 +333,13 @@ def test_same_day_payments_come_with_their_total(live):
     response = client.post("/api/advice", json=advice_payload(client))
     assert response.status_code == 200
     assert "Outgoing payments on Friday, November 27 total EUR 17,000.00." in model.requests[0]["messages"][1]["content"]
+
+
+def test_amalfi_recurring_obligations_noted_when_inflows_pause(live):
+    client, model = live([GOOD])
+    payload = advice_payload(client)
+    response = client.post("/api/advice", json=payload)
+    assert response.status_code == 200
+    prompt = model.requests[0]["messages"][1]["content"]
+    assert "Ongoing regular obligations (Payroll, Office rent)" in prompt
+    assert "closure or vacation" in prompt

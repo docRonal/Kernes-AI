@@ -207,6 +207,50 @@ def _predict_delay_impact(
     return delay_lines, extra_allowed
 
 
+_FIXED_OBLIGATION_RE = re.compile(
+    r"\b(rent|payroll|salar\w*|wage\w*|lease|utilit\w*|insur\w*|tax\w*|miete|gehalt|lohn|czynsz|wynagrodz\w*)\b",
+    re.IGNORECASE,
+)
+
+
+def _recurring_expense_note(transactions: list[Transaction], window: list[date]) -> tuple[str | None, set[int]]:
+    """Summarize recurring or fixed obligations (e.g. rent, payroll) that continue even during quiet revenue periods."""
+    in_window = [t for t in transactions if window[0] <= t.date <= window[-1]]
+    outflows = [t for t in in_window if t.amount_minor < 0]
+    if not outflows:
+        return None, set()
+
+    label_counts: dict[str, int] = {}
+    for t in transactions:
+        if t.amount_minor < 0:
+            key = t.label.strip().lower()
+            label_counts[key] = label_counts.get(key, 0) + 1
+
+    recurring = [
+        t for t in outflows
+        if _FIXED_OBLIGATION_RE.search(t.label) or label_counts.get(t.label.strip().lower(), 0) > 1
+    ]
+    if not recurring:
+        return None, set()
+
+    total_recurring = sum(-t.amount_minor for t in recurring)
+    names = list(dict.fromkeys(t.label.strip() for t in recurring))
+    inflows_before_last_out = any(
+        t.amount_minor > 0 and t.date <= max(r.date for r in recurring)
+        for t in in_window
+    )
+    context = (
+        "even when incoming revenue pauses (e.g. during a closure or vacation)"
+        if not inflows_before_last_out
+        else "alongside scheduled receipts"
+    )
+    note = (
+        f"Ongoing regular obligations ({', '.join(names)}) continue {context}, "
+        f"totaling {pln(total_recurring)}."
+    )
+    return note, {total_recurring}
+
+
 def build_facts(request: AdviceRequest) -> Facts:
     baseline = request.baseline
     window = horizon(baseline.days[0].date)
@@ -248,6 +292,9 @@ def build_facts(request: AdviceRequest) -> Facts:
     day_totals = _same_day_outgoing_totals(relevant)
     for day, total in day_totals.items():
         lines.append(f"Outgoing payments on {day_name(day)} total {pln(total)}.")
+    recurring_note, recurring_allowed = _recurring_expense_note(request.transactions, window)
+    if recurring_note:
+        lines.append(recurring_note)
 
     reminder = _reminder_target(request.transactions, first.date, window)
     delay_lines, extra_allowed = _predict_delay_impact(request, window, proposal.limit_minor)
@@ -258,6 +305,7 @@ def build_facts(request: AdviceRequest) -> Facts:
     allowed |= {abs(t.amount_minor) for t in request.transactions}
     allowed |= extra_allowed
     allowed |= set(day_totals.values())
+    allowed |= recurring_allowed
     return Facts(
         proposal=proposal,
         lines=lines,
@@ -298,9 +346,9 @@ def build_messages(facts: Facts) -> list[dict[str, str]]:
         "Task 1, explanation: write exactly 3 sentences about the forecast, in the future tense "
         '("is projected to"). Sentence 1: when the balance first goes below zero and the size of that gap, and the '
         "deepest point and its gap if it is a different day. Take the gap amounts from the facts, never from a "
-        "transaction. Sentence 2: which transactions cause the gap and when money "
-        f"comes back. Sentence 3: why a credit facility of {limit} covers the gap, and that the owner can "
-        "approve or reject this proposal. Do not mention any email.",
+        "transaction. Sentence 2: which transactions cause the gap (noting ongoing regular obligations like "
+        "rent or payroll if listed) and when money comes back. Sentence 3: why a credit facility of "
+        f"{limit} covers the gap, and that the owner can approve or reject this proposal. Do not mention any email.",
     ]
     if facts.reminder:
         task.append(
