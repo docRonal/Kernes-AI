@@ -375,3 +375,13 @@ def test_currency_does_not_leak_between_requests(live):
     client.post("/api/advice", json=advice_payload(client))  # no currency: EUR
     assert "CZK 5,000.00" in model.requests[0]["messages"][1]["content"]
     assert "EUR 5,000.00" in model.requests[1]["messages"][1]["content"]
+
+
+def test_amalfi_recurring_obligations_noted_when_inflows_pause(live):
+    client, model = live([GOOD])
+    payload = advice_payload(client)
+    response = client.post("/api/advice", json=payload)
+    assert response.status_code == 200
+    prompt = model.requests[0]["messages"][1]["content"]
+    assert "Ongoing regular obligations (Payroll, Office rent)" in prompt
+    assert "closure or vacation" in prompt
