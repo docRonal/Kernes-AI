@@ -21,6 +21,7 @@ from pathlib import Path
 
 from fastapi import HTTPException
 
+from .currency import amount_markers, money
 from .forecast import horizon, propose
 from .models import (
     AdviceRequest,
@@ -43,8 +44,10 @@ log = logging.getLogger("autonomous_cfo.advice")
 # Thousands separators: comma, no-break space and narrow no-break space. A plain
 # space is left out so "November 27, 5,000 PLN" isn't read as 275,000.
 _DIGITS = r"\d[\d,\u00a0\u202f]*(?:\.\d{1,2})?"
+# Any EU currency code or local symbol, before or after the number.
+_MARKERS = amount_markers()
 _AMOUNT = re.compile(
-    rf"(?:EUR|€|PLN|zł|zl)\s*[-−]?\s*({_DIGITS})|({_DIGITS})\s*(?:EUR|€|PLN|zł|zl)\b",
+    rf"(?<![A-Za-z])(?:{_MARKERS})\s*[-−]?\s*({_DIGITS})|({_DIGITS})\s*(?:{_MARKERS})(?![A-Za-z])",
     re.IGNORECASE,
 )
 
@@ -135,9 +138,8 @@ class ModelConfig:
 
 
 def pln(minor: int) -> str:
-    sign = "-" if minor < 0 else ""
-    whole, cents = divmod(abs(minor), 100)
-    return f"{sign}EUR {whole:,}.{cents:02d}"
+    """Kept under its first name for the modules that import it; writes the request's currency."""
+    return money(minor)
 
 
 def day_name(day: date) -> str:
@@ -583,7 +585,7 @@ def get_advice(*, mode: str, request: AdviceRequest) -> AdviceResponse:
 
     forecast = json.loads((DEMO_DIR / "forecast.example.json").read_text(encoding="utf-8"))
     expected = {"baseline": forecast["baseline"], "transactions": forecast["transactions"]}
-    if request.model_dump(mode="json", exclude_none=True) != expected:
+    if request.model_dump(mode="json", exclude_none=True, exclude={"currency"}) != expected:
         raise HTTPException(422, "Submit the bundled baseline forecast in demo mode.")
 
     return AdviceResponse.model_validate_json((DEMO_DIR / "advice.example.json").read_text(encoding="utf-8"))

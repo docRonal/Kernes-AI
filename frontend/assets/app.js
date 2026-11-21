@@ -1,11 +1,11 @@
-import { parseRedHatBankCsv } from "./parser.js?v=tc6";
+import { parseRedHatBankCsv } from "./parser.js?v=tc7";
 import {
   AMALFI_DEFAULT_MOVE_DATE,
   AMALFI_DEFAULT_OPENING_EUR,
   AMALFI_DEFAULT_START_DATE,
   AMALFI_SAMPLE_CSV,
   AMALFI_SAMPLE_FILENAME,
-} from "./sample-amalfi.js?v=tc6";
+} from "./sample-amalfi.js?v=tc7";
 import {
   buildInsightPayload,
   request,
@@ -21,8 +21,8 @@ import {
   requestSendReminder,
   requestStressTest,
   resolveForecast,
-} from "./js/api.js?v=tc6";
-import { replayFade, toMinor } from "./js/format.js?v=tc6";
+} from "./js/api.js?v=tc7";
+import { EU_CURRENCIES, replayFade, toMinor } from "./js/format.js?v=tc7";
 import {
   populateDelayCandidates,
   renderAnomalies,
@@ -36,15 +36,15 @@ import {
   renderOptimizePayments,
   renderStressTest,
   resetInsightsUi,
-} from "./js/insights.js?v=tc6";
-import { computeProposal } from "./js/proposal.js?v=tc6";
+} from "./js/insights.js?v=tc7";
+import { computeProposal } from "./js/proposal.js?v=tc7";
 import {
   buildReminderTemplate,
   populateIncomingPayments,
   renderKpis,
   renderLedgerAndChart,
   renderProposalPanel,
-} from "./js/render.js?v=tc6";
+} from "./js/render.js?v=tc7";
 
 const forecastForm = document.querySelector("#forecast-form");
 const scenarioForm = document.querySelector("#scenario-form");
@@ -100,6 +100,7 @@ const copyFeedback = document.querySelector("#copy-feedback");
 let selectedSample = null;
 
 const state = {
+  currency: "EUR",
   openingBalanceMinor: null,
   startDate: AMALFI_DEFAULT_START_DATE,
   horizonDays: 14,
@@ -190,6 +191,7 @@ async function fetchAdvice({ forceDraft = false } = {}) {
     const data = await requestAdvice({
       baseline: state.forecast.baseline,
       transactions: state.forecast.transactions,
+      currency: state.forecast.currency,
     });
     if (reqId !== state.adviceRequestId) return;
 
@@ -241,6 +243,11 @@ async function runBaselineForecast() {
     const header = csvText.trimStart().split(/\r?\n/, 1)[0];
     state.parsedCsv = header.includes(";") ? parseRedHatBankCsv(csvText) : null;
     if (!state.parsedCsv) horizonSelect.value = "14";
+    // A bank statement names its own currency; a transaction CSV uses the one the owner picked.
+    if (EU_CURRENCIES.includes(state.parsedCsv?.currency)) {
+      forecastForm.elements.currency.value = state.parsedCsv.currency;
+    }
+    state.currency = forecastForm.elements.currency.value;
     state.openingBalanceMinor = Number(toMinor(forecastForm.elements.opening_balance.value));
     state.startDate = forecastForm.elements.start_date.value;
     state.horizonDays = horizonSelect.value === "all" ? "all" : Number(horizonSelect.value);
@@ -249,6 +256,7 @@ async function runBaselineForecast() {
       csvFile: state.csvFile,
       parsedCsv: state.parsedCsv,
       openingBalanceMinor: state.openingBalanceMinor,
+      currency: state.currency,
       startDate: state.startDate,
       horizonDays: state.horizonDays,
     });
@@ -527,6 +535,7 @@ loadKernesSampleBtn.addEventListener("click", async () => {
     fileInput.value = "";
     fileNameEl.textContent = "Kernes demo (EUR)";
     forecastForm.elements.opening_balance.value = "12000.00";
+    forecastForm.elements.currency.value = "EUR";
     forecastForm.elements.start_date.value = "2026-11-23";
     horizonSelect.value = "14";
     await runBaselineForecast();
@@ -551,6 +560,7 @@ scenarioForm.addEventListener("submit", async (event) => {
       csvFile: state.csvFile,
       parsedCsv: state.parsedCsv,
       openingBalanceMinor: state.openingBalanceMinor,
+      currency: state.currency,
       startDate: state.startDate,
       horizonDays: state.horizonDays,
       moveTransactionId: scenarioForm.elements.move_transaction_id.value,
@@ -583,7 +593,9 @@ async function simulateDecision(decision) {
   approveButton.disabled = true;
   rejectButton.disabled = true;
   try {
-    const outcome = state.parsedCsv ? null : await requestDecision({ baseline, decision });
+    const outcome = state.parsedCsv
+      ? null
+      : await requestDecision({ baseline, decision, currency: state.forecast.currency });
     if (state.forecast?.baseline !== baseline) return;
     state.simulationDecision = outcome?.decision ?? decision;
     state.simulationOutcome = outcome;

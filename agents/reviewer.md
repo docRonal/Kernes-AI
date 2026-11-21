@@ -6,7 +6,7 @@ Read the diff, related code, and contract. Identify concrete issues and report t
 
 - Verify monetary units, the 14 forecast dates, same-day transaction totals, and how the first shortfall is identified.
 - Confirm that rescheduling a positive payment only changes the alternative forecast. Check invalid CSV, duplicate IDs, and moves outside the forecast window.
-- The example in `demo/` should show Friday balances of −5,000 PLN and +4,000 PLN.
+- The example in `demo/` should show Friday balances of −5,000 EUR and +4,000 EUR.
 - Identify the tests that support each finding and any edge cases that remain untested.
 
 ## integration-reviewer

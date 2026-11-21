@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/styles.css?v=tc6">
-  <script type="module" src="/assets/app.js?v=tc6"></script>
+  <link rel="stylesheet" href="/assets/styles.css?v=tc7">
+  <script type="module" src="/assets/app.js?v=tc7"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -75,6 +75,19 @@
               <div class="bento-tile field">
                 <label for="opening-balance">Opening cash balance</label>
                 <input id="opening-balance" name="opening_balance" inputmode="decimal" value="5000.00" placeholder="5000.00" required>
+              </div>
+
+              <div class="bento-tile field">
+                <label for="currency-select">Account currency</label>
+                <select id="currency-select" name="currency">
+                  <option value="EUR" selected>EUR · Euro</option>
+                  <option value="PLN">PLN · Polish złoty</option>
+                  <option value="CZK">CZK · Czech koruna</option>
+                  <option value="HUF">HUF · Hungarian forint</option>
+                  <option value="RON">RON · Romanian leu</option>
+                  <option value="SEK">SEK · Swedish krona</option>
+                  <option value="DKK">DKK · Danish krone</option>
+                </select>
               </div>
 
               <div class="bento-tile field">
