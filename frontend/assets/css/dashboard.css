@@ -6,7 +6,8 @@
 }
 
 .dashboard > section,
-.dashboard > .story-grid {
+.dashboard > .story-grid,
+.dashboard > .autonomy-bar {
   animation: fadeSlideUp 0.36s var(--ease-out) both;
 }
 
@@ -33,6 +34,27 @@
   background: var(--surface-tile);
   border-radius: var(--radius-tile);
   padding: 24px 26px;
+}
+
+.hero-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.header-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.header-badges .eyebrow-dot,
+.header-badges .eyebrow-dark {
+  margin-bottom: 0;
 }
 
 .hero-title {

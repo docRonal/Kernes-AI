@@ -186,8 +186,38 @@ function projectSeries(transactions, startingBalanceMinor, startDate, totalDays)
   return { days, first_deficit: firstDeficit };
 }
 
+function deriveServerShapedProposal(baseline, transactions) {
+  const days = baseline.days || [];
+  const first = days.find((d) => d.balance_minor < 0) || null;
+  if (!first) return null;
+
+  let deepest = first;
+  for (const day of days) {
+    if (day.balance_minor < deepest.balance_minor) {
+      deepest = day;
+    }
+  }
+
+  const deepestIdx = days.indexOf(deepest);
+  const recovery = days.slice(deepestIdx + 1).find((d) => d.balance_minor >= 0) || null;
+  const windowEnd = recovery ? recovery.date : days[days.length - 1].date;
+  const relevantIds = [...transactions]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .filter((tx) => days[0].date <= tx.date && tx.date <= windowEnd)
+    .map((tx) => tx.id);
+
+  const gap = -deepest.balance_minor;
+  return {
+    limit_minor: gap,
+    first_shortfall: { date: first.date, shortfall_minor: -first.balance_minor },
+    deepest_shortfall: { date: deepest.date, shortfall_minor: gap },
+    relevant_transaction_ids: relevantIds,
+  };
+}
+
 /**
- * Compute a ForecastResponse-compatible object from parsed Red Hat bank statement rows.
+ * Temporary semicolon-CSV shim for local Red Hat / Pizzeria Amalfi bank exports
+ * until backend CSV support is merged on main.
  */
 export function buildForecastFromRedHat({
   parsed,
@@ -233,6 +263,7 @@ export function buildForecastFromRedHat({
     currency,
     transactions,
     baseline,
+    proposal: deriveServerShapedProposal(baseline, transactions),
     scenario,
   };
 }

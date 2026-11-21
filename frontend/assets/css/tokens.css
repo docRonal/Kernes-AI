@@ -238,6 +238,158 @@ main.container {
   color: var(--danger);
 }
 
+/* Four-Level Autonomy Badges (Minimal Editorial Pills, No Emojis) */
+.autonomy-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border-radius: var(--radius-frame);
+  box-shadow: var(--shadow-card);
+}
+
+.autonomy-bar-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.autonomy-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.autonomy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+}
+
+.autonomy-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.autonomy-badge.level-1 {
+  background: #f2f2ef;
+  color: #555553;
+}
+
+.autonomy-badge.level-1::before {
+  background: #666665;
+}
+
+.autonomy-badge.level-2 {
+  background: var(--accent-soft);
+  color: #b5451b;
+}
+
+.autonomy-badge.level-2::before {
+  background: var(--accent);
+}
+
+.autonomy-badge.level-3 {
+  background: var(--warning-soft);
+  color: #9a4c00;
+  border: 1px solid rgba(184, 92, 0, 0.22);
+}
+
+.autonomy-badge.level-3::before {
+  background: #d97706;
+}
+
+.autonomy-badge.level-4 {
+  background: var(--positive-soft);
+  color: #176b3a;
+}
+
+.autonomy-badge.level-4::before {
+  background: var(--positive);
+}
+
+.autonomy-badge.level-2-dark {
+  background: rgba(255, 123, 75, 0.16);
+  color: #ffb396;
+}
+
+.autonomy-badge.level-2-dark::before {
+  background: var(--accent);
+}
+
+.autonomy-badge.level-3-dark {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.autonomy-badge.level-3-dark::before {
+  background: #ffb020;
+}
+
+.autonomy-badge.level-4-dark {
+  background: rgba(52, 199, 89, 0.14);
+  color: #9ceab0;
+}
+
+.autonomy-badge.level-4-dark::before {
+  background: #34c759;
+}
+
+/* Loading Spinner & Waiting Indicators (5-8 s Model Calls) */
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--hairline-strong);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.thinking-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  margin-bottom: 4px;
+}
+
+.thinking-box {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--surface-tile);
+  color: var(--ink-secondary);
+  font-size: 13.5px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: fadeInSoft 0.24s var(--ease-out) both;
+}
+
 /* Minimal Dark Charcoal Footer */
 .footer-wrap {
   max-width: 964px;

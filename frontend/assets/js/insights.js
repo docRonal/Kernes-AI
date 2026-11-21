@@ -1,18 +1,18 @@
-import { printDate, printMoney, replayFade } from "./format.js?v=tc6";
+import { printDate, printMoney, replayFade } from "./format.js?v=tc8";
 
 const ANOMALY_LABELS = {
-  duplicate_payment: "Possible duplicate",
-  outlier_expense: "Unusually large expense",
-  same_day_spike: "Heavy payment day",
+  duplicate_payment: "Possible repeat charge",
+  outlier_expense: "Unusually large payment",
+  same_day_spike: "Busy payment day",
 };
 
 const FACTOR_LABELS = {
-  repayment: "Repayment",
-  coverage: "Coverage",
-  duration: "Duration",
-  depth: "Gap depth",
-  concentration: "Client mix",
-  delays: "Delay history",
+  repayment: "Money coming back in",
+  coverage: "Days needed",
+  duration: "Length of dip",
+  depth: "Lowest balance",
+  concentration: "Customer spread",
+  delays: "Late-payment track record",
 };
 
 const RISK_META = {
@@ -44,10 +44,13 @@ export function resetInsightsUi() {
     if (el) el.hidden = true;
   }
   const hiddenIds = [
+    "#ask-loading",
     "#ask-answer-box",
     "#ask-error",
+    "#delay-loading",
     "#delay-result-box",
     "#delay-error",
+    "#credit-explain-error",
     "#credit-factors-toggle",
     "#optimize-footer",
   ];
@@ -73,7 +76,7 @@ export function renderAnomalies(data, currency = "EUR") {
       createEl(
         "div",
         "bento-tile insight-empty",
-        "No duplicate charges, unusual spikes, or outlier expenses detected in this 14-day window.",
+        "No repeat charges, unusual spikes, or extra-large payments detected in this 14-day window.",
       ),
     );
   } else {
@@ -124,12 +127,12 @@ export function renderCompareOptions(data, currency = "EUR") {
       const metrics = createEl("dl", "compare-metrics");
       const costWrap = document.createElement("div");
       costWrap.append(
-        createEl("dt", "", "Estimated cost"),
+        createEl("dt", "", "Estimated fee"),
         createEl("dd", "", printMoney(opt.estimated_cost_minor, currency)),
       );
       const creditWrap = document.createElement("div");
       creditWrap.append(
-        createEl("dt", "", "Credit needed"),
+        createEl("dt", "", "Buffer needed"),
         createEl("dd", "", printMoney(opt.credit_needed_minor, currency)),
       );
       metrics.append(costWrap, creditWrap);
@@ -151,6 +154,7 @@ export function renderCreditCheck(data, currency = "EUR") {
   const scoreVal = document.querySelector("#credit-score-value");
   const scoreBar = document.querySelector("#credit-score-fill");
   const scoreNote = document.querySelector("#credit-score-note");
+  const explainErrEl = document.querySelector("#credit-explain-error");
   const factorsList = document.querySelector("#credit-factors-list");
   const toggleBtn = document.querySelector("#credit-factors-toggle");
 
@@ -164,7 +168,17 @@ export function renderCreditCheck(data, currency = "EUR") {
 
   scoreNote.textContent =
     data.explanation ||
-    `Calculated for a ${printMoney(data.limit_minor, currency)} credit line based on repayment, coverage, gap depth, and client concentration.`;
+    `Calculated for a ${printMoney(data.limit_minor, currency)} buffer based on incoming payments, dip length, lowest balance, and customer spread.`;
+
+  if (explainErrEl) {
+    if (data.explanation_error) {
+      explainErrEl.textContent =
+        "AI commentary is temporarily offline, but your readiness score and factor breakdown above are calculated accurately.";
+      explainErrEl.hidden = false;
+    } else {
+      explainErrEl.hidden = true;
+    }
+  }
 
   const factors = data.factors || [];
   let expanded = false;
@@ -208,6 +222,7 @@ export function renderHealthyCreditScore() {
   const scoreVal = document.querySelector("#credit-score-value");
   const scoreBar = document.querySelector("#credit-score-fill");
   const scoreNote = document.querySelector("#credit-score-note");
+  const explainErrEl = document.querySelector("#credit-explain-error");
   const factorsList = document.querySelector("#credit-factors-list");
   const toggleBtn = document.querySelector("#credit-factors-toggle");
 
@@ -216,12 +231,13 @@ export function renderHealthyCreditScore() {
   scoreVal.textContent = "100";
   scoreBar.style.width = "100%";
   scoreBar.className = "score-bar-fill score-bar-low";
-  scoreNote.textContent = "Your balance stays positive across the entire 14-day window — no credit facility is needed.";
+  scoreNote.textContent = "Your balance stays positive across all 14 days — no safety buffer is needed.";
+  if (explainErrEl) explainErrEl.hidden = true;
 
   const healthyRows = [
     { name: "Cash cushion", reason: "Balance stays positive every day", pts: "+40" },
-    { name: "Credit needed", reason: "No temporary facility required", pts: "+35" },
-    { name: "Shortfall risk", reason: "Zero deficit days projected", pts: "+25" },
+    { name: "Buffer needed", reason: "No temporary buffer required", pts: "+35" },
+    { name: "Shortfall risk", reason: "Zero negative days projected", pts: "+25" },
   ];
   factorsList.replaceChildren(
     ...healthyRows.map((row) => {
@@ -252,8 +268,8 @@ export function renderStressTest(data, currency = "EUR") {
   recValue.textContent = printMoney(data.recommended_limit_minor, currency);
   bufferSub.textContent =
     data.buffer_minor > 0
-      ? `Includes +${printMoney(data.buffer_minor, currency)} extra safety buffer over baseline.`
-      : "Baseline limit already covers all stress scenarios.";
+      ? `Includes +${printMoney(data.buffer_minor, currency)} extra safety cushion over your main estimate.`
+      : "Your main safety buffer already covers all what-if scenarios.";
 
   list.replaceChildren(
     ...(data.scenarios || []).map((sc) => {
@@ -296,8 +312,8 @@ export function renderAskAnswer(data, currency = "EUR") {
   const parts = [];
   if (data.what_if) {
     const gap = data.what_if.deepest_shortfall
-      ? `Recalculated gap: ${printMoney(data.what_if.deepest_shortfall.shortfall_minor, currency)} on ${printDate(data.what_if.deepest_shortfall.date)}`
-      : "Recalculated gap: 0.00 (no shortfall)";
+      ? `New shortfall if this happens: ${printMoney(data.what_if.deepest_shortfall.shortfall_minor, currency)} on ${printDate(data.what_if.deepest_shortfall.date)}`
+      : "New shortfall if this happens: 0.00 (no shortfall)";
     parts.push(gap);
   }
   if (data.model) {
@@ -335,7 +351,7 @@ export function renderOptimizePayments(data, transactions, currency = "EUR", onP
         createEl(
           "div",
           "bento-tile insight-empty",
-          "No payment timing moves improve the credit limit in this window.",
+          "No payment timing moves reduce the buffer needed in this window.",
         ),
       );
       footer.hidden = true;
@@ -367,7 +383,7 @@ export function renderOptimizePayments(data, transactions, currency = "EUR", onP
         const meta = createEl(
           "span",
           "optimize-meta",
-          `${printDate(action.due_date)} → ${printDate(action.new_date)} · Credit after: ${printMoney(action.limit_after_minor, currency)}`,
+          `${printDate(action.due_date)} → ${printDate(action.new_date)} · Buffer after: ${printMoney(action.limit_after_minor, currency)}`,
         );
 
         tile.append(top, title, meta);
@@ -438,7 +454,7 @@ export function populateDelayCandidates(forecast, currency = "EUR") {
   } else {
     form.hidden = true;
     emptyEl.textContent =
-      "Delay prediction requires a projected shortfall and at least one incoming payment in the 14-day window.";
+      "Late-payment check is available when your forecast dips below zero and has an incoming payment in the next 14 days.";
     emptyEl.hidden = false;
   }
 
@@ -459,7 +475,7 @@ export function renderDelayResult(data) {
     warningBox.className = "delay-warning";
   } else {
     warningBox.textContent =
-      "Demo mode returned the bundled explanation. In live mode, delay-specific warnings appear here.";
+      "Local preview mode shows a saved example note. When connected to the live AI model, specific late-payment warnings appear here.";
     warningBox.className = "delay-warning is-note";
   }
 

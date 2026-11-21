@@ -1,6 +1,6 @@
-import { renderCashflowChart } from "../chart.js";
-import { printDate, printMoney, replayFade } from "./format.js?v=tc6";
-import { groupTransactionsByDate } from "./proposal.js";
+import { renderCashflowChart } from "../chart.js?v=tc8";
+import { printDate, printMoney, replayFade } from "./format.js?v=tc8";
+import { groupTransactionsByDate } from "./proposal.js?v=tc8";
 
 export function renderKpis(state) {
   const { forecast, proposal, openingBalanceMinor, simulationDecision } = state;
@@ -44,21 +44,23 @@ export function renderKpis(state) {
     firstCard.classList.add("is-danger");
     peakCard.classList.add("is-danger");
 
+    const activeLimit = state.simulationOutcome?.limit_minor ?? proposal.recommendedLimitMinor;
+
     if (simulationDecision === "approved") {
       heroBadge.textContent = "Preview: Covered";
       heroBadge.className = "pill pill-success";
-      heroTitle.textContent = `Covered with a ${money(proposal.recommendedLimitMinor)} credit line`;
-      heroSummary.textContent = `In this preview, a temporary ${money(proposal.recommendedLimitMinor)} credit line covers your cash dip so your uncovered gap drops to ${money(0)}.`;
+      heroTitle.textContent = `Covered with a ${money(activeLimit)} safety buffer`;
+      heroSummary.textContent = `In this simulation preview, a temporary ${money(activeLimit)} safety buffer covers your cash dip so money still short drops to ${money(0)}.`;
     } else if (simulationDecision === "rejected") {
       heroBadge.textContent = "Preview: Uncovered";
       heroBadge.className = "pill pill-danger";
       heroTitle.textContent = `Short by ${money(proposal.peakDeficit.shortfall_minor)} on ${printDate(proposal.peakDeficit.date)}`;
-      heroSummary.textContent = `Without a credit line, your account dips below zero on ${printDate(proposal.firstDeficit.date)} and stays up to ${money(proposal.peakDeficit.shortfall_minor)} short. Try moving an incoming payment earlier.`;
+      heroSummary.textContent = `Without a safety buffer, your account dips below zero on ${printDate(proposal.firstDeficit.date)} and runs up to ${money(proposal.peakDeficit.shortfall_minor)} short. Try testing an earlier customer payment below.`;
     } else {
       heroBadge.textContent = "Heads up · Cash dip ahead";
       heroBadge.className = "pill pill-warning";
       heroTitle.textContent = `You may run ${money(proposal.peakDeficit.shortfall_minor)} short on ${printDate(proposal.peakDeficit.date)}`;
-      heroSummary.textContent = `Your cash first goes below zero on ${printDate(proposal.firstDeficit.date)} (−${money(proposal.firstDeficit.shortfall_minor)}). Review the summary and test a credit line or earlier payment below.`;
+      heroSummary.textContent = `Your cash first goes below zero on ${printDate(proposal.firstDeficit.date)} (−${money(proposal.firstDeficit.shortfall_minor)}). Review the options below to see what helps.`;
     }
 
     firstVal.textContent = `−${money(proposal.firstDeficit.shortfall_minor)}`;
@@ -118,10 +120,11 @@ export function renderLedgerAndChart(state) {
   renderCashflowChart(document.querySelector("#chart-container"), {
     baselineDays: baseline.days,
     scenarioDays: scenario ? scenario.days : null,
+    decisionDays: simulationOutcome?.days ?? null,
     transactionsByDate: txByDate,
     firstDeficitDate: proposal?.firstDeficit.date ?? null,
     peakDeficitDate: proposal?.peakDeficit.date ?? null,
-    facilityLimitMinor: proposal?.recommendedLimitMinor ?? 0,
+    facilityLimitMinor: simulationOutcome?.limit_minor ?? proposal?.recommendedLimitMinor ?? 0,
     simulationDecision,
     currencySymbol: currency === "EUR" ? "€" : "PLN ",
     formatMoney: money,
@@ -192,9 +195,11 @@ export function renderProposalPanel(state) {
   draftCard.hidden = !showDraft;
   whatifGrid?.classList.toggle("is-single", !showDraft);
 
-  document.querySelector("#proposal-limit-value").textContent = money(proposal.recommendedLimitMinor);
+  const limitMinor = simulationOutcome?.limit_minor ?? proposal.recommendedLimitMinor;
+
+  document.querySelector("#proposal-limit-value").textContent = money(limitMinor);
   document.querySelector("#fact-peak-shortfall").textContent =
-    `Covers your lowest day (${printDate(proposal.peakDeficit.date)})`;
+    `Covers your lowest projected day (${printDate(proposal.peakDeficit.date)})`;
 
   // Populate 2-3 plain-English "Why it happens" bullets
   const outflows = proposal.relevantTransactions.filter((tx) => tx.amount_minor < 0);
@@ -213,7 +218,7 @@ export function renderProposalPanel(state) {
     );
   }
   bullets.push(
-    `A ${money(proposal.recommendedLimitMinor)} safety net covers every negative day in this forecast.`,
+    `A ${money(limitMinor)} safety buffer covers every negative day in this forecast.`,
   );
 
   document.querySelector("#why-bullets").replaceChildren(
@@ -261,17 +266,17 @@ export function renderProposalPanel(state) {
   if (simulationDecision === "approved") {
     outcomeBox.className = "outcome-box approved";
     outcomeTitle.textContent = "Preview Approved — You're Covered";
-    outcomeDetails.textContent = `A ${money(proposal.recommendedLimitMinor)} credit line covers every negative day in this forecast.`;
+    outcomeDetails.textContent = `A ${money(limitMinor)} safety buffer covers every negative day in this simulation.`;
     const peakUncovered = simulationOutcome
       ? simulationOutcome.largest_uncovered?.shortfall_minor ?? 0
-      : Math.max(0, proposal.peakDeficit.shortfall_minor - proposal.recommendedLimitMinor);
+      : Math.max(0, proposal.peakDeficit.shortfall_minor - limitMinor);
     outcomeGapValue.textContent = money(peakUncovered);
     outcomeBox.hidden = false;
     replayFade(outcomeBox);
   } else if (simulationDecision === "rejected") {
     outcomeBox.className = "outcome-box rejected";
     outcomeTitle.textContent = "Preview Rejected — Gap Remains";
-    outcomeDetails.textContent = `Without a credit line, you'll still be short on ${printDate(proposal.peakDeficit.date)}. You can test moving a payment earlier in Tab 2.`;
+    outcomeDetails.textContent = `Without a temporary buffer, you'll still be short on ${printDate(proposal.peakDeficit.date)}. Try testing an earlier customer payment in Tab 2.`;
     outcomeGapValue.textContent = money(simulationOutcome?.largest_uncovered?.shortfall_minor ?? proposal.peakDeficit.shortfall_minor);
     outcomeBox.hidden = false;
     replayFade(outcomeBox);

@@ -1,4 +1,27 @@
-import { buildForecastFromRedHat } from "../parser.js";
+import { buildForecastFromRedHat } from "../parser.js?v=tc8";
+
+export function formatCsvError(rawMessage) {
+  const msg = String(rawMessage || "").trim();
+  if (!msg) {
+    return "We couldn't read this file. Upload a valid CSV export or try one of the built-in samples below.";
+  }
+  if (/must be the header id,date,amount_minor,label/i.test(msg)) {
+    return "This CSV doesn't match the expected columns. Upload a bank CSV export (with Booking Date, Amount, Currency) or a CSV with header: id,date,amount_minor,label — or try one of the sample buttons below.";
+  }
+  if (/missing required columns/i.test(msg)) {
+    return "This bank CSV doesn't have the required columns (Booking Date, Amount, Currency). Export a fresh CSV from your bank or try one of the built-in samples below.";
+  }
+  if (/Use 12000 EUR|Use the bundled transactions\.csv/i.test(msg)) {
+    return "In local preview mode, custom comma CSVs aren't active yet — click 'Try Kernes demo (EUR)' or 'Try Pizzeria Amalfi sample' below to explore.";
+  }
+  if (/UTF-8/i.test(msg)) {
+    return "This file isn't readable plain text (UTF-8 CSV). Export a fresh CSV from your bank or spreadsheet and try again.";
+  }
+  if (/larger than 1 MB/i.test(msg)) {
+    return "This file is larger than 1 MB. Export a shorter date range as CSV and try again.";
+  }
+  return msg;
+}
 
 export async function request(path, options) {
   const response = await fetch(path, options);

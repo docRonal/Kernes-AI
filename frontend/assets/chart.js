@@ -55,6 +55,7 @@ export function renderCashflowChart(container, config) {
   const {
     baselineDays,
     scenarioDays = null,
+    decisionDays = null,
     transactionsByDate = new Map(),
     firstDeficitDate = null,
     peakDeficitDate = null,
@@ -195,7 +196,7 @@ export function renderCashflowChart(container, config) {
           "text-anchor": "end",
           class: "facility-tag",
         },
-        `Credit line cover (${formatCompactMoney(-facilityLimitMinor, currencySymbol)})`,
+        `Safety buffer (${formatCompactMoney(-facilityLimitMinor, currencySymbol)})`,
       ),
     );
   }
@@ -287,6 +288,8 @@ export function renderCashflowChart(container, config) {
   });
   svg.append(crosshair);
 
+  const decisionByDate = new Map((decisionDays || []).map((d) => [d.date, d]));
+
   // Floating tooltip
   const tooltip = document.createElement("div");
   tooltip.className = "chart-tooltip";
@@ -319,24 +322,27 @@ export function renderCashflowChart(container, config) {
 
       const lines = [
         `<div class="tip-date">${formatDate(day.date)}</div>`,
-        `<div class="tip-row"><span>Baseline</span><strong class="${day.balance_minor < 0 ? "neg" : ""}">${formatMoney(day.balance_minor)}</strong></div>`,
+        `<div class="tip-row"><span>Projected cash</span><strong class="${day.balance_minor < 0 ? "neg" : ""}">${formatMoney(day.balance_minor)}</strong></div>`,
       ];
 
       if (scenarioDays && scenarioDays[i]) {
         const adj = scenarioDays[i].balance_minor;
         lines.push(
-          `<div class="tip-row"><span>Adjusted</span><strong class="${adj < 0 ? "neg" : "pos"}">${formatMoney(adj)}</strong></div>`,
+          `<div class="tip-row"><span>If paid earlier</span><strong class="${adj < 0 ? "neg" : "pos"}">${formatMoney(adj)}</strong></div>`,
         );
       }
 
       if (simulationDecision) {
+        const serverDay = decisionByDate.get(day.date);
         const rawGap = Math.max(0, -day.balance_minor);
-        const uncovered =
-          simulationDecision === "approved"
+        const uncovered = serverDay
+          ? serverDay.uncovered_minor
+          : simulationDecision === "approved"
             ? Math.max(0, rawGap - facilityLimitMinor)
             : rawGap;
+        const statusLabel = simulationDecision === "approved" ? "approved" : "rejected";
         lines.push(
-          `<div class="tip-row"><span>Uncovered gap (${simulationDecision})</span><strong class="${uncovered > 0 ? "neg" : "pos"}">${formatMoney(uncovered)}</strong></div>`,
+          `<div class="tip-row"><span>Still short (${statusLabel})</span><strong class="${uncovered > 0 ? "neg" : "pos"}">${formatMoney(uncovered)}</strong></div>`,
         );
       }
 

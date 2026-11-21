@@ -273,6 +273,33 @@
   margin-bottom: 0;
 }
 
+.callout-badge-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.control-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.outcome-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.draft-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
 .credit-callout-label {
   font-size: 12px;
   font-weight: 600;
@@ -484,7 +511,8 @@
   line-height: 1.45;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: flex-start;
+  gap: 4px;
   animation: fadeInSoft 0.26s var(--ease-out) both;
 }
 

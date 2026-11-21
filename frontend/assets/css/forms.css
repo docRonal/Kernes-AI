@@ -420,6 +420,7 @@ textarea {
 .status-banner.error {
   background: var(--danger-soft);
   color: var(--danger);
+  border: 1px solid rgba(217, 56, 58, 0.22);
 }
 
 .inline-alert {
@@ -434,6 +435,18 @@ textarea {
 .inline-alert-soft {
   background: var(--surface-tile);
   color: var(--ink-secondary);
+}
+
+.inline-alert-warn {
+  background: var(--warning-soft);
+  color: #8c4500;
+  border: 1px solid rgba(184, 92, 0, 0.16);
+}
+
+.alert-title {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 2px;
 }
 
 .inline-alert-dark {

@@ -1,13 +1,14 @@
-import { parseRedHatBankCsv } from "./parser.js?v=tc6";
+import { parseRedHatBankCsv } from "./parser.js?v=tc8";
 import {
   AMALFI_DEFAULT_MOVE_DATE,
   AMALFI_DEFAULT_OPENING_EUR,
   AMALFI_DEFAULT_START_DATE,
   AMALFI_SAMPLE_CSV,
   AMALFI_SAMPLE_FILENAME,
-} from "./sample-amalfi.js?v=tc6";
+} from "./sample-amalfi.js?v=tc8";
 import {
   buildInsightPayload,
+  formatCsvError,
   request,
   requestAdvice,
   requestAnomalies,
@@ -21,8 +22,8 @@ import {
   requestSendReminder,
   requestStressTest,
   resolveForecast,
-} from "./js/api.js?v=tc6";
-import { replayFade, toMinor } from "./js/format.js?v=tc6";
+} from "./js/api.js?v=tc8";
+import { replayFade, toMinor } from "./js/format.js?v=tc8";
 import {
   populateDelayCandidates,
   renderAnomalies,
@@ -36,15 +37,15 @@ import {
   renderOptimizePayments,
   renderStressTest,
   resetInsightsUi,
-} from "./js/insights.js?v=tc6";
-import { computeProposal } from "./js/proposal.js?v=tc6";
+} from "./js/insights.js?v=tc8";
+import { readProposal } from "./js/proposal.js?v=tc8";
 import {
   buildReminderTemplate,
   populateIncomingPayments,
   renderKpis,
   renderLedgerAndChart,
   renderProposalPanel,
-} from "./js/render.js?v=tc6";
+} from "./js/render.js?v=tc8";
 
 const forecastForm = document.querySelector("#forecast-form");
 const scenarioForm = document.querySelector("#scenario-form");
@@ -74,11 +75,13 @@ const horizonPills = document.querySelectorAll(".horizon-pill");
 const askForm = document.querySelector("#ask-cfo-form");
 const askInput = document.querySelector("#ask-cfo-input");
 const askBtn = document.querySelector("#ask-cfo-btn");
+const askLoading = document.querySelector("#ask-loading");
 const askChips = document.querySelectorAll(".ask-chip");
 const delayForm = document.querySelector("#delay-form");
 const delayTxSelect = document.querySelector("#delay-tx-select");
 const delayDaysInput = document.querySelector("#delay-days-input");
 const delayPredictBtn = document.querySelector("#delay-predict-btn");
+const delayLoading = document.querySelector("#delay-loading");
 
 const tabCredit = document.querySelector("#tab-credit");
 const tabWhatIf = document.querySelector("#tab-whatif");
@@ -127,7 +130,7 @@ function showStatus(message, isError = false) {
 function showSetupScreen() {
   state.forecast = null;
   state.adviceRequestId += 1;
-  agentStatusPill.textContent = "Assistant Ready";
+  agentStatusPill.textContent = "Assistant ready";
   setupScreen.hidden = false;
   resultsSection.hidden = true;
   changeFileBtn.hidden = true;
@@ -175,22 +178,70 @@ function applyTemplateDraft({ force = false } = {}) {
   replayFade(draftSourceNote);
 }
 
+function validateCsvUpload(file, text) {
+  if (file && file.size > 1_000_000) {
+    throw new Error("This file is larger than 1 MB. Export a shorter date range as CSV and try again.");
+  }
+  const name = (file?.name || "").toLowerCase();
+  if (name && /\.(pdf|xlsx?|docx?|png|jpe?g|zip|json|xml)$/.test(name)) {
+    throw new Error(
+      "Please upload a plain CSV file (.csv). Spreadsheet, PDF, or image files can't be imported directly.",
+    );
+  }
+  if (!text || !text.trim()) {
+    throw new Error("This file is empty. Choose a CSV with transactions or try one of the sample buttons below.");
+  }
+  if (/\x00/.test(text)) {
+    throw new Error(
+      "This file doesn't look like plain text CSV. Export a CSV from your bank or spreadsheet and try again.",
+    );
+  }
+  const firstLine = text.replace(/^\uFEFF/, "").trimStart().split(/\r?\n/, 1)[0] || "";
+  if (!firstLine.includes(";")) {
+    const cols = firstLine.split(",").map((col) => col.trim().replace(/^"|"$/g, "")).sort();
+    const expected = ["amount_minor", "date", "id", "label"];
+    if (cols.length !== expected.length || cols.some((col, i) => col !== expected[i])) {
+      throw new Error("The first line must be the header id,date,amount_minor,label.");
+    }
+  }
+}
+
+function pickDecisionBaseline(forecast) {
+  const insightBaseline = buildInsightPayload(forecast)?.baseline;
+  if (insightBaseline?.first_deficit) return insightBaseline;
+
+  const allDays = forecast?.baseline?.days || [];
+  if (allDays.length < 14) return forecast?.baseline ?? null;
+
+  const peakDate = forecast?.proposal?.deepest_shortfall?.date || forecast?.baseline?.first_deficit?.date;
+  const peakIdx = peakDate ? allDays.findIndex((d) => d.date === peakDate) : 0;
+  const startIdx = Math.max(0, Math.min(allDays.length - 14, peakIdx > 0 ? peakIdx - 6 : 0));
+  const slice = allDays.slice(startIdx, startIdx + 14).map(({ date, balance_minor }) => ({
+    date,
+    balance_minor: Math.trunc(Number(balance_minor)),
+  }));
+  const firstNeg = slice.find((d) => d.balance_minor < 0);
+  return {
+    days: slice,
+    first_deficit: firstNeg ? { date: firstNeg.date, shortfall_minor: -firstNeg.balance_minor } : null,
+  };
+}
+
 async function fetchAdvice({ forceDraft = false } = {}) {
-  if (!state.forecast || state.parsedCsv || !state.forecast.baseline.first_deficit) return;
+  const payload = buildInsightPayload(state.forecast);
+  if (!state.forecast || !payload || !state.proposal) return;
 
   const reqId = ++state.adviceRequestId;
   adviceLoading.hidden = false;
   adviceError.hidden = true;
+  adviceError.className = "inline-alert inline-alert-soft";
   retryAdviceBtn.hidden = true;
   explanationEl.hidden = true;
   adviceModelEl.hidden = true;
   agentStatusPill.textContent = "Assistant thinking…";
 
   try {
-    const data = await requestAdvice({
-      baseline: state.forecast.baseline,
-      transactions: state.forecast.transactions,
-    });
+    const data = await requestAdvice(payload);
     if (reqId !== state.adviceRequestId) return;
 
     state.advice = data;
@@ -207,14 +258,29 @@ async function fetchAdvice({ forceDraft = false } = {}) {
     }
     adviceWrap.hidden = false;
     adviceButton.textContent = "Regenerate draft";
-    agentStatusPill.textContent = "Assistant Ready";
-  } catch {
+    agentStatusPill.textContent = "Assistant ready";
+  } catch (error) {
     if (reqId !== state.adviceRequestId) return;
-    agentStatusPill.textContent = "AI Offline";
-    adviceError.textContent =
-      "Our AI writer is temporarily offline, but your cash numbers and suggested credit line below are accurate and ready to test.";
-    adviceError.hidden = false;
-    retryAdviceBtn.hidden = false;
+    if (error?.status === 422 && state.parsedCsv) {
+      agentStatusPill.textContent = "Preview ready";
+      adviceError.className = "inline-alert inline-alert-soft";
+      adviceError.textContent =
+        "Local preview mode only stores a saved AI write-up for the Kernes sample. Your cash numbers, server decision preview, and editable email draft below are ready.";
+      adviceError.hidden = false;
+      retryAdviceBtn.hidden = true;
+    } else {
+      agentStatusPill.textContent = "AI offline";
+      adviceError.className = "inline-alert inline-alert-warn";
+      const titleEl = document.createElement("strong");
+      titleEl.className = "alert-title";
+      titleEl.textContent = "AI explanation is temporarily unavailable";
+      const msgEl = document.createElement("span");
+      msgEl.textContent =
+        "Your cash numbers and suggested safety buffer are calculated accurately and ready to test below.";
+      adviceError.replaceChildren(titleEl, msgEl);
+      adviceError.hidden = false;
+      retryAdviceBtn.hidden = false;
+    }
     if (forceDraft) {
       applyTemplateDraft({ force: true });
     }
@@ -235,6 +301,9 @@ async function runBaselineForecast() {
   try {
     const selectedFile = fileInput.files?.[0] || selectedSample;
     const csvText = selectedFile ? await selectedFile.text() : AMALFI_SAMPLE_CSV;
+    if (selectedFile) {
+      validateCsvUpload(selectedFile, csvText);
+    }
     state.csvFile =
       selectedFile || new File([AMALFI_SAMPLE_CSV], AMALFI_SAMPLE_FILENAME, { type: "text/csv" });
 
@@ -263,10 +332,12 @@ async function runBaselineForecast() {
     state.adviceRequestId += 1;
     adviceLoading.hidden = true;
     adviceError.hidden = true;
+    adviceError.className = "inline-alert inline-alert-soft";
+    adviceError.replaceChildren();
     retryAdviceBtn.hidden = true;
     explanationEl.hidden = true;
     adviceModelEl.hidden = true;
-    state.proposal = computeProposal(data);
+    state.proposal = readProposal(data);
     state.simulationDecision = null;
     state.simulationOutcome = null;
     state.advice = null;
@@ -284,18 +355,16 @@ async function runBaselineForecast() {
     renderAll();
     loadInsights();
 
-    if (state.proposal && state.parsedCsv) {
-      adviceError.textContent =
-        "This bank statement is analyzed locally. Your cash summary, credit preview, and editable email draft in Tab 2 are ready below.";
-      adviceError.hidden = false;
-      agentStatusPill.textContent = "Local forecast";
-    } else if (state.proposal) {
+    if (state.proposal) {
       fetchAdvice({ forceDraft: false });
     } else {
-      agentStatusPill.textContent = "Assistant Ready";
+      agentStatusPill.textContent = "Assistant ready";
     }
   } catch (error) {
-    showStatus(error.message, true);
+    showStatus(formatCsvError(error.message), true);
+    if (resultsSection.hidden) {
+      statusBanner.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   } finally {
     submitBtn.disabled = false;
     loadSampleBtn.disabled = false;
@@ -325,7 +394,7 @@ async function checkHealth() {
   try {
     const data = await requestHealth();
     if (data?.status === "ok") {
-      healthPill.textContent = "API Online";
+      healthPill.textContent = "Connected";
       healthPill.classList.remove("is-down");
       healthPill.classList.add("is-ok");
       return;
@@ -333,7 +402,7 @@ async function checkHealth() {
   } catch {
     // Fall through to offline indicator
   }
-  healthPill.textContent = "API Offline";
+  healthPill.textContent = "Offline";
   healthPill.classList.remove("is-ok");
   healthPill.classList.add("is-down");
 }
@@ -402,22 +471,26 @@ async function submitAskQuestion(question) {
 
   const payload = buildInsightPayload(state.forecast);
   if (!payload) {
-    renderAskError("Ask the CFO requires at least 14 forecast days.");
+    renderAskError("Questions require at least 14 days in your forecast.");
     return;
   }
 
   askBtn.disabled = true;
-  askBtn.textContent = "Thinking…";
+  askBtn.textContent = "Checking…";
+  askLoading.hidden = false;
+  document.querySelector("#ask-answer-box").hidden = true;
+  document.querySelector("#ask-error").hidden = true;
   try {
     const data = await requestAskCfo(payload, trimmed);
     renderAskAnswer(data, state.forecast.currency ?? "EUR");
   } catch (error) {
     renderAskError(
       error.status === 503
-        ? "Ask the CFO runs with the live OpenShift AI model. Switch the server to live mode to ask free-form questions."
+        ? "Free-form questions need the live AI model on OpenShift AI. Right now the server is running in local preview mode."
         : error.message,
     );
   } finally {
+    askLoading.hidden = true;
     askBtn.disabled = false;
     askBtn.textContent = "Ask →";
   }
@@ -455,14 +528,22 @@ delayForm.addEventListener("submit", async (event) => {
 
   delayPredictBtn.disabled = true;
   delayPredictBtn.textContent = "Checking…";
+  delayLoading.hidden = false;
+  document.querySelector("#delay-result-box").hidden = true;
+  document.querySelector("#delay-error").hidden = true;
   try {
     const data = await requestPredictDelays(payload, { [txId]: days });
     renderDelayResult(data);
   } catch (error) {
-    renderDelayError(error.message);
+    renderDelayError(
+      error.status === 503
+        ? "The AI assistant is temporarily unavailable. Your main numbers and safety buffer estimate are still ready above."
+        : error.message,
+    );
   } finally {
+    delayLoading.hidden = true;
     delayPredictBtn.disabled = false;
-    delayPredictBtn.textContent = "Predict delay impact →";
+    delayPredictBtn.textContent = "Check late impact →";
   }
 });
 
@@ -578,14 +659,15 @@ const approveButton = document.querySelector("#approve-sim-btn");
 const rejectButton = document.querySelector("#reject-sim-btn");
 
 async function simulateDecision(decision) {
-  if (!state.proposal) return;
+  if (!state.proposal || !state.forecast) return;
   const baseline = state.forecast.baseline;
+  const decisionBaseline = pickDecisionBaseline(state.forecast);
   approveButton.disabled = true;
   rejectButton.disabled = true;
   try {
-    const outcome = state.parsedCsv ? null : await requestDecision({ baseline, decision });
+    const outcome = await requestDecision({ baseline: decisionBaseline, decision });
     if (state.forecast?.baseline !== baseline) return;
-    state.simulationDecision = outcome?.decision ?? decision;
+    state.simulationDecision = outcome.decision;
     state.simulationOutcome = outcome;
     showStatus("");
     renderAll();
@@ -627,7 +709,7 @@ adviceButton.addEventListener("click", () => {
   state.draftEdited = false;
   reminderReceipt.hidden = true;
   reminderError.hidden = true;
-  if (!state.parsedCsv && state.proposal) {
+  if (state.proposal && (!state.parsedCsv || state.advice)) {
     fetchAdvice({ forceDraft: true });
     return;
   }
@@ -668,13 +750,16 @@ sendReminderBtn.addEventListener("click", async () => {
   sendReminderBtn.textContent = "Simulating…";
   try {
     const data = await requestSendReminder({ to_email, subject, body });
+    const badge = document.createElement("span");
+    badge.className = "autonomy-badge level-4-dark";
+    badge.textContent = "Simulation only — nothing sent";
     const title = document.createElement("strong");
     title.textContent = "Simulated · Nothing sent";
     const meta = document.createElement("span");
     meta.textContent = `To: ${data.recipient} · Subject: ${data.subject}`;
     const msg = document.createElement("span");
     msg.textContent = data.message;
-    reminderReceipt.replaceChildren(title, meta, msg);
+    reminderReceipt.replaceChildren(badge, title, meta, msg);
     reminderReceipt.hidden = false;
     replayFade(reminderReceipt);
   } catch (error) {
