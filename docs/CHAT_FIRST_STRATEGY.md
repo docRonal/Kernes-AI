@@ -15,7 +15,7 @@ Instead of rewriting our working backend or changing the tech stack with **16 ho
    - If the business has a **cash shortfall**: produces a concrete **Survival Plan** (*1. Check duplicate/outlier → 2. Shift payment to cut gap free → 3. Cover remaining gap with short-term credit line*).
    - If the business has **no shortfall (healthy surplus)**: produces a **Safe Growth Plan** (*how much cash buffer to keep after stress-test scenarios vs. how much is safe to reinvest in equipment/savings*).
 3. **Interactive Actions Inside the Chat + Progressive Disclosure:**
-   - Directly inside the chat thread, Luigi gets interactive simulation buttons (`Approve credit preview`, `Preview client reminder email`, `Ask a follow-up question like "Can I buy a €3,000 oven?"`) with all **4 Challenge Card autonomy badges** visible.
+   - Directly inside the chat thread, Luigi gets interactive simulation buttons (`Approve credit preview`, `Preview client reminder email`, `Ask a follow-up question like "What happens if a selected client pays 3 days later?"`) with all **4 Challenge Card autonomy badges** visible.
    - A prominent topbar/card toggle **`More details · Advanced CFO`** switches seamlessly to the full existing dashboard (Chart with `+7d` / `Stress` / `What-If` overlays, Credit Readiness Score, Stress Test, Smart Payment Moves, Compare Options, Anomalies, Telemetry).
 
 ---
@@ -26,6 +26,9 @@ Instead of rewriting our working backend or changing the tech stack with **16 ho
 - Keep the original Red Hat `demo/pizzeria_amalfi_sample.csv` untouched.
 - Add **only 1 new backend endpoint** (`POST /api/action-plan`) that composes existing calculators, filters actions by `actionability`, and reuses our existing `ModelConfig` + `cited_amounts` grounding + fallback pipeline.
 - Keep all existing dashboard DOM IDs (`#results`, `#compare-card`, `#health-stress-grid`, `#anomalies-card`, etc.) intact inside the **Advanced CFO** view so zero existing functionality or tests break.
+- **Demo framing (known payments scenario):** `EUR 5,000.00` on `2025-06-22` is a demo scenario assumption (the reconstructed balance from the full historical statement on that date was `−EUR 8,848.69`). The current dashboard computes balances from operations already present in the CSV for the forecast dates, so on the demo we present this honestly as a **scenario with known/scheduled payments**. A separate historical-only forecast was validated in Jupyter (tables in **PR #17**).
+- **Ask CFO scope:** Current `/api/ask-cfo` modifies/shifts existing scheduled payments rather than adding new capex transactions — therefore use *"What happens if a selected client pays 3 days later?"* instead of *"Can I buy a €3,000 oven?"*.
+- **Branch discipline (`main` via PR only — NO direct push / NO force-push):** Strongly requested: merge all branches into `main` **only via Pull Request** and never force-push to `main` (GitHub branch protection settings are currently restricted to the repository owner `docRonal`).
 
 ---
 
@@ -181,7 +184,7 @@ Register `@app.post("/api/action-plan", response_model=ActionPlanResponse)` and 
       - `[Approve credit line preview]` / `[Reject preview]` (calls existing `simulateDecision()` and posts simulated outcome bubble in chat).
       - `[Preview client reminder email]` (expands editable draft + `[Simulate send]` right inside chat).
       - `[Show full CFO dashboard →]` button (switches to Advanced Mode).
-    - **Continuous Follow-Up Input** at the bottom of the chat (wired directly to existing `/api/ask-cfo` + suggested chips tailored to Luigi, e.g., *"Can I afford a €3,000 pizza oven?"*, *"What if a client pays 3 days late?"*).
+    - **Continuous Follow-Up Input** at the bottom of the chat (wired directly to existing `/api/ask-cfo` + suggested chips tailored to Luigi, e.g., *"What happens if a selected client pays 3 days later?"*, *"What if we delay our biggest supplier payment by 3 days?"* — noting that `/api/ask-cfo` operates on existing payments, not new capex).
 
 #### Modify `frontend/index.html`, `frontend/assets/app.js`, `frontend/assets/js/api.js`
 - Add mode toggle pill in topbar: **`Simple Chat`** (default) | **`Advanced Dashboard`** (`#mode-toggle-btn`).
@@ -211,7 +214,7 @@ Register `@app.post("/api/action-plan", response_model=ActionPlanResponse)` and 
 | **Hours 6–8** | **Yuri (QA + Lead)** | Integrate PRs into `main`, run full local pytest (`uv run --locked pytest -q`), verify both Simple Chat (Luigi survival + healthy growth) and Advanced Dashboard flows locally in Edge Playwright. |
 | **Hours 8–10** | **Mikhail** (`feat/openshift`) | Rebuild & redeploy OpenShift container from unified `main` (`app-<sha>`), verify `kernes-qwen-7b` handles `POST /api/action-plan` in <6s, update `deploy/EVIDENCE.md`. |
 | **Hours 10–12** | **Yuri (QA + Lead)** | Run live OpenShift remote pytest + Playwright E2E on both modes; fix any UI/copy rough edges. |
-| **Hours 12–16** | **Whole Team** | Freeze code! Finalize `Collabothon_2026_Project_Card_Filled.pdf`, `Kernes_AI_Demo_Script_v1.pdf` (built around **Luigi's 3-minute story**: 3-question chat → instant survival plan → Approve simulation → "Can I buy a €3,000 oven?" → 1 click into `Advanced Dashboard` for tech judges), and rehearse 2x live on OpenShift. |
+| **Hours 12–16** | **Whole Team** | Freeze code! Finalize `Collabothon_2026_Project_Card_Filled.pdf`, `Kernes_AI_Demo_Script_v1.pdf` (built around **Luigi's 3-minute story**: 3-question chat → instant survival plan → Approve simulation → "What happens if a selected client pays 3 days later?" → 1 click into `Advanced Dashboard` for tech judges), and rehearse 2x live on OpenShift. |
 
 ---
 
