@@ -16,6 +16,7 @@ import {
   resolveForecast,
 } from "./js/api.js?v=tc31";
 import { renderActionPlan } from "./js/action_plan.js?v=tc28";
+import { fetchAndRenderCfoSuite } from "./js/cfo_suite.js?v=tc35";
 import { extractCsvDefaults } from "./js/csv.js?v=1";
 import { printDate, printMoney, replayFade, toMinor } from "./js/format.js?v=tc11";
 import {
@@ -82,6 +83,7 @@ const statusBanner = document.querySelector("#status");
 const resultsStatusBanner = document.querySelector("#results-status");
 const setupScreen = document.querySelector("#setup-screen");
 const resultsSection = document.querySelector("#results");
+const cfoSuiteContainer = document.querySelector("#cfo-suite-container");
 const changeFileBtn = document.querySelector("#change-file-btn");
 const printReportBtn = document.querySelector("#print-report-btn");
 const calendarFilterChips = Array.from(document.querySelectorAll("[data-cal-filter]"));
@@ -189,6 +191,7 @@ function showSetupScreen() {
   state.forecastAnalysis = null;
   state.forecastAnalysisRequestId += 1;
   resetForecastIntelligence();
+  cfoSuiteContainer?.replaceChildren();
   state.proposal = null;
   state.advice = null;
   state.adviceRequestId += 1;
@@ -592,6 +595,12 @@ async function runBaselineForecast({ customOpeningMinor = null } = {}) {
     renderAll();
 
     loadForecastAnalysis();
+    if (cfoSuiteContainer) {
+      fetchAndRenderCfoSuite(cfoSuiteContainer, {
+        forecast: data,
+        currency: data.currency ?? "EUR",
+      });
+    }
     const insightsPromise = loadInsights();
     const advicePromise = state.proposal
       ? fetchAdvice({ forceDraft: false })

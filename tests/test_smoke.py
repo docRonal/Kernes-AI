@@ -48,6 +48,8 @@ def test_preview_serves_html_assets_and_demo_csv():
     assert 'id="business-goal-input"' in page.text
     assert 'id="action-plan-steps"' in page.text
     assert 'id="workspace-nav"' in page.text
+    assert 'id="ws-tab-agents"' in page.text
+    assert 'id="cfo-suite-container"' in page.text
     assert 'id="ws-view-all-btn"' in page.text
     assert 'id="forecast-intel"' in page.text
     assert 'id="load-sample-btn"' not in page.text
@@ -56,17 +58,24 @@ def test_preview_serves_html_assets_and_demo_csv():
     styles = client.get("/assets/styles.css")
     assert styles.status_code == 200
     assert "css/tokens.css" in styles.text
+    assert "css/cfo_suite.css" in styles.text
     for asset in (
         "app.js", "chart.js",
-        "js/action_plan.js", "js/api.js", "js/csv.js", "js/format.js", "js/insights.js", "js/predictions.js", "js/proposal.js", "js/render.js", "js/workspace.js",
-        "css/tokens.css", "css/dashboard.css", "css/forms.css", "css/insights.css", "css/panels.css", "css/progressive.css", "css/workspace.css", "css/responsive.css",
+        "js/action_plan.js", "js/api.js", "js/cfo_suite.js", "js/csv.js", "js/format.js", "js/insights.js", "js/predictions.js", "js/proposal.js", "js/render.js", "js/workspace.js",
+        "css/tokens.css", "css/dashboard.css", "css/forms.css", "css/insights.css", "css/panels.css", "css/progressive.css", "css/workspace.css", "css/cfo_suite.css", "css/responsive.css",
     ):
         assert client.get(f"/assets/{asset}").status_code == 200, asset
     assert client.get("/demo/transactions.csv").status_code == 404
     assert client.get("/demo/amalfi.csv").status_code == 200
     assert client.get("/demo/amalfi.csv").content == (DEMO / "pizzeria_amalfi_sample.csv").read_bytes()
+    mcp_manifest = client.get("/api/mcp/tools")
+    assert mcp_manifest.status_code == 200
+    assert mcp_manifest.json()["protocol"] == "mcp"
+    assert len(mcp_manifest.json()["tools"]) == 8
     operations = client.get("/openapi.json").json()["paths"]
     assert "multipart/form-data" in operations["/api/forecast"]["post"]["requestBody"]["content"]
+    assert "/api/multi-agent" in operations
+    assert "/api/mcp/tools" in operations
 
 
 def test_full_statement_forecasts_january_beyond_the_imported_dates():
@@ -117,6 +126,14 @@ def test_demo_baseline_scenario_and_draft():
     adv_body = advice.json()
     assert "EUR 8,248.91" in adv_body["explanation"]
     assert adv_body["model"] == "demo-deterministic"
+
+    suite = client.post("/api/multi-agent", json=payload)
+    assert suite.status_code == 200, suite.text
+    suite_body = suite.json()
+    assert suite_body["agents_active"] == 4
+    assert suite_body["fx_hedging"]["agent"] == "fx_hedging"
+    assert suite_body["tax_agent"]["agent"] == "tax_agent"
+    assert suite_body["investment_agent"]["agent"] == "investment_agent"
 
     healthy = forecast(client, {**BASE_INPUT, "starting_balance_minor": "3000000"}).json()
     assert client.post(

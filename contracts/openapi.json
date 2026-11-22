@@ -541,6 +541,198 @@
           }
         }
       }
+    },
+    "/api/fx-hedging": {
+      "post": {
+        "summary": "Fx Hedging",
+        "operationId": "fx_hedging_api_fx_hedging_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsightRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FxHedgingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tax-agent": {
+      "post": {
+        "summary": "Tax Agent",
+        "operationId": "tax_agent_api_tax_agent_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsightRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxAgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/investments": {
+      "post": {
+        "summary": "Investments",
+        "operationId": "investments_api_investments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsightRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvestmentAgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/multi-agent": {
+      "post": {
+        "summary": "Multi Agent",
+        "operationId": "multi_agent_api_multi_agent_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsightRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultiAgentSuiteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mcp/tools": {
+      "get": {
+        "tags": [
+          "mcp"
+        ],
+        "summary": "MCP tool discovery manifest for Autonomous CFO agents",
+        "operationId": "list_mcp_tools_api_mcp_tools_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpManifestResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mcp": {
+      "post": {
+        "tags": [
+          "mcp"
+        ],
+        "summary": "MCP JSON-RPC 2.0 agent orchestration endpoint",
+        "operationId": "mcp_jsonrpc_mcp_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1435,6 +1627,43 @@
         "title": "DecisionResponse",
         "description": "Outcome of a simulated human decision. Nothing is applied for, sent or moved."
       },
+      "DeductibleCategorySummary": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "rent",
+              "b2b_supplier",
+              "utility",
+              "staff_payroll"
+            ],
+            "title": "Category"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "transaction_count": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Transaction Count"
+          },
+          "total_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total Minor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "category",
+          "display_name",
+          "transaction_count",
+          "total_minor"
+        ],
+        "title": "DeductibleCategorySummary"
+      },
       "Deficit": {
         "properties": {
           "date": {
@@ -1977,6 +2206,238 @@
         ],
         "title": "ForecastResponse"
       },
+      "FxExposureItem": {
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "title": "Transaction Id"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "counterparty": {
+            "type": "string",
+            "title": "Counterparty"
+          },
+          "amount_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Amount Minor"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "inflow",
+              "outflow"
+            ],
+            "title": "Direction"
+          },
+          "detected_currency": {
+            "type": "string",
+            "title": "Detected Currency"
+          },
+          "exposure_kind": {
+            "type": "string",
+            "enum": [
+              "direct_fx",
+              "cross_border",
+              "international_supplier"
+            ],
+            "title": "Exposure Kind"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "transaction_id",
+          "date",
+          "counterparty",
+          "amount_minor",
+          "direction",
+          "detected_currency",
+          "exposure_kind",
+          "reason"
+        ],
+        "title": "FxExposureItem"
+      },
+      "FxHedgeRecommendation": {
+        "properties": {
+          "instrument_kind": {
+            "type": "string",
+            "enum": [
+              "fx_forward",
+              "fx_option"
+            ],
+            "title": "Instrument Kind"
+          },
+          "product_name": {
+            "type": "string",
+            "title": "Product Name"
+          },
+          "protected_amount_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Protected Amount Minor"
+          },
+          "estimated_cost_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Estimated Cost Minor"
+          },
+          "cost_bps": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Cost Bps"
+          },
+          "coverage_pct": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Coverage Pct"
+          },
+          "autonomy_level": {
+            "type": "string",
+            "enum": [
+              "analyzed",
+              "recommended",
+              "requires_approval",
+              "simulation_only"
+            ],
+            "title": "Autonomy Level"
+          },
+          "simulated": {
+            "type": "boolean",
+            "const": true,
+            "title": "Simulated",
+            "default": true
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "instrument_kind",
+          "product_name",
+          "protected_amount_minor",
+          "estimated_cost_minor",
+          "cost_bps",
+          "coverage_pct",
+          "autonomy_level",
+          "detail"
+        ],
+        "title": "FxHedgeRecommendation"
+      },
+      "FxHedgingResponse": {
+        "properties": {
+          "agent": {
+            "type": "string",
+            "const": "fx_hedging",
+            "title": "Agent",
+            "default": "fx_hedging"
+          },
+          "home_currency": {
+            "type": "string",
+            "enum": [
+              "EUR",
+              "PLN",
+              "CHF",
+              "USD",
+              "GBP",
+              "CZK",
+              "SEK",
+              "DKK",
+              "HUF",
+              "RON",
+              "BGN",
+              "NOK"
+            ],
+            "title": "Home Currency"
+          },
+          "risk_level": {
+            "type": "string",
+            "enum": [
+              "none",
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Risk Level"
+          },
+          "total_exposure_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total Exposure Minor"
+          },
+          "adverse_shock_bps": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Adverse Shock Bps",
+            "default": 500
+          },
+          "adverse_shock_impact_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Adverse Shock Impact Minor"
+          },
+          "exposures": {
+            "items": {
+              "$ref": "#/components/schemas/FxExposureItem"
+            },
+            "type": "array",
+            "title": "Exposures"
+          },
+          "hedges": {
+            "items": {
+              "$ref": "#/components/schemas/FxHedgeRecommendation"
+            },
+            "type": "array",
+            "title": "Hedges"
+          },
+          "autonomy_level": {
+            "type": "string",
+            "enum": [
+              "analyzed",
+              "recommended",
+              "requires_approval",
+              "simulation_only"
+            ],
+            "title": "Autonomy Level"
+          },
+          "simulated": {
+            "type": "boolean",
+            "const": true,
+            "title": "Simulated",
+            "default": true
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Summary"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "home_currency",
+          "risk_level",
+          "total_exposure_minor",
+          "adverse_shock_impact_minor",
+          "exposures",
+          "hedges",
+          "autonomy_level",
+          "summary"
+        ],
+        "title": "FxHedgingResponse"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2032,6 +2493,351 @@
         ],
         "title": "InsightRequest",
         "description": "The baseline and transactions from the forecast response. Every figure is recalculated from them."
+      },
+      "InvestmentAgentResponse": {
+        "properties": {
+          "agent": {
+            "type": "string",
+            "const": "investment_agent",
+            "title": "Agent",
+            "default": "investment_agent"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "EUR",
+              "PLN",
+              "CHF",
+              "USD",
+              "GBP",
+              "CZK",
+              "SEK",
+              "DKK",
+              "HUF",
+              "RON",
+              "BGN",
+              "NOK"
+            ],
+            "title": "Currency"
+          },
+          "min_balance_minor": {
+            "type": "integer",
+            "title": "Min Balance Minor"
+          },
+          "safety_cushion_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Safety Cushion Minor"
+          },
+          "investable_surplus_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Investable Surplus Minor"
+          },
+          "surplus_threshold_needed_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Surplus Threshold Needed Minor"
+          },
+          "liquidity_first_mode": {
+            "type": "boolean",
+            "title": "Liquidity First Mode"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/InvestmentOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "autonomy_level": {
+            "type": "string",
+            "enum": [
+              "analyzed",
+              "recommended",
+              "requires_approval",
+              "simulation_only"
+            ],
+            "title": "Autonomy Level"
+          },
+          "simulated": {
+            "type": "boolean",
+            "const": true,
+            "title": "Simulated",
+            "default": true
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Summary"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "currency",
+          "min_balance_minor",
+          "safety_cushion_minor",
+          "investable_surplus_minor",
+          "surplus_threshold_needed_minor",
+          "liquidity_first_mode",
+          "options",
+          "autonomy_level",
+          "summary"
+        ],
+        "title": "InvestmentAgentResponse"
+      },
+      "InvestmentOption": {
+        "properties": {
+          "option_kind": {
+            "type": "string",
+            "enum": [
+              "fixed_term_deposit",
+              "money_market_fund",
+              "capex_equipment_financing",
+              "capex_leasing"
+            ],
+            "title": "Option Kind"
+          },
+          "product_name": {
+            "type": "string",
+            "title": "Product Name"
+          },
+          "annual_rate_bps": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Annual Rate Bps"
+          },
+          "allocated_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Allocated Minor"
+          },
+          "projected_yield_30d_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Projected Yield 30D Minor"
+          },
+          "projected_yield_90d_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Projected Yield 90D Minor"
+          },
+          "autonomy_level": {
+            "type": "string",
+            "enum": [
+              "analyzed",
+              "recommended",
+              "requires_approval",
+              "simulation_only"
+            ],
+            "title": "Autonomy Level"
+          },
+          "simulated": {
+            "type": "boolean",
+            "const": true,
+            "title": "Simulated",
+            "default": true
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "option_kind",
+          "product_name",
+          "annual_rate_bps",
+          "allocated_minor",
+          "projected_yield_30d_minor",
+          "projected_yield_90d_minor",
+          "autonomy_level",
+          "detail"
+        ],
+        "title": "InvestmentOption"
+      },
+      "McpManifestResponse": {
+        "properties": {
+          "protocol": {
+            "type": "string",
+            "const": "mcp",
+            "title": "Protocol",
+            "default": "mcp"
+          },
+          "protocol_version": {
+            "type": "string",
+            "title": "Protocol Version",
+            "default": "2024-11-05"
+          },
+          "server_name": {
+            "type": "string",
+            "title": "Server Name",
+            "default": "kernes-cfo-mcp"
+          },
+          "server_version": {
+            "type": "string",
+            "title": "Server Version",
+            "default": "0.1.0"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/McpToolDescriptor"
+            },
+            "type": "array",
+            "title": "Tools"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tools"
+        ],
+        "title": "McpManifestResponse"
+      },
+      "McpToolAnnotations": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "readOnlyHint": {
+            "type": "boolean",
+            "const": true,
+            "title": "Readonlyhint",
+            "default": true
+          },
+          "destructiveHint": {
+            "type": "boolean",
+            "const": false,
+            "title": "Destructivehint",
+            "default": false
+          },
+          "idempotentHint": {
+            "type": "boolean",
+            "const": true,
+            "title": "Idempotenthint",
+            "default": true
+          },
+          "openWorldHint": {
+            "type": "boolean",
+            "const": false,
+            "title": "Openworldhint",
+            "default": false
+          },
+          "autonomy_level": {
+            "type": "string",
+            "enum": [
+              "analyzed",
+              "recommended",
+              "requires_approval",
+              "simulation_only"
+            ],
+            "title": "Autonomy Level"
+          },
+          "autonomy_badge": {
+            "type": "string",
+            "title": "Autonomy Badge"
+          },
+          "agent": {
+            "type": "string",
+            "title": "Agent"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "autonomy_level",
+          "autonomy_badge",
+          "agent"
+        ],
+        "title": "McpToolAnnotations"
+      },
+      "McpToolDescriptor": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "inputSchema": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Inputschema"
+          },
+          "autonomy_level": {
+            "type": "string",
+            "enum": [
+              "analyzed",
+              "recommended",
+              "requires_approval",
+              "simulation_only"
+            ],
+            "title": "Autonomy Level"
+          },
+          "annotations": {
+            "$ref": "#/components/schemas/McpToolAnnotations"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "inputSchema",
+          "autonomy_level",
+          "annotations"
+        ],
+        "title": "McpToolDescriptor"
+      },
+      "MultiAgentSuiteResponse": {
+        "properties": {
+          "fx_hedging": {
+            "$ref": "#/components/schemas/FxHedgingResponse"
+          },
+          "tax_agent": {
+            "$ref": "#/components/schemas/TaxAgentResponse"
+          },
+          "investment_agent": {
+            "$ref": "#/components/schemas/InvestmentAgentResponse"
+          },
+          "summary_headline": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Summary Headline"
+          },
+          "agents_active": {
+            "type": "integer",
+            "const": 4,
+            "title": "Agents Active",
+            "default": 4
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "latency_ms": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Latency Ms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fx_hedging",
+          "tax_agent",
+          "investment_agent",
+          "summary_headline",
+          "model",
+          "latency_ms"
+        ],
+        "title": "MultiAgentSuiteResponse"
       },
       "PaymentAction": {
         "properties": {
@@ -2330,6 +3136,179 @@
         ],
         "title": "StressTestResponse",
         "description": "Worst cases for the forecast and the extra credit they would need. Calculated, never from the model."
+      },
+      "TaxAgentResponse": {
+        "properties": {
+          "agent": {
+            "type": "string",
+            "const": "tax_agent",
+            "title": "Agent",
+            "default": "tax_agent"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "EUR",
+              "PLN",
+              "CHF",
+              "USD",
+              "GBP",
+              "CZK",
+              "SEK",
+              "DKK",
+              "HUF",
+              "RON",
+              "BGN",
+              "NOK"
+            ],
+            "title": "Currency"
+          },
+          "scheduled_tax_total_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Scheduled Tax Total Minor"
+          },
+          "operating_inflows_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Operating Inflows Minor"
+          },
+          "operating_outflows_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Operating Outflows Minor"
+          },
+          "net_operating_cash_minor": {
+            "type": "integer",
+            "title": "Net Operating Cash Minor"
+          },
+          "vat_advance_reserve_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Vat Advance Reserve Minor"
+          },
+          "recommended_quarterly_reserve_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Recommended Quarterly Reserve Minor"
+          },
+          "tax_obligations": {
+            "items": {
+              "$ref": "#/components/schemas/TaxObligationItem"
+            },
+            "type": "array",
+            "title": "Tax Obligations"
+          },
+          "deductible_categories": {
+            "items": {
+              "$ref": "#/components/schemas/DeductibleCategorySummary"
+            },
+            "type": "array",
+            "title": "Deductible Categories"
+          },
+          "total_deductible_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total Deductible Minor"
+          },
+          "reserve_at_risk": {
+            "type": "boolean",
+            "title": "Reserve At Risk"
+          },
+          "reserve_shortfall_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Reserve Shortfall Minor"
+          },
+          "cash_dip_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Dip Warning"
+          },
+          "autonomy_level": {
+            "type": "string",
+            "enum": [
+              "analyzed",
+              "recommended",
+              "requires_approval",
+              "simulation_only"
+            ],
+            "title": "Autonomy Level"
+          },
+          "simulated": {
+            "type": "boolean",
+            "const": true,
+            "title": "Simulated",
+            "default": true
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Summary"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "currency",
+          "scheduled_tax_total_minor",
+          "operating_inflows_minor",
+          "operating_outflows_minor",
+          "net_operating_cash_minor",
+          "vat_advance_reserve_minor",
+          "recommended_quarterly_reserve_minor",
+          "tax_obligations",
+          "deductible_categories",
+          "total_deductible_minor",
+          "reserve_at_risk",
+          "reserve_shortfall_minor",
+          "cash_dip_warning",
+          "autonomy_level",
+          "summary"
+        ],
+        "title": "TaxAgentResponse"
+      },
+      "TaxObligationItem": {
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "title": "Transaction Id"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "counterparty": {
+            "type": "string",
+            "title": "Counterparty"
+          },
+          "amount_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Amount Minor"
+          },
+          "reference": {
+            "type": "string",
+            "title": "Reference"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "transaction_id",
+          "date",
+          "counterparty",
+          "amount_minor",
+          "reference"
+        ],
+        "title": "TaxObligationItem"
       },
       "Transaction": {
         "properties": {

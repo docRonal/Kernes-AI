@@ -10,10 +10,21 @@ from fastapi.staticfiles import StaticFiles
 from .action_plan import build_action_plan
 from .advice import check_ai_health, get_advice, predict_delays, send_reminder, use_currency
 from .advisory_extras import compare_financing_options, detect_anomalies
+from .cfo_agents import (
+    FxHedgingResponse,
+    InvestmentAgentResponse,
+    MultiAgentSuiteResponse,
+    TaxAgentResponse,
+    analyze_fx_hedging,
+    analyze_investments,
+    analyze_tax_reserve,
+    run_multi_agent_suite,
+)
 from .consultant import ask_cfo, credit_check
 from .forecast import AMALFI_DEMO_FILE, get_decision, get_forecast
 from .forecast_analysis import get_forecast_analysis
 from .insights import optimize_payments, stress_test
+from .mcp_server import create_mcp_router
 from .models import (
     ActionPlanRequest,
     ActionPlanResponse,
@@ -162,6 +173,28 @@ def create_app(mode: str | None = None) -> FastAPI:
     def action_plan(request: ActionPlanRequest) -> ActionPlanResponse:
         with use_currency(request.currency):
             return build_action_plan(mode=mode, request=request)
+
+    @app.post("/api/fx-hedging", response_model=FxHedgingResponse)
+    def fx_hedging(request: InsightRequest) -> FxHedgingResponse:
+        with use_currency(request.currency):
+            return analyze_fx_hedging(mode=mode, request=request)
+
+    @app.post("/api/tax-agent", response_model=TaxAgentResponse)
+    def tax_agent(request: InsightRequest) -> TaxAgentResponse:
+        with use_currency(request.currency):
+            return analyze_tax_reserve(mode=mode, request=request)
+
+    @app.post("/api/investments", response_model=InvestmentAgentResponse)
+    def investments(request: InsightRequest) -> InvestmentAgentResponse:
+        with use_currency(request.currency):
+            return analyze_investments(mode=mode, request=request)
+
+    @app.post("/api/multi-agent", response_model=MultiAgentSuiteResponse)
+    def multi_agent(request: InsightRequest) -> MultiAgentSuiteResponse:
+        with use_currency(request.currency):
+            return run_multi_agent_suite(mode=mode, request=request)
+
+    app.include_router(create_mcp_router(mode))
 
     return app
 

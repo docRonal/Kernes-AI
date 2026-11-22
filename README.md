@@ -15,10 +15,10 @@ An AI CFO on Red Hat OpenShift AI that forecasts an SME's cash 14 days ahead fro
 ## Technology Stack
 
 - **Backend:** Python 3.12, FastAPI, Pydantic v2, Uvicorn, `python-multipart` (deterministic integer minor-unit arithmetic across 12 supported currencies including `EUR`, `PLN`, `USD`, `CHF`, `GBP`)
-- **Frontend:** HTML5, CSS3 (Bento, 4-Tab Workspace & Progressive Disclosure UI), Vanilla ES Modules JavaScript, interactive SVG cash-flow & dual donut charts
+- **Frontend:** HTML5, CSS3 (Bento, 5-Tab Workspace & Progressive Disclosure UI), Vanilla ES Modules JavaScript, interactive SVG cash-flow & dual donut charts
 - **AI & Inference:** Open-weight **Qwen2.5 7B Instruct** (`kernes-qwen-7b`) served via **vLLM** on Red Hat OpenShift AI (**NVIDIA L4 GPU**), with automatic fallback to **Qwen2.5 1.5B Instruct** (`kernes-qwen`, `llama.cpp` CPU)
-- **Platform & OpenShift Bonus Paths:** Red Hat OpenShift Container Platform & OpenShift AI (`Containerfile`, KServe `InferenceService`, Deployment, Service, HTTPS Route, Secrets), **vLLM** GPU serving, **Jupyter Notebooks on OpenShift AI** ([evaluate_liquidity_agent.ipynb](notebooks/evaluate_liquidity_agent.ipynb) + historical forecast validation in PR #17), optional **MLflow** latency & grounding telemetry
-- **Testing & Workflow:** `uv` + `uv.lock`, `pytest` (192 automated tests in 10 suites + 5 Node.js CSV parser tests), rolling-origin backtest on the real 2025 statement (PR #17), GitHub Pull Request workflow
+- **Platform & OpenShift Bonus Paths:** Red Hat OpenShift Container Platform & OpenShift AI (`Containerfile`, KServe `InferenceService`, Deployment, Service, HTTPS Route, Secrets), **vLLM** GPU serving, **Model Context Protocol (MCP)** JSON-RPC 2.0 server (`POST /mcp`, `GET /api/mcp/tools`) exposing all 8 CFO tools, **Jupyter Notebooks on OpenShift AI** ([evaluate_liquidity_agent.ipynb](notebooks/evaluate_liquidity_agent.ipynb) + historical forecast validation in PR #17), optional **MLflow** latency & grounding telemetry
+- **Testing & Workflow:** `uv` + `uv.lock`, `pytest` (220 automated tests across 12 suites + 5 Node.js CSV parser tests), rolling-origin backtest on the real 2025 statement (PR #17), GitHub Pull Request workflow
 
 ## Source Code Repository
 
@@ -60,6 +60,8 @@ Small and medium-sized enterprises (SMEs) are often run by hands-on founders who
 - **Peak-gap credit facility proposal & simulation** (`POST /api/decision` — `Approve preview` reduces uncovered gap to `0.00`; `Reject preview` preserves the baseline gap).
 - **Grounded AI Action Plan, Forecast Intelligence & Briefing** (`POST /api/action-plan` with dynamic AI `suggested_questions`, `POST /api/forecast-analysis` for full-year trend/seasonality/delay commentary, `POST /api/advice`) running on OpenShift AI (`kernes-qwen-7b` GPU primary + `kernes-qwen` CPU fallback) with HTTP 503 / graceful deterministic fallback resilience.
 - **Full Interactive CFO Suite:** Unified SVG chart (`Recorded balance` → `Projected +14d` with post-divider Stress Test / What-If / Purchase / Early-Pay overlays), **Dual Income/Expense Donut Charts**, **Smart Cash Calendar**, **"Can I Afford It?" Planned Purchase Sandbox**, **What-If Q&A** (`POST /api/ask-cfo`), **Client-Pays-Late Predictor** (`POST /api/predict-delays`), **Compare Financing Options** (`POST /api/compare-options`), **Cash Health Score** (`POST /api/credit-check`), **Stress Test** (`POST /api/stress-test`), **Smart Payment Moves** (`POST /api/optimize-payments`), and **Anomaly Detector** (`POST /api/detect-anomalies`).
+- **Full 4-Agent Autonomous CFO Suite (`CFO Agents & MCP` tab):** Covers all 4 Challenge Card agents — **Liquidity Agent** (14-day forecast + above suite), **FX Hedging Agent** (`POST /api/fx-hedging` — cross-border exposure & ±5% shock hedging), **Tax & Reserve Agent** (`POST /api/tax-agent` — tax obligations, quarterly VAT/advance reserve & deductible expense totals), and **Investment & Capex Agent** (`POST /api/investments` — Liquidity-First protection during shortfalls or Festgeld / Money Market yield optimization during surplus), orchestrated via `POST /api/multi-agent`.
+- **MCP (Model Context Protocol) Tool Server (Red Hat Bonus):** Standard JSON-RPC 2.0 MCP endpoint (`POST /mcp`) and REST discovery manifest (`GET /api/mcp/tools`) exposing all 8 deterministic CFO tools with Pydantic JSON Schemas and 4-level autonomy annotations, plus an interactive **MCP Tool Inspector** inside the dashboard.
 
 **Simulated by Design (Zero Real Execution):**
 - Credit facility approval/rejection and payment reminder sending (`POST /api/send-reminder`) are 100% simulated.
@@ -81,9 +83,9 @@ Small and medium-sized enterprises (SMEs) are often run by hands-on founders who
 
 ### RESULTS AND NEXT STEPS
 
-- **Results Achieved:** Live end-to-end deployment on Red Hat OpenShift AI (`kernes-qwen-7b` on NVIDIA L4 GPU + `kernes-qwen` fallback), 192 automated `pytest` tests in 10 suites (+ 5 Node.js CSV tests) covering math, CSV validation, counterparty classification, full-year pattern & AI forecast analysis, action plans, grounding, backtesting, and error paths, plus a Jupyter evaluation notebook ([evaluate_liquidity_agent.ipynb](notebooks/evaluate_liquidity_agent.ipynb)).
+- **Results Achieved:** Live end-to-end deployment on Red Hat OpenShift AI (`kernes-qwen-7b` on NVIDIA L4 GPU + `kernes-qwen` fallback), all 4 Autonomous CFO Challenge Card agents (Liquidity, FX Hedging, Tax, Investment) + standard MCP JSON-RPC 2.0 server (`POST /mcp`, `GET /api/mcp/tools`), 220 automated `pytest` tests across 12 suites (+ 5 Node.js CSV tests) covering math, CSV validation, counterparty classification, full-year pattern & AI forecast analysis, action plans, grounding, backtesting (PR #17), and error paths, plus a Jupyter evaluation notebook ([evaluate_liquidity_agent.ipynb](notebooks/evaluate_liquidity_agent.ipynb)).
 - **Current Limitations:** Uses uploaded CSV exports rather than live PSD2 bank feeds; the free-text `/api/ask-cfo` chat shifts or scales existing scheduled transactions (new capex items are simulated via the dedicated *Can I Afford It?* Purchase Sandbox rather than free-text chat); all banking actions are simulated.
-- **Next Steps:** Connect Commerzbank / PSD2 APIs for real-time account sync, let owners add planned multi-day closures/holidays on top of the learned forecast, unify free-text What-If chat with the Purchase Sandbox for ad-hoc capex queries, and expand to FX Hedging, Tax, and Investment sub-agents.
+- **Next Steps:** Connect Commerzbank / PSD2 APIs for real-time account sync, let owners add planned multi-day closures/holidays on top of the learned forecast, unify free-text What-If chat with the Purchase Sandbox for ad-hoc capex queries, and connect the MCP server directly to external IDE / Red Hat OpenShift AI agent orchestrators.
 
 ---
 

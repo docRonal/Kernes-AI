@@ -1,0 +1,779 @@
+/* ==========================================================================
+   KERNES CFO — Autonomous Multi-Agent CFO Suite & MCP Protocol Inspector
+   Matches Warm Stone & Charcoal (#121211) Bento Aesthetic · Zero Emojis
+   ========================================================================== */
+
+.cfo-suite {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: fadeSlideUp 0.32s var(--ease-out) both;
+}
+
+/* --------------------------------------------------------------------------
+   1. Header Strip (Warm Charcoal Editorial Bar + 4 Agents + MCP Badge)
+   -------------------------------------------------------------------------- */
+.cfo-suite-header {
+  background: var(--surface-dark);
+  color: #ffffff;
+  border-radius: var(--radius-frame);
+  padding: 20px 22px;
+  box-shadow: var(--shadow-dark);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cfo-suite-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px 18px;
+  flex-wrap: wrap;
+}
+
+.cfo-suite-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  flex: 1 1 360px;
+}
+
+.cfo-suite-eyebrow-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cfo-suite-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #bdbdb9;
+}
+
+.cfo-suite-eyebrow::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.cfo-suite-title {
+  margin: 0;
+  font-size: clamp(19px, 2.2vw, 23px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: #ffffff;
+}
+
+.cfo-suite-headline {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 400;
+  color: #c8c8c4;
+  line-height: 1.45;
+  max-width: 680px;
+}
+
+/* MCP Protocol Badge Button */
+.cfo-mcp-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cfo-mcp-badge-btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: var(--surface-dark-tile);
+  color: #f5f5f3;
+  border-radius: var(--radius-pill);
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s var(--ease-out);
+}
+
+.cfo-mcp-badge-btn:hover {
+  background: #262623;
+  border-color: rgba(255, 123, 75, 0.55);
+  transform: translateY(-1px);
+}
+
+.cfo-mcp-badge-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.cfo-mcp-badge-btn[aria-expanded="true"] {
+  background: #292925;
+  border-color: var(--accent);
+}
+
+.cfo-mcp-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #34c759;
+  flex-shrink: 0;
+}
+
+.cfo-mcp-dot.is-fallback {
+  background: #ffb020;
+}
+
+.cfo-mcp-chevron {
+  font-size: 10px;
+  color: #a8a8a4;
+  transition: transform 0.18s ease;
+}
+
+.cfo-mcp-badge-btn[aria-expanded="true"] .cfo-mcp-chevron {
+  transform: rotate(180deg);
+}
+
+/* 4-Agent Active Strip */
+.cfo-agent-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cfo-agent-pill {
+  background: var(--surface-dark-tile);
+  border: 1px solid var(--hairline-dark);
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cfo-agent-pill-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cfo-agent-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #34c759;
+  flex-shrink: 0;
+}
+
+.cfo-agent-pill-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #f3f3f1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cfo-agent-pill-role {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9e9e9a;
+  white-space: nowrap;
+}
+
+/* Expandable MCP Tool Inspector Drawer */
+.cfo-mcp-drawer {
+  background: #181816;
+  border: 1px solid var(--hairline-dark);
+  border-radius: var(--radius-tile);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: fadeInSoft 0.2s var(--ease-out) both;
+}
+
+.cfo-mcp-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cfo-mcp-drawer-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.cfo-mcp-drawer-meta {
+  font-size: 12px;
+  color: #a4a4a0;
+  font-family: var(--font-mono);
+}
+
+.cfo-mcp-tool-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cfo-mcp-tool-item {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cfo-mcp-tool-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cfo-mcp-tool-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffb396;
+}
+
+.cfo-mcp-tool-level {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.1);
+  color: #d6d6d2;
+}
+
+.cfo-mcp-tool-desc {
+  margin: 0;
+  font-size: 12px;
+  color: #b8b8b4;
+  line-height: 1.4;
+}
+
+.cfo-mcp-curl-box {
+  background: #10100f;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cfo-mcp-curl-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cfo-mcp-curl-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #c2c2be;
+}
+
+.cfo-mcp-copy-btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  border-radius: var(--radius-pill);
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.cfo-mcp-copy-btn:hover {
+  background: rgba(255, 123, 75, 0.24);
+  border-color: var(--accent);
+}
+
+.cfo-mcp-curl-code {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #e5e5e1;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+
+/* --------------------------------------------------------------------------
+   2. 3-Column Bento Agent Grid
+   -------------------------------------------------------------------------- */
+.cfo-agent-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+.cfo-agent-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-frame);
+  padding: 18px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.cfo-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cfo-card-badges {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cfo-card-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+}
+
+.cfo-card-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  line-height: 1.25;
+}
+
+.cfo-card-summary {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-secondary);
+  line-height: 1.45;
+}
+
+/* Metric Bento Pair */
+.cfo-metric-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cfo-metric-tile {
+  background: var(--surface-tile);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  padding: 11px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.cfo-metric-tile.is-warn {
+  background: var(--warning-soft);
+  border-color: rgba(184, 92, 0, 0.2);
+}
+
+.cfo-metric-tile.is-danger {
+  background: var(--danger-soft);
+  border-color: rgba(217, 56, 58, 0.2);
+}
+
+.cfo-metric-tile.is-positive {
+  background: var(--positive-soft);
+  border-color: rgba(31, 138, 76, 0.2);
+}
+
+.cfo-metric-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  line-height: 1.3;
+}
+
+.cfo-metric-value {
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.cfo-metric-value.is-positive {
+  color: var(--positive);
+}
+
+.cfo-metric-value.is-warn {
+  color: var(--warning);
+}
+
+.cfo-metric-value.is-danger {
+  color: var(--danger);
+}
+
+.cfo-metric-sub {
+  font-size: 11px;
+  color: var(--ink-secondary);
+  line-height: 1.3;
+}
+
+/* Tag / Currency / Category Chips */
+.cfo-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cfo-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-stone);
+  color: var(--ink-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* Option / Product List */
+.cfo-options-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cfo-option-tile {
+  background: var(--surface-tile);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 14px;
+  padding: 11px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.cfo-option-tile.is-selected {
+  background: var(--accent-soft);
+  border-color: rgba(255, 123, 75, 0.5);
+}
+
+.cfo-option-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cfo-option-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.cfo-option-rate {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--positive);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cfo-option-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--ink-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.cfo-option-note {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--ink-muted);
+  line-height: 1.35;
+}
+
+/* Tax Reserve Status Banner */
+.cfo-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--surface-tile);
+  border: 1px solid var(--hairline);
+}
+
+.cfo-status-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  line-height: 1.35;
+}
+
+/* Tax-Prep Checklist */
+.cfo-checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.cfo-checklist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ink-secondary);
+  line-height: 1.4;
+}
+
+.cfo-checklist-item input[type="checkbox"] {
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  min-height: 16px;
+  padding: 0;
+  margin: 2px 0 0;
+  accent-color: var(--surface-dark);
+  cursor: pointer;
+  flex: 0 0 16px;
+}
+
+.cfo-checklist-item span {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.cfo-checklist-item.is-checked span {
+  text-decoration: line-through;
+  color: var(--ink-muted);
+}
+
+/* Interactive Simulation Toggle & Outcome Panel */
+.cfo-card-footer {
+  margin-top: auto;
+  padding-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cfo-sim-toggle-btn {
+  appearance: none;
+  width: 100%;
+  border: 1px solid var(--surface-dark);
+  background: var(--surface-dark);
+  color: #ffffff;
+  border-radius: var(--radius-input);
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s var(--ease-out);
+}
+
+.cfo-sim-toggle-btn:hover {
+  background: #252522;
+  transform: translateY(-1px);
+}
+
+.cfo-sim-toggle-btn[aria-pressed="true"] {
+  background: var(--surface-stone);
+  color: var(--ink);
+  border-color: var(--hairline-strong);
+}
+
+.cfo-sim-panel {
+  background: var(--surface-dark);
+  color: #f4f4f2;
+  border-radius: 14px;
+  padding: 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  animation: fadeInSoft 0.2s var(--ease-out) both;
+}
+
+.cfo-sim-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12.5px;
+  color: #c7c7c3;
+}
+
+.cfo-sim-row strong {
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.cfo-sim-row strong.is-accent {
+  color: #9ceab0;
+}
+
+.cfo-sim-disclaimer {
+  margin: 0;
+  font-size: 11px;
+  color: #9b9b97;
+  line-height: 1.35;
+}
+
+/* Loading Skeleton & Error State */
+.cfo-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.cfo-skeleton-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-frame);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cfo-skeleton-bar {
+  height: 14px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--surface-stone) 25%, #f3f3f0 50%, var(--surface-stone) 75%);
+  background-size: 200% 100%;
+  animation: cfoShimmer 1.3s ease-in-out infinite;
+}
+
+.cfo-skeleton-bar.is-title {
+  height: 20px;
+  width: 68%;
+}
+
+.cfo-skeleton-bar.is-short {
+  width: 45%;
+}
+
+@keyframes cfoShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.cfo-error-card {
+  background: var(--surface);
+  border: 1px solid rgba(217, 56, 58, 0.28);
+  border-radius: var(--radius-frame);
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.cfo-error-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cfo-error-copy strong {
+  font-size: 14.5px;
+  color: var(--ink);
+}
+
+.cfo-error-copy span {
+  font-size: 13px;
+  color: var(--ink-secondary);
+}
+
+/* --------------------------------------------------------------------------
+   3. Responsive Layout (1-col on mobile)
+   -------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+  .cfo-agent-grid,
+  .cfo-skeleton-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cfo-agent-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cfo-mcp-tool-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .cfo-agent-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .cfo-metric-pair {
+    grid-template-columns: 1fr;
+  }
+
+  .cfo-suite-header {
+    padding: 16px;
+  }
+}
