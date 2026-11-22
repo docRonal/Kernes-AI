@@ -44,6 +44,11 @@ def test_preview_serves_html_assets_and_demo_csv():
     assert "Step 1 of 2" not in page.text
     assert "Step 2 of 2" not in page.text
     assert 'id="run-forecast-btn"' in page.text
+    assert 'id="business-type-input"' in page.text
+    assert 'id="business-goal-input"' in page.text
+    assert 'id="action-plan-steps"' in page.text
+    assert 'id="advanced-details-section"' in page.text
+    assert 'id="toggle-all-details-btn"' in page.text
     assert 'id="load-sample-btn"' not in page.text
     assert 'id="load-kernes-sample-btn"' not in page.text
     assert 'id="currency-select"' not in page.text
@@ -52,8 +57,8 @@ def test_preview_serves_html_assets_and_demo_csv():
     assert "css/tokens.css" in styles.text
     for asset in (
         "app.js", "chart.js",
-        "js/api.js", "js/format.js", "js/insights.js", "js/predictions.js", "js/proposal.js", "js/render.js",
-        "css/tokens.css", "css/dashboard.css", "css/forms.css", "css/insights.css", "css/panels.css", "css/responsive.css",
+        "js/action_plan.js", "js/api.js", "js/csv.js", "js/format.js", "js/insights.js", "js/predictions.js", "js/proposal.js", "js/render.js",
+        "css/tokens.css", "css/dashboard.css", "css/forms.css", "css/insights.css", "css/panels.css", "css/progressive.css", "css/responsive.css",
     ):
         assert client.get(f"/assets/{asset}").status_code == 200, asset
     assert client.get("/demo/transactions.csv").status_code == 404
@@ -438,6 +443,7 @@ def test_remote_deployment_workflow():
 
     status, openapi = _http_call(base_url, "/openapi.json", ssl_ctx=ssl_ctx)
     assert status == 200
+    has_action_plan = "/api/action-plan" in openapi.get("paths", {})
     advice_props = openapi["components"]["schemas"]["AdviceRequest"]["properties"]
     uses_baseline_advice = "baseline" in advice_props
     advice_resp_props = openapi["components"]["schemas"]["AdviceResponse"]["properties"]
@@ -545,3 +551,39 @@ def test_remote_deployment_workflow():
             assert mv_body["proposal"] == body["proposal"]
             assert [d["balance_minor"] for d in mv_body["scenario"]["days"]] == move["expected_scenario_balances"]
             assert mv_body["scenario"]["first_deficit"] == move["expected_first_deficit"]
+
+        if has_action_plan:
+            ap_status, ap_body = _http_call(
+                base_url,
+                "/api/action-plan",
+                method="POST",
+                body=json.dumps(
+                    {
+                        "baseline": body["baseline"],
+                        "transactions": body["transactions"],
+                        "currency": body.get("currency", "EUR"),
+                        "profile": {
+                            "business_type": "Pizzeria / Restaurant",
+                            "goal": "Avoid running out of cash",
+                        },
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                ssl_ctx=ssl_ctx,
+                timeout=150,
+            )
+            if ap_status == 200:
+                if case["expected_proposal"] is None:
+                    assert ap_body["mode"] == "growth"
+                    assert all(s["email_draft"] is None for s in ap_body["steps"])
+                else:
+                    assert ap_body["mode"] == "survival"
+                    assert 1 <= len(ap_body["steps"]) <= 4
+                    if case["id"] == "amalfi_sample":
+                        counterparties = {s.get("counterparty") for s in ap_body["steps"] if s.get("counterparty")}
+                        assert "Pizzeria Amalfi Customers (Debit)" not in counterparties
+                        assert "Techniker Krankenkasse Social Health Fund" not in counterparties
+            elif require_advice:
+                pytest.fail(f"{case['id']} expected live /api/action-plan 200, got HTTP {ap_status}: {ap_body}")
+            else:
+                assert ap_status == 503

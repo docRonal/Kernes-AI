@@ -83,12 +83,11 @@ oc -n kernes-ai run model-check --rm -i --restart=Never \
 
 ## Deploy the live app
 
-Build the integrated Git commit, then rerun the app deployment with `CFO_MODE=live`. [openshift-template.yaml](openshift-template.yaml) already defaults `CFO_MODEL_URL` to the cluster's `kernes-qwen-7b` vLLM GPU endpoint and `CFO_FALLBACK_MODEL_URL` to the 8-thread `kernes-qwen` CPU service. If your endpoint or MLflow tracking server requires authentication, create the `autonomous-cfo-model` Secret in the team namespace with `CFO_MODEL_TOKEN` (and optional `MLFLOW_TRACKING_TOKEN`) before the rollout, and optionally set `MLFLOW_TRACKING_URI` to record LLM latency and grounding telemetry.
+Build the integrated Git commit, then rerun the app deployment with `CFO_MODE=live`. [openshift-template.yaml](openshift-template.yaml) already defaults `CFO_MODEL_URL` to the cluster's `kernes-qwen-7b` vLLM GPU endpoint and `CFO_FALLBACK_MODEL_URL` to the 8-thread `kernes-qwen` CPU service, so the command below leaves them out; an unset shell variable passed with `-p` would replace those defaults. Add `-p "CFO_MODEL_URL=..." -p "CFO_MODEL_NAME=..."` only to use another endpoint. If your endpoint or MLflow tracking server requires authentication, create the `autonomous-cfo-model` Secret in the team namespace with `CFO_MODEL_TOKEN` (and optional `MLFLOW_TRACKING_TOKEN`) before the rollout, and optionally set `MLFLOW_TRACKING_URI` to record LLM latency and grounding telemetry.
 
 ```sh
 oc process --local -f deploy/openshift-template.yaml \
-  -p "APP_IMAGE=${APP_IMAGE}" -p CFO_MODE=live \
-  -p "CFO_MODEL_URL=${CFO_MODEL_URL}" -p "CFO_MODEL_NAME=${CFO_MODEL_NAME}" |
+  -p "APP_IMAGE=${APP_IMAGE}" -p CFO_MODE=live |
   oc -n kernes-ai apply -f -
 oc -n kernes-ai rollout status deployment/autonomous-cfo
 ```

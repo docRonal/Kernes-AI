@@ -1,7 +1,7 @@
 # Implementation Plan — Chat-First Guided CFO + Advanced Dashboard (`16h Sprint`)
 
 ## Goal Description
-Feedback from the Red Hat / Commerzbank review showed that while the engineering stack (`kernes-qwen-7b` on OpenShift AI vLLM GPU, 161+ passing tests, deterministic integer math, 4 autonomy boundaries) is solid, **non-technical SME owners ("Luigi the pizzeria owner") cannot see immediate practical value** when greeted by a cold CSV upload form followed by 8+ analytical widgets.
+Feedback from the Red Hat / Commerzbank review showed that while the engineering stack (`kernes-qwen-7b` on OpenShift AI vLLM GPU, 170 passing tests, deterministic integer math, 4 autonomy boundaries) is solid, **non-technical SME owners ("Luigi the pizzeria owner") cannot see immediate practical value** when greeted by a cold CSV upload form followed by 8+ analytical widgets.
 
 Instead of rewriting our working backend or changing the tech stack with **16 hours remaining**, we will wrap our existing deterministic engines in a **Chat-First Guided Experience (default)** with a one-click **`More details · Advanced CFO`** toggle that reveals the full analytical dashboard:
 
@@ -26,7 +26,7 @@ Instead of rewriting our working backend or changing the tech stack with **16 ho
 - Keep the original Red Hat `demo/pizzeria_amalfi_sample.csv` untouched.
 - Add **only 1 new backend endpoint** (`POST /api/action-plan`) that composes existing calculators, filters actions by `actionability`, and reuses our existing `ModelConfig` + `cited_amounts` grounding + fallback pipeline.
 - Keep all existing dashboard DOM IDs (`#results`, `#compare-card`, `#health-stress-grid`, `#anomalies-card`, etc.) intact inside the **Advanced CFO** view so zero existing functionality or tests break.
-- **Demo framing (known payments scenario):** `EUR 5,000.00` on `2025-06-22` is a demo scenario assumption (the reconstructed balance from the full historical statement on that date was `−EUR 8,848.69`). The current dashboard computes balances from operations already present in the CSV for the forecast dates, so on the demo we present this honestly as a **scenario with known/scheduled payments**. A separate historical-only forecast was validated in Jupyter (tables in **PR #17**).
+- **Demo framing (known payments scenario):** `EUR 5,000.00` on `2025-06-22` is a demo scenario assumption (the reconstructed balance from the full historical statement on that date was `−EUR 8,848.69`). When the CSV already lists operations for the forecast dates, the dashboard uses them as known payments, so on the demo we present this honestly as a **scenario with known/scheduled payments**. When the forecast starts after the statement ends, `backend/history_forecast.py` learns it from history only: the default one-click sample forecasts 1–14 January 2026 from the full 2025 statement, and the same rule is backtested in **PR #17**.
 - **Ask CFO scope:** Current `/api/ask-cfo` modifies/shifts existing scheduled payments rather than adding new capex transactions — therefore use *"What happens if a selected client pays 3 days later?"* instead of *"Can I buy a €3,000 oven?"*.
 - **Branch discipline (`main` via PR only — NO direct push / NO force-push):** Strongly requested: merge all branches into `main` **only via Pull Request** and never force-push to `main` (GitHub branch protection settings are currently restricted to the repository owner `docRonal`).
 
