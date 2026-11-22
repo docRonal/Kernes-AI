@@ -47,8 +47,9 @@ def test_preview_serves_html_assets_and_demo_csv():
     assert 'id="business-type-input"' in page.text
     assert 'id="business-goal-input"' in page.text
     assert 'id="action-plan-steps"' in page.text
-    assert 'id="advanced-details-section"' in page.text
-    assert 'id="toggle-all-details-btn"' in page.text
+    assert 'id="workspace-nav"' in page.text
+    assert 'id="ws-view-all-btn"' in page.text
+    assert 'id="forecast-intel"' in page.text
     assert 'id="load-sample-btn"' not in page.text
     assert 'id="load-kernes-sample-btn"' not in page.text
     assert 'id="currency-select"' not in page.text
@@ -57,8 +58,8 @@ def test_preview_serves_html_assets_and_demo_csv():
     assert "css/tokens.css" in styles.text
     for asset in (
         "app.js", "chart.js",
-        "js/action_plan.js", "js/api.js", "js/csv.js", "js/format.js", "js/insights.js", "js/predictions.js", "js/proposal.js", "js/render.js",
-        "css/tokens.css", "css/dashboard.css", "css/forms.css", "css/insights.css", "css/panels.css", "css/progressive.css", "css/responsive.css",
+        "js/action_plan.js", "js/api.js", "js/csv.js", "js/format.js", "js/insights.js", "js/predictions.js", "js/proposal.js", "js/render.js", "js/workspace.js",
+        "css/tokens.css", "css/dashboard.css", "css/forms.css", "css/insights.css", "css/panels.css", "css/progressive.css", "css/workspace.css", "css/responsive.css",
     ):
         assert client.get(f"/assets/{asset}").status_code == 200, asset
     assert client.get("/demo/transactions.csv").status_code == 404

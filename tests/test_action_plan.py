@@ -305,3 +305,34 @@ def test_action_plan_backward_compat_and_live_503_when_model_missing(live, monke
     err = unconfigured_client.post("/api/action-plan", json=payload)
     assert err.status_code == 503
     assert "unavailable" in err.json()["detail"].lower()
+
+
+def test_action_plan_uses_grounded_ai_suggested_questions_and_filters_hallucinations(live):
+    peak = _forecast_json(DEMO / "credit_peak_case.csv", "100000", "2026-11-23")
+    payload = {
+        "baseline": peak["baseline"],
+        "transactions": peak["transactions"],
+        "currency": "EUR",
+        "profile": {"business_type": "Bakery", "goal": "Smooth out supplier bills"},
+    }
+    live_answer = {
+        "headline": "Collect EUR 1,000.00 early to clear the EUR 700.00 dip",
+        "summary": (
+            "Cash dips by EUR 200.00 on Tuesday, November 24 and reaches -EUR 700.00 on Thursday, November 26. "
+            "Ask Client invoice to settle early."
+        ),
+        "email_draft": "",
+        "suggested_questions": [
+            "What if Equipment payment is delayed by 4 days?",
+            "What if Utility bill jumps by EUR 9,999.00?",  # hallucinated amount -> must be filtered out
+            "How much cash buffer covers Thursday, November 26?",
+        ],
+    }
+    live_client, _fake = live([live_answer])
+    resp = live_client.post("/api/action-plan", json=payload)
+    assert resp.status_code == 200, resp.text
+    questions = resp.json()["suggested_questions"]
+    assert questions == [
+        "What if Equipment payment is delayed by 4 days?",
+        "How much cash buffer covers Thursday, November 26?",
+    ]

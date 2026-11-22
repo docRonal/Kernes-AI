@@ -56,6 +56,19 @@ export async function resolveForecast({
   return response.json();
 }
 
+export async function requestForecastAnalysis({
+  csvFile,
+  openingBalanceMinor,
+  startDate,
+}) {
+  const formData = new FormData();
+  formData.set("file", csvFile, csvFile.name);
+  formData.set("starting_balance_minor", String(openingBalanceMinor));
+  formData.set("start_date", startDate);
+  const response = await request("/api/forecast-analysis", { method: "POST", body: formData });
+  return response.json();
+}
+
 async function post(path, body) {
   const response = await request(path, {
     method: "POST",

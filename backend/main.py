@@ -12,6 +12,7 @@ from .advice import check_ai_health, get_advice, predict_delays, send_reminder, 
 from .advisory_extras import compare_financing_options, detect_anomalies
 from .consultant import ask_cfo, credit_check
 from .forecast import AMALFI_DEMO_FILE, get_decision, get_forecast
+from .forecast_analysis import get_forecast_analysis
 from .insights import optimize_payments, stress_test
 from .models import (
     ActionPlanRequest,
@@ -28,6 +29,8 @@ from .models import (
     DecisionRequest,
     DecisionResponse,
     DelayPredictResponse,
+    ForecastAnalysisRequest,
+    ForecastAnalysisResponse,
     ForecastRequest,
     ForecastResponse,
     InsightRequest,
@@ -96,6 +99,15 @@ def create_app(mode: str | None = None) -> FastAPI:
             start_date=request.start_date,
             move_transaction_id=request.move_transaction_id,
             move_to_date=request.move_to_date,
+        )
+
+    @app.post("/api/forecast-analysis", response_model=ForecastAnalysisResponse)
+    async def forecast_analysis(request: Annotated[ForecastAnalysisRequest, File()]) -> ForecastAnalysisResponse:
+        return await get_forecast_analysis(
+            mode=mode,
+            file=request.file,
+            starting_balance_minor=request.starting_balance_minor,
+            start_date=request.start_date,
         )
 
     @app.post("/api/decision", response_model=DecisionResponse)

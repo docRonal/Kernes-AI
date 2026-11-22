@@ -386,3 +386,54 @@ class ActionPlanResponse(BaseModel):
     suggested_questions: list[str]
     model: str
     latency_ms: NonNegativeInt | None
+
+
+class ForecastAnalysisRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    file: UploadFile
+    starting_balance_minor: int
+    start_date: date = Field(le=date.max - timedelta(days=HORIZON_DAYS - 1))
+
+
+class ForecastPatternRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    counterparty: str
+    direction: Literal["inflow", "outflow"]
+    category: TransactionCategory
+    cadence: str
+    occurrences: PositiveInt
+    typical_amount_minor: NonNegativeInt
+    regularity: str
+    avg_delay_days: NonNegativeInt = 0
+    max_delay_days: NonNegativeInt = 0
+
+
+class ChartDriver(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    date: date
+    kind: Literal["drop", "spike", "low", "milestone"]
+    amount_minor: StrictInt
+    label: str
+    note: str
+
+
+class ForecastAnalysisResponse(BaseModel):
+    """Full-year pattern, delay, seasonality, and AI forecast commentary grounded in calculated facts."""
+
+    model_config = ConfigDict(extra="forbid")
+    currency: CurrencyCode = "EUR"
+    history_span_days: NonNegativeInt
+    transactions_analyzed: NonNegativeInt
+    months_analyzed: NonNegativeInt
+    daily_volatility_minor: NonNegativeInt = 0
+    trend_note: str | None = None
+    seasonality_note: str | None = None
+    weekend_lift_note: str | None = None
+    closure_months: list[str] = Field(default_factory=list)
+    trend_summary: str = Field(min_length=1)
+    ai_callouts: list[str] = Field(default_factory=list)
+    chart_drivers: list[ChartDriver] = Field(default_factory=list)
+    patterns: list[ForecastPatternRow] = Field(default_factory=list)
+    ai_error: str | None = None
+    model: str
+    latency_ms: NonNegativeInt | None

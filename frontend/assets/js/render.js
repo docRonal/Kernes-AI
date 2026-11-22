@@ -1,6 +1,12 @@
-import { renderCashflowChart } from "../chart.js?v=history-chart";
+import { renderCashflowChart } from "../chart.js?v=tc34";
 import { printDate, printMoney, replayFade } from "./format.js?v=tc10";
-import { buildForwardForecast, buildStressCurve, buildWindowStressCurve } from "./predictions.js?v=history-chart";
+import {
+  buildBackendForwardOverlay,
+  buildConfidenceSeries,
+  buildForwardForecast,
+  buildProjectedStressCurve,
+  mapOverlayToProjectedDays,
+} from "./predictions.js?v=tc34";
 import { groupTransactionsByDate } from "./proposal.js?v=tc10";
 
 export function renderKpis(state) {
@@ -117,46 +123,98 @@ export function renderLedgerAndChart(state) {
   const estimatedFromHistory = forecast.forecast_basis === "history";
   const historyDays = estimatedFromHistory ? forecast.history_days ?? [] : [];
 
-  const shortfallEl = document.querySelector("#shortfall");
-  shortfallEl.textContent = estimatedFromHistory
-    ? "Hover or tap a day to see its balance and any estimated payments."
-    : baseline.first_deficit
-      ? "Red dots mark days below zero. Hover or tap any day to see the payments."
-      : "Your balance stays at or above zero every day. Hover or tap any day for details.";
+  const hasRecordedHistory = estimatedFromHistory && historyDays.length > 0;
+  const showHistoryForecast = hasRecordedHistory && state.showForecast;
+  const historyOnlyView = hasRecordedHistory && !state.showForecast;
 
-  const forecastDays = !estimatedFromHistory && state.showForecast
-    ? buildForwardForecast(baseline.days, forecast.transactions, 14).days
+  const shortfallEl = document.querySelector("#shortfall");
+  shortfallEl.textContent = historyOnlyView
+    ? 'Showing your last 14 recorded days. Click "Project +14d" to view the next 14 projected days.'
+    : estimatedFromHistory
+      ? "Hover or tap a day to see its balance and projected payments."
+      : baseline.first_deficit
+        ? "Red dots mark days below zero. Hover or tap any day to see the payments."
+        : "Your balance stays at or above zero every day. Hover or tap any day for details.";
+
+  const volatilityMinor = state.forecastAnalysis?.daily_volatility_minor ?? 0;
+  // For history-based statements (e.g. Pizzeria Amalfi), baseline.days IS the +14d projection;
+  // only scheduled statements need a separate forwardPack continuation.
+  const forwardPack = !hasRecordedHistory && state.showForecast
+    ? buildBackendForwardOverlay(baseline.days, state.forwardForecast, volatilityMinor) ||
+      buildForwardForecast(baseline.days, forecast.transactions, 14, volatilityMinor)
     : null;
-  const buildStress = estimatedFromHistory ? buildWindowStressCurve : buildStressCurve;
-  const stressDays = state.showStress ? buildStress(baseline.days, forecast.transactions) : null;
-  const whatIfDays = state.whatIfOverlay?.days ?? null;
+  let forecastDays = forwardPack?.days ?? null;
+  const forwardTransactions = forwardPack?.transactions ?? [];
+  if (forwardTransactions.length > 0) {
+    const forwardByDate = groupTransactionsByDate(forwardTransactions);
+    for (const [iso, list] of forwardByDate.entries()) {
+      if (!txByDate.has(iso)) {
+        txByDate.set(iso, list);
+      }
+    }
+  }
+
+  let chartHistoryDays = showHistoryForecast ? historyDays : [];
+  let chartBaselineDays = historyOnlyView ? historyDays : baseline.days;
+  let chartEstimatedFlag = showHistoryForecast;
+  if (showHistoryForecast) {
+    const anchorBal = historyDays[historyDays.length - 1].balance_minor;
+    chartBaselineDays = buildConfidenceSeries(baseline.days, anchorBal, baseline.days, volatilityMinor);
+  }
+
+  const driversByDate = new Map(
+    (state.forecastAnalysis?.chart_drivers || []).map((drv) => [drv.date, drv]),
+  );
+
+  // Under ALL circumstances, every simulation overlay (Stress, What-If, If paid earlier, Safety buffer)
+  // is mapped strictly onto the 14 projected days AFTER the blue vertical divider.
+  const projectedTargetDays = showHistoryForecast ? chartBaselineDays : forecastDays;
+  const projectedTargetTxs = showHistoryForecast ? forecast.transactions : forwardTransactions;
+  const hasProjectedZone = Boolean(projectedTargetDays?.length);
+
+  const stressDays = hasProjectedZone && state.showStress
+    ? buildProjectedStressCurve(projectedTargetDays, projectedTargetTxs, forecast.transactions)
+    : null;
+  const scenarioDays = hasProjectedZone && scenario
+    ? mapOverlayToProjectedDays(baseline.days, scenario.days, projectedTargetDays)
+    : null;
+  const whatIfDays = hasProjectedZone && state.whatIfOverlay?.days
+    ? mapOverlayToProjectedDays(baseline.days, state.whatIfOverlay.days, projectedTargetDays)
+    : null;
   const whatIfLabel = state.whatIfOverlay?.label ?? "What-if";
 
-  document.querySelector("#legend-history").hidden = historyDays.length === 0;
-  document.querySelector("#legend-baseline-key").classList.toggle("key-estimate", estimatedFromHistory);
-  document.querySelector("#legend-baseline-label").textContent =
-    estimatedFromHistory ? "Estimated forecast" : "Your cash";
-  document.querySelector("#legend-forecast").hidden = !forecastDays;
-  document.querySelector("#legend-scenario").hidden = !scenario;
+  document.querySelector("#legend-history").hidden = !showHistoryForecast;
+  const baselineKey = document.querySelector("#legend-baseline-key");
+  baselineKey.className = showHistoryForecast ? "dot dot-forecast" : "dot dot-baseline";
+  document.querySelector("#legend-baseline-label").textContent = showHistoryForecast
+    ? `Projected +${baseline.days.length}d`
+    : historyOnlyView
+      ? "Recorded balance"
+      : "Your cash";
+  document.querySelector("#legend-forecast").hidden = hasRecordedHistory || !forecastDays;
+  document.querySelector("#legend-scenario").hidden = !scenarioDays;
   document.querySelector("#legend-whatif").hidden = !whatIfDays;
   const whatIfLegendLabel = document.querySelector("#legend-whatif-label");
   if (whatIfLegendLabel) whatIfLegendLabel.textContent = whatIfLabel;
   document.querySelector("#legend-stress").hidden = !stressDays;
-  document.querySelector("#legend-facility").hidden = !(simulationDecision === "approved" && proposal);
+  document.querySelector("#legend-facility").hidden =
+    !hasProjectedZone || !(simulationDecision === "approved" && proposal);
   const clearOverlayBtn = document.querySelector("#clear-whatif-overlay-btn");
   if (clearOverlayBtn) clearOverlayBtn.hidden = !whatIfDays;
 
   renderCashflowChart(document.querySelector("#chart-container"), {
-    historyDays,
-    estimatedFromHistory,
-    baselineDays: baseline.days,
-    scenarioDays: scenario ? scenario.days : null,
+    historyDays: chartHistoryDays,
+    estimatedFromHistory: chartEstimatedFlag,
+    baselineLabel: historyOnlyView ? "Recorded balance" : null,
+    baselineDays: chartBaselineDays,
+    scenarioDays,
     decisionDays: simulationOutcome?.days ?? null,
     forecastDays,
     whatIfDays,
     whatIfLabel,
     stressDays,
     transactionsByDate: txByDate,
+    driversByDate,
     firstDeficitDate: proposal?.firstDeficit.date ?? null,
     peakDeficitDate: proposal?.peakDeficit.date ?? null,
     facilityLimitMinor: simulationOutcome?.limit_minor ?? proposal?.recommendedLimitMinor ?? 0,

@@ -53,6 +53,10 @@ _ACTION_PLAN_SCHEMA = {
         "headline": {"type": "string"},
         "summary": {"type": "string"},
         "email_draft": {"type": "string"},
+        "suggested_questions": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
     },
     "required": ["headline", "summary", "email_draft"],
 }
@@ -62,7 +66,7 @@ _SYSTEM_PROMPT = (
     "All numbers, dates, counterparties, and action steps are already calculated by the backend. "
     "Use ONLY the exact amounts, dates, and names listed in the Facts section. "
     "Never invent figures, fees, dates, or counterparties, and never use finance jargon unless quoting a supplied fact. "
-    'No markdown. Reply with JSON: {"headline": "...", "summary": "...", "email_draft": "..."}.'
+    'No markdown. Reply with JSON: {"headline": "...", "summary": "...", "email_draft": "...", "suggested_questions": ["...", "...", "..."]}.'
 )
 
 
@@ -117,22 +121,82 @@ def _template_email_draft(
     )
 
 
-def _suggested_questions(plan_mode: str, currency: str) -> list[str]:
-    if currency == "EUR":
-        oven_amt = "€3,000"
-    else:
-        oven_amt = f"{currency} 3,000"
-    if plan_mode == "survival":
-        return [
-            "What is the riskiest day in this forecast?",
-            "What happens if a client pays 3 days late?",
-            "Which regular bills leave even if sales slow down?",
-        ]
-    return [
-        f"Can I safely spend {oven_amt} on new equipment?",
-        "What happens to my cash if sales drop or payments are delayed?",
-        "Which day has the lowest cash balance?",
+def _suggested_questions(
+    plan_mode: str,
+    currency: str,
+    *,
+    transactions: list[Transaction] | None = None,
+    window_start=None,
+    window_end=None,
+    business_type: str = "",
+) -> list[str]:
+    in_window = [
+        tx
+        for tx in (transactions or [])
+        if (window_start is None or tx.date >= window_start)
+        and (window_end is None or tx.date <= window_end)
     ]
+    top_outflow = min((tx for tx in in_window if tx.amount_minor < 0), key=lambda t: t.amount_minor, default=None)
+    top_inflow = max((tx for tx in in_window if tx.amount_minor > 0), key=lambda t: t.amount_minor, default=None)
+
+    if plan_mode == "survival":
+        questions = ["What is the riskiest day in this forecast?"]
+        if top_inflow is not None:
+            party = (top_inflow.counterparty or top_inflow.label)[:40]
+            questions.append(f"What if {party} pays 3 days late?")
+        else:
+            questions.append("What happens if a client pays 3 days late?")
+        if top_outflow is not None:
+            party = (top_outflow.counterparty or top_outflow.label)[:40]
+            questions.append(f"What if {party} is 10% higher?")
+        else:
+            questions.append("Which regular bills leave even if sales slow down?")
+        return questions
+
+    oven_amt = "€3,000" if currency == "EUR" else f"{currency} 3,000"
+    questions = [
+        f"Can I safely spend {oven_amt} on new equipment?"
+        if not business_type or "small business" in business_type.lower()
+        else f"Can my {business_type.lower()[:32]} safely spend {oven_amt} right now?"
+    ]
+    if top_inflow is not None:
+        party = (top_inflow.counterparty or top_inflow.label)[:40]
+        questions.append(f"What happens if {party} arrives 4 days late?")
+    else:
+        questions.append("What happens to my cash if sales drop or payments are delayed?")
+    if top_outflow is not None:
+        party = (top_outflow.counterparty or top_outflow.label)[:40]
+        questions.append(f"What if {party} increases by 20%?")
+    else:
+        questions.append("Which day has the lowest cash balance?")
+    return questions
+
+
+def _clean_suggested_questions(
+    raw: object,
+    allowed_minor: frozenset[int],
+    fallback: list[str],
+) -> list[str]:
+    if not isinstance(raw, list):
+        return fallback
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        q = _clean_prompt_text(item)
+        if not q or len(q) > 120:
+            continue
+        if any(amt not in allowed_minor for amt in cited_amounts(q)):
+            continue
+        key = q.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(q)
+        if len(cleaned) == 3:
+            break
+    return cleaned if len(cleaned) >= 2 else fallback
 
 
 def build_action_plan(*, mode: str, request: ActionPlanRequest) -> ActionPlanResponse:
@@ -366,7 +430,14 @@ def build_action_plan(*, mode: str, request: ActionPlanRequest) -> ActionPlanRes
         )
 
     steps = [step.model_copy(update={"step_number": idx}) for idx, step in enumerate(steps_raw, start=1)]
-    questions = _suggested_questions(plan_mode, request.currency)
+    questions = _suggested_questions(
+        plan_mode,
+        request.currency,
+        transactions=request.transactions,
+        window_start=request.baseline.days[0].date,
+        window_end=request.baseline.days[-1].date,
+        business_type=request.profile.business_type,
+    )
 
     if mode == "demo":
         return ActionPlanResponse(
@@ -419,8 +490,10 @@ def build_action_plan(*, mode: str, request: ActionPlanRequest) -> ActionPlanRes
 
     task_instruction = (
         "Write JSON with keys headline (under 14 words), summary (2-3 plain-English sentences tailored to this "
-        "owner's business and goal using ONLY exact amounts and dates from the facts above), and email_draft "
-        "(either a polite <70 word email matching template_draft with zero credit/facility/shortfall terms, or empty string if none needed)."
+        "owner's business and goal using ONLY exact amounts and dates from the facts above), email_draft "
+        "(either a polite <70 word email matching template_draft with zero credit/facility/shortfall terms, or empty string if none needed), "
+        "and suggested_questions (array of 3 concise plain-English what-if questions this owner could ask next about their real payments/dates, "
+        "using ONLY figures from the facts above or no specific numbers)."
     )
     messages = [
         {"role": "system", "content": _SYSTEM_PROMPT},
@@ -452,6 +525,11 @@ def build_action_plan(*, mode: str, request: ActionPlanRequest) -> ActionPlanRes
             llm_headline = parsed.get("headline")
             llm_summary = parsed.get("summary")
             llm_email = parsed.get("email_draft", "")
+            llm_questions = _clean_suggested_questions(
+                parsed.get("suggested_questions"),
+                allowed_minor,
+                questions,
+            )
 
             if not isinstance(llm_headline, str) or not llm_headline.strip():
                 problem = "missing headline"
@@ -498,7 +576,7 @@ def build_action_plan(*, mode: str, request: ActionPlanRequest) -> ActionPlanRes
                 headline=llm_headline.strip(),
                 summary=llm_summary.strip(),
                 steps=updated_steps,
-                suggested_questions=questions,
+                suggested_questions=llm_questions,
                 model=config.name,
                 latency_ms=latency,
             )
