@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/styles.css?v=tc28">
-  <script type="module" src="/assets/app.js?v=tc28"></script>
+  <link rel="stylesheet" href="/assets/styles.css?v=tc34">
+  <script type="module" src="/assets/app.js?v=tc34"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -297,7 +297,7 @@
               <div class="chart-controls">
                 <div class="chart-pills-row">
                   <div class="overlay-pills" role="group" aria-label="Chart projections and overlays">
-                    <button type="button" class="overlay-pill is-active" id="toggle-forecast-btn" aria-pressed="true">Project +14d</button>
+                    <button type="button" class="overlay-pill" id="toggle-forecast-btn" aria-pressed="false">Project +14d</button>
                     <button type="button" class="overlay-pill" id="toggle-stress-btn" aria-pressed="false">Stress test</button>
                     <button type="button" class="overlay-pill is-clear" id="clear-whatif-overlay-btn" hidden>Clear what-if ×</button>
                   </div>
@@ -309,7 +309,7 @@
               <div class="chart-legend" aria-label="Chart legend">
                 <span class="legend-item" id="legend-history" hidden><i class="key-history"></i>Recorded balance</span>
                 <span class="legend-item"><i class="dot dot-baseline" id="legend-baseline-key"></i><span id="legend-baseline-label">Your cash</span></span>
-                <span class="legend-item" id="legend-forecast"><i class="dot dot-forecast"></i>Extra 14-day projection</span>
+                <span class="legend-item" id="legend-forecast"><i class="dot dot-forecast"></i>Projected +14d</span>
                 <span class="legend-item" id="legend-scenario" hidden><i class="dot dot-scenario"></i>If paid earlier</span>
                 <span class="legend-item" id="legend-whatif" hidden><i class="dot dot-whatif"></i><span id="legend-whatif-label">What-if</span></span>
                 <span class="legend-item" id="legend-stress" hidden><i class="dot dot-stress"></i>Stress case</span>
@@ -318,6 +318,37 @@
             </div>
 
             <div class="chart-wrapper" id="chart-container" aria-label="Cash balance graph"></div>
+
+            <div class="forecast-intel" id="forecast-intel" hidden>
+              <div class="forecast-intel-head">
+                <div class="forecast-intel-title-wrap">
+                  <span class="eyebrow-dot">Forecast Intelligence</span>
+                  <span class="forecast-intel-meta" id="forecast-intel-meta"></span>
+                </div>
+                <span class="forecast-intel-model" id="forecast-intel-model"></span>
+              </div>
+              <p class="forecast-intel-summary" id="forecast-intel-summary"></p>
+              <div class="forecast-intel-callouts" id="forecast-intel-callouts"></div>
+              <details class="forecast-patterns-details" id="forecast-patterns-details" hidden>
+                <summary class="forecast-patterns-summary" id="forecast-patterns-summary">
+                  Detected recurring schedules &amp; payment regularity
+                </summary>
+                <div class="patterns-table-wrap">
+                  <table class="patterns-table">
+                    <thead>
+                      <tr>
+                        <th>Counterparty</th>
+                        <th>Schedule</th>
+                        <th>Observed</th>
+                        <th class="num-col">Typical amount</th>
+                        <th>Timing &amp; delays</th>
+                      </tr>
+                    </thead>
+                    <tbody id="forecast-patterns-tbody"></tbody>
+                  </table>
+                </div>
+              </details>
+            </div>
           </section>
 
           <!-- Briefing & Tailored Action Plan -->

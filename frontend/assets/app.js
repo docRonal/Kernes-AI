@@ -8,12 +8,13 @@ import {
   requestCompareOptions,
   requestCreditCheck,
   requestDecision,
+  requestForecastAnalysis,
   requestOptimizePayments,
   requestPredictDelays,
   requestSendReminder,
   requestStressTest,
   resolveForecast,
-} from "./js/api.js?v=tc16";
+} from "./js/api.js?v=tc31";
 import { renderActionPlan } from "./js/action_plan.js?v=tc28";
 import { extractCsvDefaults } from "./js/csv.js?v=1";
 import { printDate, printMoney, replayFade, toMinor } from "./js/format.js?v=tc11";
@@ -31,7 +32,7 @@ import {
   renderStressTest,
   resetInsightsUi,
 } from "./js/insights.js?v=tc25";
-import { buildWhatIfCurve, addDaysIso } from "./js/predictions.js?v=history-chart";
+import { buildWhatIfCurve, addDaysIso } from "./js/predictions.js?v=tc34";
 import { readProposal } from "./js/proposal.js?v=tc11";
 import {
   buildReminderTemplate,
@@ -39,17 +40,19 @@ import {
   renderKpis,
   renderLedgerAndChart,
   renderProposalPanel,
-} from "./js/render.js?v=history-chart";
+} from "./js/render.js?v=tc34";
 import {
   buildCombinedWhatIfOverlay,
   createWorkspaceController,
   initAffordSandbox,
   renderActiveSimsBar,
   renderCashBreakdown,
+  renderForecastIntelligence,
   renderSignalStripBase,
   renderSmartCalendar,
+  resetForecastIntelligence,
   updateSignalStripInsights,
-} from "./js/workspace.js?v=tc27";
+} from "./js/workspace.js?v=tc31";
 
 const HORIZON_DAYS = 14;
 const AMALFI_OPENING_BALANCE_MINOR = 3_326_635;
@@ -150,6 +153,10 @@ const state = {
     experience_level: "beginner",
   },
   forecast: null,
+  forwardForecast: null,
+  forwardRequestId: 0,
+  forecastAnalysis: null,
+  forecastAnalysisRequestId: 0,
   proposal: null,
   advice: null,
   advicePreviewOnly: false,
@@ -158,7 +165,7 @@ const state = {
   insightsRequestId: 0,
   simulationDecision: null,
   simulationOutcome: null,
-  showForecast: true,
+  showForecast: false,
   showStress: false,
   whatIfOverlay: null,
   plannedPurchases: [],
@@ -178,6 +185,10 @@ function showStatus(message, isError = false) {
 
 function showSetupScreen() {
   state.forecast = null;
+  state.forwardForecast = null;
+  state.forecastAnalysis = null;
+  state.forecastAnalysisRequestId += 1;
+  resetForecastIntelligence();
   state.proposal = null;
   state.advice = null;
   state.adviceRequestId += 1;
@@ -240,6 +251,14 @@ function syncSimulationsAndRender() {
     if (whatIfChartBanner) whatIfChartBanner.hidden = false;
   } else if (whatIfChartBanner) {
     whatIfChartBanner.hidden = true;
+  }
+  if (
+    state.forecast &&
+    !state.showForecast &&
+    (state.whatIfOverlay || state.forecast.scenario || state.showStress || state.simulationDecision === "approved")
+  ) {
+    setForecastOverlay(true);
+    ensureForwardForecast();
   }
   if (state.forecast) renderAll();
 }
@@ -528,10 +547,14 @@ async function runBaselineForecast({ customOpeningMinor = null } = {}) {
     if (inlineBalanceForm) inlineBalanceForm.hidden = true;
     if (editBalanceBtn) editBalanceBtn.hidden = false;
     state.forecast = data;
-    const estimatedFromHistory = data.forecast_basis === "history";
-    setForecastOverlay(!estimatedFromHistory);
-    toggleForecastBtn.hidden = estimatedFromHistory;
-    toggleForecastBtn.disabled = estimatedFromHistory;
+    state.forwardForecast = null;
+    state.forwardRequestId += 1;
+    state.forecastAnalysis = null;
+    state.forecastAnalysisRequestId += 1;
+    resetForecastIntelligence();
+    setForecastOverlay(false);
+    toggleForecastBtn.hidden = false;
+    toggleForecastBtn.disabled = false;
     state.adviceRequestId += 1;
     adviceLoading.hidden = true;
     adviceError.hidden = true;
@@ -568,6 +591,7 @@ async function runBaselineForecast({ customOpeningMinor = null } = {}) {
     showStatus("");
     renderAll();
 
+    loadForecastAnalysis();
     const insightsPromise = loadInsights();
     const advicePromise = state.proposal
       ? fetchAdvice({ forceDraft: false })
@@ -754,9 +778,61 @@ function setForecastOverlay(enabled) {
   toggleForecastBtn.setAttribute("aria-pressed", String(enabled));
 }
 
+async function loadForecastAnalysis() {
+  if (!state.forecast || !state.csvFile) return null;
+  const reqId = ++state.forecastAnalysisRequestId;
+  try {
+    const analysis = await requestForecastAnalysis({
+      csvFile: state.csvFile,
+      openingBalanceMinor: state.openingBalanceMinor,
+      startDate: state.startDate,
+    });
+    if (reqId !== state.forecastAnalysisRequestId || !state.forecast) return null;
+    state.forecastAnalysis = analysis;
+    renderForecastIntelligence(analysis);
+    renderLedgerAndChart(state);
+    return analysis;
+  } catch {
+    return null;
+  }
+}
+
+async function ensureForwardForecast() {
+  if (
+    !state.forecast ||
+    state.forecast.forecast_basis === "history" ||
+    state.forwardForecast ||
+    !state.csvFile
+  ) {
+    return;
+  }
+  const days = state.forecast.baseline?.days || [];
+  const lastDay = days[days.length - 1];
+  if (!lastDay) return;
+
+  const reqId = ++state.forwardRequestId;
+  try {
+    const nextForecast = await resolveForecast({
+      csvFile: state.csvFile,
+      openingBalanceMinor: lastDay.balance_minor,
+      startDate: addDaysIso(lastDay.date, 1),
+    });
+    if (reqId !== state.forwardRequestId || !state.forecast) return;
+    state.forwardForecast = nextForecast;
+    if (state.showForecast) renderLedgerAndChart(state);
+  } catch {
+    // Fallback client-side projection remains displayed cleanly if backend continuation isn't applicable.
+  }
+}
+
 toggleForecastBtn.addEventListener("click", () => {
   setForecastOverlay(!state.showForecast);
-  if (state.forecast) renderLedgerAndChart(state);
+  if (state.forecast) {
+    renderLedgerAndChart(state);
+    if (state.showForecast) {
+      ensureForwardForecast();
+    }
+  }
 });
 
 toggleStressBtn?.addEventListener("click", () => {
@@ -983,7 +1059,7 @@ async function simulateDecision(decision) {
     state.simulationDecision = outcome.decision;
     state.simulationOutcome = outcome;
     showStatus("");
-    renderAll();
+    syncSimulationsAndRender();
     return outcome;
   } catch (error) {
     if (state.forecast?.baseline === baseline) showStatus(error.message, true);

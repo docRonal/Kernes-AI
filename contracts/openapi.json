@@ -86,6 +86,44 @@
         }
       }
     },
+    "/api/forecast-analysis": {
+      "post": {
+        "summary": "Forecast Analysis",
+        "operationId": "forecast_analysis_api_forecast_analysis_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ForecastAnalysisRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastAnalysisResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/decision": {
       "post": {
         "summary": "Decision",
@@ -1033,6 +1071,47 @@
         ],
         "title": "AskResponse"
       },
+      "ChartDriver": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "drop",
+              "spike",
+              "low",
+              "milestone"
+            ],
+            "title": "Kind"
+          },
+          "amount_minor": {
+            "type": "integer",
+            "title": "Amount Minor"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "date",
+          "kind",
+          "amount_minor",
+          "label",
+          "note"
+        ],
+        "title": "ChartDriver"
+      },
       "CompareOptionsRequest": {
         "properties": {
           "baseline": {
@@ -1502,6 +1581,255 @@
         ],
         "title": "FinancingOption"
       },
+      "ForecastAnalysisRequest": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "starting_balance_minor": {
+            "type": "integer",
+            "title": "Starting Balance Minor"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "file",
+          "starting_balance_minor",
+          "start_date"
+        ],
+        "title": "ForecastAnalysisRequest"
+      },
+      "ForecastAnalysisResponse": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "enum": [
+              "EUR",
+              "PLN",
+              "CHF",
+              "USD",
+              "GBP",
+              "CZK",
+              "SEK",
+              "DKK",
+              "HUF",
+              "RON",
+              "BGN",
+              "NOK"
+            ],
+            "title": "Currency",
+            "default": "EUR"
+          },
+          "history_span_days": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "History Span Days"
+          },
+          "transactions_analyzed": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Transactions Analyzed"
+          },
+          "months_analyzed": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Months Analyzed"
+          },
+          "daily_volatility_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Daily Volatility Minor",
+            "default": 0
+          },
+          "trend_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trend Note"
+          },
+          "seasonality_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seasonality Note"
+          },
+          "weekend_lift_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekend Lift Note"
+          },
+          "closure_months": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Closure Months"
+          },
+          "trend_summary": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Trend Summary"
+          },
+          "ai_callouts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ai Callouts"
+          },
+          "chart_drivers": {
+            "items": {
+              "$ref": "#/components/schemas/ChartDriver"
+            },
+            "type": "array",
+            "title": "Chart Drivers"
+          },
+          "patterns": {
+            "items": {
+              "$ref": "#/components/schemas/ForecastPatternRow"
+            },
+            "type": "array",
+            "title": "Patterns"
+          },
+          "ai_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Error"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "history_span_days",
+          "transactions_analyzed",
+          "months_analyzed",
+          "trend_summary",
+          "model",
+          "latency_ms"
+        ],
+        "title": "ForecastAnalysisResponse",
+        "description": "Full-year pattern, delay, seasonality, and AI forecast commentary grounded in calculated facts."
+      },
+      "ForecastPatternRow": {
+        "properties": {
+          "counterparty": {
+            "type": "string",
+            "title": "Counterparty"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "inflow",
+              "outflow"
+            ],
+            "title": "Direction"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "retail_card",
+              "card_acquirer",
+              "b2b_client",
+              "b2b_supplier",
+              "rent",
+              "owner_draw",
+              "staff_payroll",
+              "tax_social",
+              "utility",
+              "other"
+            ],
+            "title": "Category"
+          },
+          "cadence": {
+            "type": "string",
+            "title": "Cadence"
+          },
+          "occurrences": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Occurrences"
+          },
+          "typical_amount_minor": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Typical Amount Minor"
+          },
+          "regularity": {
+            "type": "string",
+            "title": "Regularity"
+          },
+          "avg_delay_days": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Avg Delay Days",
+            "default": 0
+          },
+          "max_delay_days": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Max Delay Days",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "counterparty",
+          "direction",
+          "category",
+          "cadence",
+          "occurrences",
+          "typical_amount_minor",
+          "regularity"
+        ],
+        "title": "ForecastPatternRow"
+      },
       "ForecastRequest": {
         "properties": {
           "file": {
@@ -1572,6 +1900,34 @@
             "title": "Currency",
             "default": "EUR"
           },
+          "forecast_basis": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "history"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Basis"
+          },
+          "history_days": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DailyBalance"
+                },
+                "type": "array",
+                "maxItems": 14
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "History Days",
+            "description": "End-of-day balances reconstructed from recorded movements and the supplied opening balance."
+          },
           "transactions": {
             "items": {
               "$ref": "#/components/schemas/Transaction"
@@ -1608,34 +1964,6 @@
                 "type": "null"
               }
             ]
-          },
-          "forecast_basis": {
-            "anyOf": [
-              {
-                "type": "string",
-                "const": "history"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Forecast Basis"
-          },
-          "history_days": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/DailyBalance"
-                },
-                "type": "array",
-                "maxItems": 14
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "History Days",
-            "description": "End-of-day balances reconstructed from recorded movements and the supplied opening balance."
           }
         },
         "additionalProperties": false,

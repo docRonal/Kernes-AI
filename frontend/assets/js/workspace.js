@@ -817,7 +817,7 @@ export function renderActiveSimsBar(state, callbacks = {}) {
       kind: "sim-stress",
       enabled: true,
       label: "Stress test",
-      amount: "−15% in / +10% out",
+      amount: "Receipts +5d late / +10% costs",
       onToggle: () => callbacks.onRemoveStress?.(),
       onRemove: () => callbacks.onRemoveStress?.(),
     });
@@ -1054,4 +1054,114 @@ export function initAffordSandbox({ getState, onAddPurchase, onJumpToChart, onJu
   }
 
   return { syncDateBounds };
+}
+
+/* --------------------------------------------------------------------------
+   7. Full-Year Forecast Intelligence & Recurring Pattern Table
+   -------------------------------------------------------------------------- */
+export function resetForecastIntelligence() {
+  const wrap = document.querySelector("#forecast-intel");
+  if (wrap) wrap.hidden = true;
+}
+
+export function renderForecastIntelligence(analysis) {
+  const wrap = document.querySelector("#forecast-intel");
+  const metaEl = document.querySelector("#forecast-intel-meta");
+  const modelEl = document.querySelector("#forecast-intel-model");
+  const summaryEl = document.querySelector("#forecast-intel-summary");
+  const calloutsEl = document.querySelector("#forecast-intel-callouts");
+  const detailsEl = document.querySelector("#forecast-patterns-details");
+  const detailsSummaryEl = document.querySelector("#forecast-patterns-summary");
+  const tbodyEl = document.querySelector("#forecast-patterns-tbody");
+
+  if (!wrap || !analysis) {
+    if (wrap) wrap.hidden = true;
+    return;
+  }
+
+  const currency = analysis.currency || "EUR";
+  const spanDays = Number(analysis.history_span_days || 0);
+  const txCount = Number(analysis.transactions_analyzed || 0);
+  const months = Number(analysis.months_analyzed || 0);
+  const vol = Number(analysis.daily_volatility_minor || 0);
+
+  if (metaEl) {
+    const parts = [
+      `${txCount.toLocaleString()} transactions`,
+      `${spanDays}d history${months >= 2 ? ` (${months} mo)` : ""}`,
+    ];
+    if (vol > 0) parts.push(`±${printMoney(vol, currency)}/day swing`);
+    metaEl.textContent = parts.join(" · ");
+  }
+
+  if (modelEl) {
+    const m = analysis.model || "demo-deterministic";
+    const ms = Number.isFinite(analysis.latency_ms) && analysis.latency_ms > 0 ? ` · ${analysis.latency_ms}ms` : "";
+    if (m === "demo-deterministic") {
+      modelEl.textContent = "Full-year pattern engine";
+    } else if (m === "deterministic-fallback") {
+      modelEl.textContent = "Pattern engine (AI offline)";
+    } else {
+      modelEl.textContent = `AI · ${m}${ms}`;
+    }
+    modelEl.classList.toggle("is-live-ai", m !== "demo-deterministic" && m !== "deterministic-fallback");
+  }
+
+  if (summaryEl) {
+    summaryEl.textContent = analysis.trend_summary || "";
+  }
+
+  if (calloutsEl) {
+    const items = (analysis.ai_callouts || []).slice(0, 4);
+    calloutsEl.replaceChildren(
+      ...items.map((text) => el("span", "intel-callout-chip", text)),
+    );
+    calloutsEl.hidden = items.length === 0;
+  }
+
+  const patterns = analysis.patterns || [];
+  if (detailsEl && tbodyEl) {
+    if (patterns.length === 0) {
+      detailsEl.hidden = true;
+      tbodyEl.replaceChildren();
+    } else {
+      detailsEl.hidden = false;
+      if (detailsSummaryEl) {
+        detailsSummaryEl.textContent = `Inspect ${patterns.length} detected recurring schedules & payment regularity`;
+      }
+      const rows = patterns.map((p) => {
+        const tr = document.createElement("tr");
+
+        const cpTd = document.createElement("td");
+        const dirBadge = el(
+          "span",
+          `pattern-dir-dot ${p.direction === "inflow" ? "is-in" : "is-out"}`,
+        );
+        dirBadge.setAttribute("aria-hidden", "true");
+        cpTd.append(dirBadge, document.createTextNode(p.counterparty));
+
+        const cadTd = el("td", "pattern-cadence-cell", p.cadence);
+        const obsTd = el("td", "pattern-obs-cell", `${p.occurrences}×`);
+
+        const amtTd = el(
+          "td",
+          `num-col pattern-amt-cell ${p.direction === "inflow" ? "pos" : "neg"}`,
+          `${p.direction === "inflow" ? "+" : "−"}${printMoney(p.typical_amount_minor, currency)}`,
+        );
+
+        const regTd = document.createElement("td");
+        const hasDelay = Number(p.max_delay_days || 0) > 0;
+        regTd.append(
+          el("span", `delay-pill ${hasDelay ? "is-drift" : "is-ontime"}`, p.regularity),
+        );
+
+        tr.append(cpTd, cadTd, obsTd, amtTd, regTd);
+        return tr;
+      });
+      tbodyEl.replaceChildren(...rows);
+    }
+  }
+
+  wrap.hidden = false;
+  replayFade(wrap);
 }
