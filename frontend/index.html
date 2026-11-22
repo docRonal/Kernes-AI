@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/styles.css?v=tc34">
-  <script type="module" src="/assets/app.js?v=tc34"></script>
+  <link rel="stylesheet" href="/assets/styles.css?v=tc35">
+  <script type="module" src="/assets/app.js?v=tc35"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -257,6 +257,13 @@
                 <span class="ws-tab-badge" id="ws-badge-health" hidden></span>
               </span>
               <span class="ws-tab-sub">Score, stress &amp; checks</span>
+            </button>
+            <button type="button" role="tab" class="ws-tab" id="ws-tab-agents" data-workspace="agents" aria-selected="false" aria-controls="ws-panel-agents">
+              <span class="ws-tab-top">
+                <span class="ws-tab-title">CFO Agents &amp; MCP</span>
+                <span class="ws-tab-badge is-ok" id="ws-badge-agents">4</span>
+              </span>
+              <span class="ws-tab-sub">FX, Tax, Yield &amp; MCP</span>
             </button>
           </div>
           <button type="button" class="ws-view-all-btn" id="ws-view-all-btn" aria-pressed="false">
@@ -872,6 +879,14 @@
             </div>
             <div id="anomalies-list" class="anomalies-list"></div>
           </section>
+        </div>
+
+        <!-- ================================================================
+             WORKSPACE 5: AUTONOMOUS CFO AGENT SUITE & MCP INSPECTOR
+             ================================================================ -->
+        <div class="workspace-panel" id="ws-panel-agents" data-workspace-panel="agents" role="tabpanel" aria-labelledby="ws-tab-agents" hidden>
+          <div class="workspace-section-divider">Autonomous CFO Suite &amp; MCP</div>
+          <div id="cfo-suite-container"></div>
         </div>
       </div>
     </main>

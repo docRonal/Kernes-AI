@@ -75,6 +75,11 @@ Look at his tailored **Action Plan**. Under the hood, our deterministic **Transa
 **Spoken (EN):**
 "Here, a user can stress-test what happens if a key incoming payment slips by 3 days—plotting the shifted curve directly onto the forecast chart without touching the baseline—compare financing options side-by-side with transparent estimated fees, or check their **Cash Health Score** and worst-case stress buffer."
 
+> **[Драйвер за ноутбуком · 15-sec Wow-Callout:]** Клікнути вкладку **`CFO Agents & MCP`** (`#ws-tab-agents`), показати всі 4 картки агентів (Liquidity, FX Hedging, Tax & Reserve, Investment & Capex) і клікнути **`Run via MCP`** на одному інструменті в **MCP Tool Inspector**, щоб показати живий JSON-RPC 2.0 запит до `/mcp`.
+
+**Spoken (EN, ~15 s):**
+"And right here in **CFO Agents & MCP**, all four Challenge Card agents—Liquidity, FX Hedging, Tax Reserves, and Investment—work together deterministically, and every single tool is exposed over a live **Model Context Protocol (MCP) JSON-RPC 2.0 server** (`/mcp`) so any Red Hat OpenShift AI agent can call them directly."
+
 ---
 
 ## Block 4 (3:10–4:00) — Technical Architecture & Zero-Hallucination Trust
